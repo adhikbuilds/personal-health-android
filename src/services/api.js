@@ -18,14 +18,16 @@ import {
     API_TIMEOUT,
 } from '../constants';
 
-// On Android phone: use proxy (avoids Windows Firewall).
+// On Android phone: use proxy (avoids Windows Firewall & AP isolation).
 // On iOS simulator / browser: hit FastAPI directly.
 export const API_BASE = Platform.OS === 'android'
     ? BASE_FROM_CONSTANTS                        // http://BACKEND_HOST:8083
     : `http://localhost:${FASTAPI_PORT}`;        // Direct (emulator/browser)
 
+// WebSocket through the Node.js proxy to avoid AP isolation on university networks.
+// Proxy rewrites ws://HOST:8083/ws/rppg/... → ws://localhost:8082/rppg/...
 const WS_BASE_RESOLVED = Platform.OS === 'android'
-    ? WS_FROM_CONSTANTS                          // ws://BACKEND_HOST:8082
+    ? `ws://${BACKEND_HOST}:${PROXY_PORT}/ws`    // ws://BACKEND_HOST:8083/ws (proxied)
     : `ws://localhost:${FASTAPI_PORT}`;
 
 // ─── Core fetch helper ───────────────────────────────────────────────────────
@@ -96,24 +98,29 @@ export const api = {
         body: JSON.stringify({ image_b64: imageB64 }),
     }),
 
-    /** Dashboard: get all currently active sessions to auto-connect WebSocket */
-    getActiveSessions: () => fetchJSON('/sessions/active'),
-
     /**
-     * rPPG heart rate: send a camera frame for server-side CHROM processing.
-     * Returns { frame: { face_found, signal_quality }, result: { bpm, hrv_ms } }
+     * rPPG heart rate: connect raw Edge AI WebSocket stream for ultra-low latency.
+     * Streams numerical R/G/B data directly. No Base64, no HTTP lag.
+     * Receives continuous computed metrics in return.
      */
-    sendRPPGFrame: (sessionId, imageB64, timestamp) => {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 6000);
-        return fetch(`${API_BASE}/rppg/frame`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: sessionId, image_b64: imageB64, timestamp }),
-            signal: controller.signal,
-        })
-            .then(res => { clearTimeout(timer); return res.ok ? res.json() : null; })
-            .catch(() => { clearTimeout(timer); return null; });
+    connectRPPGLiveStream: (sessionId, onMessage, onError, onClose) => {
+        const wsUrl = `${WS_BASE_RESOLVED}/rppg/live-stream/${sessionId}`;
+        console.log(`[WS-RPPG] Connecting: ${wsUrl}`);
+
+        const ws = new WebSocket(wsUrl);
+        ws.onopen  = () => console.log(`[WS-RPPG] Connected: session ${sessionId}`);
+        ws.onmessage = (e) => {
+            try { onMessage(JSON.parse(e.data)); } catch (_) {}
+        };
+        ws.onerror = (e) => {
+            console.warn('[WS-RPPG] Error:', e.message);
+            if (onError) onError(e);
+        };
+        ws.onclose = () => {
+            console.log('[WS-RPPG] Closed');
+            if (onClose) onClose();
+        };
+        return ws;
     },
 
     /** End session, returns summary with avg_form_score, xp_earned, etc. */

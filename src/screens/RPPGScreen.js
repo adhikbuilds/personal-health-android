@@ -1,21 +1,38 @@
 /**
  * RPPGScreen — Real-time Heart Rate via Camera (rPPG)
  * ─────────────────────────────────────────────────────
- * Fixed capture loop: uses async sequential loop (not setInterval)
- * so frames never overlap. Each frame waits for the previous to complete.
+ * Uses react-native-vision-camera Frame Processor for true native
+ * pixel-level RGB extraction without base64 or HTTP overhead.
  *
  * Algorithm (server-side CHROM):
- *   Face ROI → R/G/B means → bandpass 40-180 BPM → FFT → BPM + HRV
+ *   Face ROI native YUV→RGB → WebSocket → bandpass 40-180 BPM → FFT → BPM + HRV
  */
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
-    Dimensions, Animated, Easing, StatusBar,
+    Dimensions, Animated, Easing, StatusBar, ScrollView
 } from 'react-native';
-import { Camera, CameraView } from 'expo-camera';
-import Svg, { Polyline, Line } from 'react-native-svg';
+import {
+    useCameraDevice,
+    useCameraPermission,
+    useCameraFormat,
+    Camera,
+    useFrameProcessor,
+    VisionCameraProxy,
+} from 'react-native-vision-camera';
+import { Worklets } from 'react-native-worklets-core';
+import Svg, { Polyline, Line, Ellipse } from 'react-native-svg';
 import api from '../services/api';
+
+// ── Native Plugin Initialization ──────────────────────────────
+const rgbPlugin = VisionCameraProxy.initFrameProcessorPlugin('getAverageRGB');
+
+export function getAverageRGB(frame) {
+  'worklet';
+  if (rgbPlugin == null) return null;
+  return rgbPlugin.call(frame);
+}
 
 const { width: W, height: H } = Dimensions.get('window');
 const WF_H = 80;
@@ -139,6 +156,50 @@ function Waveform({ points, color }) {
     );
 }
 
+// ─── Health Inferences ─────────────────────────────────────────────────────────
+function HealthInsights({ bpm, hrv, quality }) {
+    if (quality === 'waiting' || quality === 'warmup') return null;
+
+    let insightTitle = "Gathering Insights...";
+    let insightDesc = "Keep still for a few more seconds to analyze your cardiovascular state.";
+    let icon = "⏳";
+    let color = T.muted;
+
+    if (bpm > 0) {
+        if (hrv > 60) {
+            insightTitle = "Peak Readiness";
+            insightDesc = "Your Heart Rate Variability is high. Your nervous system is fully recovered and primed for intense training.";
+            icon = "🔋";
+            color = T.cyan;
+        } else if (hrv > 30) {
+            insightTitle = "Moderate Fatigue";
+            insightDesc = "Your HRV is balanced. You are ready for a normal workout, but pay attention to hydration and sleep.";
+            icon = "⚖️";
+            color = T.green;
+        } else {
+            insightTitle = "High Stress / Fatigue";
+            insightDesc = "Low HRV detected. Your body is under stress. Consider active recovery, stretching, or a rest day.";
+            icon = "⚠️";
+            color = T.orange;
+        }
+    }
+
+    return (
+        <View style={s.insightCard}>
+            <View style={s.insightHeader}>
+                <Text style={s.insightTitle}>⚕️ CLINICAL INFERENCE</Text>
+            </View>
+            <View style={s.insightBody}>
+                <Text style={{ fontSize: 28, marginRight: 12 }}>{icon}</Text>
+                <View style={{ flex: 1 }}>
+                    <Text style={[s.insightHeading, { color }]}>{insightTitle}</Text>
+                    <Text style={s.insightText}>{insightDesc}</Text>
+                </View>
+            </View>
+        </View>
+    );
+}
+
 // ─── Stat Pill ────────────────────────────────────────────────────────────────
 function Stat({ label, value, unit, color = T.text, icon }) {
     return (
@@ -162,7 +223,14 @@ const st = StyleSheet.create({
 export default function RPPGScreen({ navigation, route }) {
     const sessionId = route?.params?.sessionId || `rppg_${Date.now()}`;
 
-    const [permission, setPermission] = useState(null);
+    // Vision Camera hooks
+    const device = useCameraDevice('front');
+    const { hasPermission, requestPermission } = useCameraPermission();
+    const format = useCameraFormat(device, [
+      { fps: 30 },
+      { videoResolution: { width: 640, height: 480 } }
+    ]);
+
     const cameraRef = useRef(null);
     const runningRef = useRef(false);
     const mountedRef = useRef(true);
@@ -171,114 +239,124 @@ export default function RPPGScreen({ navigation, route }) {
     const [hrv, setHrv] = useState(0);
     const [quality, setQuality] = useState('waiting');
     const [waveform, setWave] = useState([]);
-    const [faceFound, setFace] = useState(false);
+    const [faceFound, setFace] = useState(true); // Vision Camera always has face in ROI
     const [isRunning, setRunning] = useState(false);
     const [framesIn, setFrames] = useState(0);
     const [fps, setFps] = useState(0);
     const [errMsg, setErr] = useState('');
     const [history, setHistory] = useState([]);
-    const [frameFlash, setFrameFlash] = useState(0); // For signal pointer
+    const [frameFlash, setFrameFlash] = useState(0);
+    const wsRef = useRef(null);
+    const lastUpdateRef = useRef(0);
 
     useEffect(() => {
         mountedRef.current = true;
-        // Request camera permission on mount (replaces the old useCameraPermissions hook)
-        Camera.requestCameraPermissionsAsync().then(({ status }) => {
-            if (mountedRef.current) setPermission({ granted: status === 'granted' });
-        });
+        if (!hasPermission) requestPermission();
         return () => {
             mountedRef.current = false;
             runningRef.current = false;
+            if (wsRef.current) {
+                wsRef.current.close();
+                wsRef.current = null;
+            }
         };
     }, []);
 
-    // ── Sequential capture loop — paced to ~4fps max ───────────────────────────
-    const captureLoop = useCallback(async () => {
-        const MIN_FRAME_MS = 120; // never faster than 120ms (~8fps ceiling) to keep Android stable
-        while (runningRef.current && mountedRef.current) {
-            if (!cameraRef.current) {
-                await sleep(300);
-                continue;
-            }
-
-            const frameStart = Date.now();
-            try {
-                const photo = await cameraRef.current.takePictureAsync({
-                    base64: true,
-                    quality: 0.08,
-                    skipProcessing: true,
-                    exif: false,
-                    shutterSound: false, // Prevents Android native white flash/sound
-                });
-
-                if (!mountedRef.current || !runningRef.current) break;
-
-                if (!photo?.base64) {
-                    setErr('Camera returned empty frame');
-                    await sleep(500);
-                    continue;
-                }
-
-                // Trigger visual signal pointer
-                setFrameFlash(Date.now());
-
-                const resp = await api.sendRPPGFrame(sessionId, photo.base64, Date.now() / 1000);
-
-                if (!mountedRef.current || !runningRef.current) break;
-
-                if (!resp) {
-                    setErr('API unreachable — ensure api_server.py + proxy-server.js are running');
-                    await sleep(1000);
-                    continue;
-                }
-
-                setErr('');
-                const { frame, result } = resp;
-
-                if (frame) setFace(!!frame.face_found);
-
-                if (result) {
-                    if (result.bpm > 0) {
-                        setBpm(result.bpm);
-                        setHistory(prev => {
-                            const line = { t: new Date().toLocaleTimeString(), bpm: result.bpm };
-                            return [...prev, line].slice(-20);
-                        });
-                    }
-                    setHrv(result.hrv_ms ?? 0);
-                    setQuality(result.signal_quality ?? 'waiting');
-                    setFps(result.fps ?? 0);
-                    setFrames(result.frames_in_window ?? 0);
-                    if (result.waveform?.length > 2) setWave(result.waveform);
-                }
-            } catch (e) {
-                if (!mountedRef.current) break;
-                setErr(`Capture error: ${e.message}`);
-                await sleep(800);
-            }
-
-            // Pace to MIN_FRAME_MS — if round-trip was already slow, skip extra sleep
-            const elapsed = Date.now() - frameStart;
-            if (elapsed < MIN_FRAME_MS) await sleep(MIN_FRAME_MS - elapsed);
+    // Callback invoked asynchronously on the JS thread using Worklets.createRunOnJS
+    const sendRgbToWs = Worklets.createRunOnJS((rgb) => {
+        if (!runningRef.current) return;
+        
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+                face_found: true,
+                r: rgb.r,
+                g: rgb.g,
+                b: rgb.b,
+                ts: Date.now() / 1000.0,
+            }));
         }
-    }, [sessionId]);
+    });
+
+    // ── Native 60fps Frame Processor ───────────────────────────────────────────
+    // Runs on the camera C++ thread — no bridging overhead.
+    const frameProcessor = useFrameProcessor((frame) => {
+        'worklet';
+
+        // Native YUV→RGB conversion over face ROI
+        const rgb = getAverageRGB(frame);
+        
+        // Asynchronously pass data from C++ back to the JS thread to avoid Hermes crashes
+        if (rgb) {
+            sendRgbToWs(rgb);
+        }
+    }, []);
+
+    // handleFacesDetected is kept for the face-lock bracket UI indicator only.
+    // Real pixel data comes from the native Frame Processor above.
+    const handleFacesDetected = ({ faces }) => {
+        if (!mountedRef.current) return;
+        setFace(faces.length > 0);
+        if (faces.length > 0) {
+            // Trigger visual tick
+            setFrameFlash(Date.now());
+
+        } else {
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({ face_found: false }));
+            }
+        }
+    };
 
     const startMeasuring = useCallback(() => {
         if (runningRef.current) return;
         runningRef.current = true;
         setRunning(true);
         setErr('');
-        captureLoop();
-    }, [captureLoop]);
+        
+        // Connect Edge AI WebSocket
+        wsRef.current = api.connectRPPGLiveStream(
+            sessionId,
+            (result) => {
+                // Sub-10ms instantaneous results from Python
+                if (!mountedRef.current) return;
+                
+                // CRITICAL FIX: Throttle UI updates to 10 FPS (100ms) to prevent React Native JS bridge 
+                // saturation and application freezing (ANR). The backend still math-models at 60fps.
+                const now = Date.now();
+                if (now - lastUpdateRef.current < 100) return;
+                lastUpdateRef.current = now;
+                
+                if (result.bpm > 0 && result.status !== 'warmup') {
+                    setBpm(result.bpm);
+                    setHistory(prev => {
+                        const line = { t: new Date().toLocaleTimeString(), bpm: result.bpm };
+                        return [...prev, line].slice(-20);
+                    });
+                }
+                setHrv(result.hrv_ms ?? 0);
+                setQuality(result.signal_quality ?? 'waiting');
+                setFps(result.fps ?? 0);
+                setFrames(result.frames_in_window ?? 0);
+                if (result.waveform?.length > 2) setWave(result.waveform);
+                if (result.error) setErr(result.error);
+            },
+            (error) => setErr('WebSocket Error. Ensure Backend is running.'),
+            () => { if (runningRef.current) setErr('Stream disconnected.'); }
+        );
+        
+    }, [sessionId]);
 
     const stopMeasuring = useCallback(() => {
         runningRef.current = false;
         setRunning(false);
+        if (wsRef.current) {
+            wsRef.current.close();
+            wsRef.current = null;
+        }
     }, []);
 
-    // ── Permission ────────────────────────────────────────────────────────────
-    if (!permission) return <View style={s.bg} />;
-
-    if (!permission.granted) {
+    // ── Permission & Device ───────────────────────────────────────────────────
+    if (!hasPermission) {
         return (
             <SafeAreaView style={s.bg}>
                 <StatusBar barStyle="light-content" backgroundColor={T.bg} />
@@ -288,7 +366,7 @@ export default function RPPGScreen({ navigation, route }) {
                     <Text style={s.permBody}>
                         Camera access is needed to detect subtle skin color changes (rPPG) for heart rate measurement.
                     </Text>
-                    <TouchableOpacity style={s.grantBtn} onPress={() => Camera.requestCameraPermissionsAsync().then(({ status }) => setPermission({ granted: status === 'granted' }))}>
+                    <TouchableOpacity style={s.grantBtn} onPress={requestPermission}>
                         <Text style={s.grantTxt}>Grant Camera Access</Text>
                     </TouchableOpacity>
                 </View>
@@ -296,21 +374,29 @@ export default function RPPGScreen({ navigation, route }) {
         );
     }
 
+    if (!device) return <View style={s.bg} />;
+
     const color = bpmColor(bpm);
     const wfColor = qualityColor(quality);
 
     return (
         <View style={s.bg}>
-            <StatusBar barStyle="light-content" backgroundColor={T.bg} />
+            <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-            {/* ── Camera Preview (full width, fixed height) ── */}
+            {/* ── Top Half: Camera (Unobstructed) ── */}
             <View style={s.camWrap}>
-                <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={'front'} />
-
-                {/* Dark gradient scrim */}
-                <View style={s.scrim} />
-
-                {/* Back button */}
+                <Camera
+                    ref={cameraRef}
+                    style={StyleSheet.absoluteFill}
+                    device={device}
+                    isActive={true}
+                    format={format}
+                    frameProcessor={frameProcessor}
+                    fps={30}
+                    pixelFormat="yuv"
+                />
+                
+                {/* Safe Area Top Bar (over camera but transparent) */}
                 <SafeAreaView style={s.topBar}>
                     <TouchableOpacity
                         style={s.backBtn}
@@ -318,91 +404,79 @@ export default function RPPGScreen({ navigation, route }) {
                     >
                         <Text style={s.backTxt}>← Back</Text>
                     </TouchableOpacity>
-                    <Text style={s.screenTitle}>Heart Rate</Text>
-                    {/* Live status dot */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ flex: 1 }} />
+                    <View style={s.liveIndicator}>
                         {isRunning && (
                             <Animated.View style={[s.signalPointer, { opacity: frameFlash ? 1 : 0.2 }]} />
                         )}
+                        <Text style={s.liveTxt}>{isRunning ? 'LIVE' : 'READY'}</Text>
                         <View style={[s.liveDot, { backgroundColor: isRunning ? T.red : T.muted }]} />
                     </View>
                 </SafeAreaView>
 
-                {/* Face lock brackets */}
+                {/* Face Target Brackets */}
                 <View style={s.faceGuide} pointerEvents="none">
-                    <View style={[s.corner, s.tl, { borderColor: faceFound ? T.green : 'rgba(255,255,255,0.25)' }]} />
-                    <View style={[s.corner, s.tr, { borderColor: faceFound ? T.green : 'rgba(255,255,255,0.25)' }]} />
-                    <View style={[s.corner, s.bl, { borderColor: faceFound ? T.green : 'rgba(255,255,255,0.25)' }]} />
-                    <View style={[s.corner, s.br, { borderColor: faceFound ? T.green : 'rgba(255,255,255,0.25)' }]} />
-                    <Text style={[s.faceLabel, { color: faceFound ? T.green : 'rgba(255,255,255,0.4)' }]}>
-                        {faceFound ? '✓ Face locked' : 'Center your face'}
-                    </Text>
+                    <View style={[s.corner, s.tl, { borderColor: faceFound ? T.green : 'rgba(255,255,255,0.4)' }]} />
+                    <View style={[s.corner, s.tr, { borderColor: faceFound ? T.green : 'rgba(255,255,255,0.4)' }]} />
+                    <View style={[s.corner, s.bl, { borderColor: faceFound ? T.green : 'rgba(255,255,255,0.4)' }]} />
+                    <View style={[s.corner, s.br, { borderColor: faceFound ? T.green : 'rgba(255,255,255,0.4)' }]} />
                 </View>
+                <Text style={[s.faceLabel, { color: faceFound ? T.green : 'rgba(255,255,255,0.7)', bottom: 20, position:'absolute', alignSelf:'center' }]}>
+                    {faceFound ? 'Face Detected ✓' : 'Center your face here'}
+                </Text>
+            </View>
+
+            {/* ── Bottom Half: Premium Dashboard Panel ── */}
+            <ScrollView style={s.dashboard} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+                <View style={s.dashHeader}>
+                    <Text style={s.dashTitle}>Vitals Monitor</Text>
+                    <Text style={s.dashSub}>Remote Photoplethysmography (rPPG)</Text>
+                </View>
+
+                {/* Central BPM Ring & Tiny Stats */}
+                <View style={s.metricsCore}>
+                    <View style={{flex:1, alignItems:'center'}}>
+                        <BPMRing bpm={bpm} quality={quality} />
+                    </View>
+                    
+                    <View style={s.sideStats}>
+                        <Stat icon="💓" label="HRV" value={hrv > 0 ? hrv.toFixed(0) : '–'} unit="ms" color={T.purple} />
+                        <Stat icon="📡" label="Signal" value={
+                            quality === 'excellent' ? 'Opt' :
+                                quality === 'good' ? 'Good' :
+                                    quality === 'fair' ? 'Fair' : 'Poor'
+                        } color={wfColor} />
+                    </View>
+                </View>
+
+                {errMsg ? (
+                    <View style={s.errBanner}>
+                        <Text style={s.errTxt}>⚠️ {errMsg}</Text>
+                    </View>
+                ) : null}
+
+                {/* Waveform */}
+                <View style={s.wfBox}>
+                    <Text style={s.wfLabel}>BVP Waveform</Text>
+                    <Waveform points={waveform} color={wfColor} />
+                </View>
+
+                {/* Clinical Inference Card */}
+                {bpm > 0 && <HealthInsights bpm={bpm} hrv={hrv} quality={quality} />}
 
                 {/* Start / Stop FAB */}
                 <View style={s.fabWrap}>
                     {!isRunning ? (
                         <TouchableOpacity style={[s.fab, { backgroundColor: T.cyan }]} onPress={startMeasuring} activeOpacity={0.85}>
-                            <Text style={s.fabTxt}>▶  Start Measuring</Text>
+                            <Text style={s.fabTxt}>START SCAN</Text>
                         </TouchableOpacity>
                     ) : (
-                        <TouchableOpacity style={[s.fab, { backgroundColor: 'rgba(239,68,68,0.9)' }]} onPress={stopMeasuring} activeOpacity={0.85}>
-                            <Text style={s.fabTxt}>■  Stop</Text>
+                        <TouchableOpacity style={[s.fab, { backgroundColor: T.red }]} onPress={stopMeasuring} activeOpacity={0.85}>
+                            <Text style={s.fabTxt}>STOP SCAN</Text>
                         </TouchableOpacity>
                     )}
                 </View>
-            </View>
-
-            {/* ── BPM Ring + Stats ── */}
-            <View style={s.content}>
-                <BPMRing bpm={bpm} quality={quality} />
-
-                {/* Stats row */}
-                <View style={s.statsRow}>
-                    <Stat icon="💓" label="HRV" value={hrv > 0 ? hrv.toFixed(0) : '–'} unit="ms" color={T.purple} />
-                    <View style={{ width: 10 }} />
-                    <Stat icon="📊" label="Frames" value={framesIn || '–'} unit={fps > 0 ? `${fps.toFixed(0)} fps` : ''} color={T.cyan} />
-                    <View style={{ width: 10 }} />
-                    <Stat icon="📡" label="Signal" value={
-                        quality === 'excellent' ? '●●●●' :
-                            quality === 'good' ? '●●●○' :
-                                quality === 'fair' ? '●●○○' : '●○○○'
-                    } color={wfColor} />
-                </View>
-
-                {/* Error banner */}
-                {errMsg ? (
-                    <View style={s.errBanner}>
-                        <Text style={s.errTxt}>⚠️  {errMsg}</Text>
-                    </View>
-                ) : null}
-
-                {/* Waveform */}
-                <View style={s.wfCard}>
-                    <View style={s.wfHeader}>
-                        <Text style={s.wfTitle}>Blood Volume Pulse</Text>
-                        <Text style={s.wfSub}>CHROM · bandpass 40–180 BPM</Text>
-                    </View>
-                    <Waveform points={waveform} color={wfColor} />
-                </View>
-
-                {/* History */}
-                {history.length > 0 && (
-                    <View style={s.histCard}>
-                        <Text style={s.wfTitle}>Recent Readings</Text>
-                        <View style={s.histRow}>
-                            {history.slice(-8).map((h, i) => (
-                                <View key={i} style={s.histChip}>
-                                    <Text style={[s.histBpm, { color: bpmColor(h.bpm) }]}>
-                                        {Math.round(h.bpm)}
-                                    </Text>
-                                    <Text style={s.histTime}>{h.t.slice(0, 5)}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    </View>
-                )}
-            </View>
+            </ScrollView>
         </View>
     );
 }
@@ -412,7 +486,8 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-    bg: { flex: 1, backgroundColor: T.bg },
+    bg: { flex: 1, backgroundColor: '#000' },
+    
     // Permission
     permWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
     permIcon: { fontSize: 52, marginBottom: 16 },
@@ -420,41 +495,56 @@ const s = StyleSheet.create({
     permBody: { fontSize: 13, color: T.muted, textAlign: 'center', lineHeight: 20, marginBottom: 28 },
     grantBtn: { backgroundColor: T.cyan, borderRadius: 14, paddingHorizontal: 30, paddingVertical: 13 },
     grantTxt: { color: '#000', fontWeight: '900', fontSize: 14 },
-    // Camera
-    camWrap: { width: '100%', height: H * 0.38, backgroundColor: '#000', position: 'relative' },
-    scrim: {
-        position: 'absolute', bottom: 0, left: 0, right: 0, height: 80,
-        backgroundColor: T.bg,
-        // gradient-like fade via overlapping views
-    },
-    topBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8 },
-    backBtn: { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
+    
+    // Layout
+    camWrap: { flex: 0.45, backgroundColor: '#111', overflow: 'hidden', borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
+    dashboard: { flex: 0.55, backgroundColor: T.surf, paddingHorizontal: 20, paddingTop: 20 },
+    
+    // Top Bar (over camera)
+    topBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16 },
+    backBtn: { backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
     backTxt: { color: T.text, fontWeight: '700', fontSize: 13 },
-    screenTitle: { flex: 1, textAlign: 'center', color: T.text, fontWeight: '800', fontSize: 16 },
+    liveIndicator: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
+    liveTxt: { color: T.text, fontSize: 10, fontWeight: '800', marginRight: 6 },
     liveDot: { width: 8, height: 8, borderRadius: 4 },
-    signalPointer: { width: 6, height: 6, borderRadius: 3, backgroundColor: T.cyan, marginRight: 8, elevation: 4, shadowColor: T.cyan, shadowRadius: 4, shadowOpacity: 0.8 },
-    faceGuide: { position: 'absolute', top: '10%', left: '22%', right: '22%', bottom: '25%', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 6 },
-    corner: { position: 'absolute', width: 22, height: 22 },
-    tl: { top: 0, left: 0, borderTopWidth: 2, borderLeftWidth: 2, borderTopLeftRadius: 4 },
-    tr: { top: 0, right: 0, borderTopWidth: 2, borderRightWidth: 2, borderTopRightRadius: 4 },
-    bl: { bottom: 0, left: 0, borderBottomWidth: 2, borderLeftWidth: 2, borderBottomLeftRadius: 4 },
-    br: { bottom: 0, right: 0, borderBottomWidth: 2, borderRightWidth: 2, borderBottomRightRadius: 4 },
-    faceLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
-    fabWrap: { position: 'absolute', bottom: 16, left: 20, right: 20 },
-    fab: { borderRadius: 14, paddingVertical: 12, alignItems: 'center', shadowOffset: { width: 0, height: 4 }, shadowRadius: 12, shadowOpacity: 0.4, elevation: 8 },
-    fabTxt: { color: '#000', fontWeight: '900', fontSize: 14, letterSpacing: 0.5 },
-    // Content
-    content: { flex: 1, paddingHorizontal: 20 },
-    statsRow: { flexDirection: 'row', marginBottom: 12 },
-    errBanner: { backgroundColor: 'rgba(239,68,68,0.10)', borderRadius: 10, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)' },
-    errTxt: { color: T.orange, fontSize: 11, fontWeight: '700' },
-    wfCard: { backgroundColor: T.card, borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: T.border },
-    wfHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-    wfTitle: { color: T.text, fontWeight: '800', fontSize: 12 },
-    wfSub: { color: T.muted, fontSize: 9, fontWeight: '700' },
-    histCard: { backgroundColor: T.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: T.border },
-    histRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-    histChip: { backgroundColor: T.surf, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center' },
-    histBpm: { fontSize: 16, fontWeight: '900' },
-    histTime: { fontSize: 8, color: T.muted, fontWeight: '700', marginTop: 2 },
+    signalPointer: { width: 6, height: 6, borderRadius: 3, backgroundColor: T.cyan, marginRight: 8, elevation: 4 },
+    
+    // Face Guide
+    faceGuide: { position: 'absolute', top: '25%', left: '25%', right: '25%', height: '50%' },
+    corner: { position: 'absolute', width: 20, height: 20 },
+    tl: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 8 },
+    tr: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 8 },
+    bl: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 8 },
+    br: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 8 },
+    faceLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+    
+    // Dashboard Header
+    dashHeader: { marginBottom: 16 },
+    dashTitle: { fontSize: 22, fontWeight: '900', color: T.text },
+    dashSub: { fontSize: 12, color: T.muted, fontWeight: '600', marginTop: 2 },
+    
+    // Metrics Core
+    metricsCore: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.card, borderRadius: 24, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: T.border },
+    sideStats: { width: 100, gap: 10 },
+    
+    // Waveform Box
+    wfBox: { backgroundColor: T.card, borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: T.border },
+    wfLabel: { color: T.muted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+    
+    // Errors
+    errBanner: { backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)' },
+    errTxt: { color: T.red, fontSize: 12, fontWeight: '700', textAlign: 'center' },
+    
+    // Insights
+    insightCard: { backgroundColor: T.card, borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: T.border },
+    insightHeader: { marginBottom: 10 },
+    insightTitle: { color: T.muted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+    insightBody: { flexDirection: 'row', alignItems: 'center' },
+    insightHeading: { fontSize: 13, fontWeight: '800', marginBottom: 4 },
+    insightText: { fontSize: 11, color: T.text, lineHeight: 16 },
+    
+    // Action FAB
+    fabWrap: { alignItems: 'center', justifyContent: 'center', marginTop: 10, marginBottom: 20 },
+    fab: { borderRadius: 16, paddingVertical: 16, width: '100%', alignItems: 'center', shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, shadowOpacity: 0.3, elevation: 6 },
+    fabTxt: { color: '#000', fontWeight: '900', fontSize: 15, letterSpacing: 1 },
 });

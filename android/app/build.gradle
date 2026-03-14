@@ -109,12 +109,12 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    // Force CMake 4.1.2 — CMake 3.22.1 has a known bug where it loops
-    // regenerating build.ninja ('still dirty after 100 tries') with
-    // react-native-vision-camera's C++ Frame Processor codegen.
+    // Pin CMake to 3.22.1 — the last version that does NOT loop regenerating
+    // build.ninja on Windows with react-native-vision-camera's C++ codegen.
+    // Versions above 3.22.x introduced Ninja regeneration logic that breaks on Windows paths.
     externalNativeBuild {
         cmake {
-            version "4.1.2"
+            version "3.22.1"
         }
     }
 
@@ -125,6 +125,12 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
+
+        // Restrict to arm64-v8a only to prevent cross-compile failures on Windows
+        // with LLVM when targeting x86/x86_64 from NDK 26+
+        ndk {
+            abiFilters "arm64-v8a"
+        }
     }
     signingConfigs {
         debug {

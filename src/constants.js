@@ -9,7 +9,7 @@
  */
 
 // Your machine's Wi-Fi IP on the local network
-export const BACKEND_HOST = '172.17.105.97';
+export const BACKEND_HOST = '10.194.109.98';
 
 // Use the frontend proxy (recommended — avoids Windows Firewall issues)
 export const PROXY_PORT = 8083;
