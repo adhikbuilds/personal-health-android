@@ -39,6 +39,9 @@
           "cameraPermission": "Allow ActiveBharat to use camera for AI biomechanics analysis."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "backendHost": "10.0.2.2"
+    }
   }
 }

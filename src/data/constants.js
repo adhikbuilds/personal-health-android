@@ -175,3 +175,264 @@ export const SPORT_LABELS = {
   javelin: 'Javelin',
   cricket_bat: 'Cricket',
 };
+
+// ─── Full Sports Library (Learn Sports) ──────────────────────────────────────
+export const SPORTS_LIBRARY = [
+  { id: 'athletics',    name: 'Athletics',     emoji: '🏃', color: '#f97316', videoCount: 28, category: 'track' },
+  { id: 'kabaddi',      name: 'Kabaddi',       emoji: '🤼', color: '#ef4444', videoCount: 22, category: 'combat' },
+  { id: 'wrestling',    name: 'Wrestling',     emoji: '🤼‍♂️', color: '#8b5cf6', videoCount: 18, category: 'combat' },
+  { id: 'kho_kho',      name: 'Kho-Kho',       emoji: '🏃‍♀️', color: '#06b6d4', videoCount: 16, category: 'team' },
+  { id: 'gymnastics',   name: 'Gymnastics',    emoji: '🤸', color: '#ec4899', videoCount: 24, category: 'track' },
+  { id: 'judo',         name: 'Judo',          emoji: '🥋', color: '#84cc16', videoCount: 20, category: 'combat' },
+  { id: 'table_tennis', name: 'Table Tennis',  emoji: '🏓', color: '#22c55e', videoCount: 19, category: 'court' },
+  { id: 'archery',      name: 'Archery',       emoji: '🏹', color: '#eab308', videoCount: 15, category: 'precision' },
+  { id: 'swimming',     name: 'Swimming',      emoji: '🏊', color: '#06b6d4', videoCount: 26, category: 'aquatic' },
+  { id: 'shooting',     name: 'Shooting',      emoji: '🎯', color: '#64748b', videoCount: 12, category: 'precision' },
+  { id: 'football',     name: 'Football',      emoji: '⚽', color: '#22c55e', videoCount: 32, category: 'team' },
+  { id: 'basketball',   name: 'Basketball',    emoji: '🏀', color: '#f97316', videoCount: 27, category: 'court' },
+  { id: 'badminton',    name: 'Badminton',     emoji: '🏸', color: '#06b6d4', videoCount: 34, category: 'court',
+    videos: [
+      { id: 'b1', title: 'How to Prepare to Return a Serve in Singles', duration: '4:12', youtubeId: 'WKb-FuwKHy8' },
+      { id: 'b2', title: 'How to Hit a Backhand Flick Serve',           duration: '3:45', youtubeId: 'Bq6HXQT2YQU' },
+      { id: 'b3', title: 'How to Hit a High Forehand Serve',            duration: '5:02', youtubeId: '6PBn2XK22yA' },
+      { id: 'b4', title: 'How to Hit a Low Forehand Serve',             duration: '3:30', youtubeId: 'wPzrfSWPy6g' },
+      { id: 'b5', title: 'How to Hit a Block Shot',                     duration: '4:55', youtubeId: 'Yz8P4YMEwJ4' },
+      { id: 'b6', title: 'How to Hit a Low Backhand Serve',             duration: '3:18', youtubeId: 'OwPWYb0mvpE' },
+      { id: 'b7', title: 'How to Defend a Smash',                       duration: '6:20', youtubeId: 'mhGj6BCflJE' },
+      { id: 'b8', title: 'How to Hit a Backhand Overhead Clear',        duration: '5:44', youtubeId: 'ixqKJGrNLb8' },
+    ],
+  },
+  { id: 'boxing',       name: 'Boxing',        emoji: '🥊', color: '#ef4444', videoCount: 21, category: 'combat' },
+  { id: 'lawn_tennis',  name: 'Lawn Tennis',   emoji: '🎾', color: '#84cc16', videoCount: 30, category: 'court' },
+  { id: 'volleyball',   name: 'Volleyball',    emoji: '🏐', color: '#eab308', videoCount: 17, category: 'team' },
+  { id: 'weightlifting',name: 'Weightlifting', emoji: '🏋️', color: '#8b5cf6', videoCount: 14, category: 'track' },
+  { id: 'hockey',       name: 'Hockey',        emoji: '🏑', color: '#06b6d4', videoCount: 23, category: 'team' },
+];
+
+// ─── Fitness Test Configuration ───────────────────────────────────────────────
+export const FITNESS_TEST_BANDS = [
+  { level: 1, label: 'Work Harder',   color: '#ef4444', minScore: 0,  maxScore: 14 },
+  { level: 2, label: 'Must Improve',  color: '#f97316', minScore: 14, maxScore: 28 },
+  { level: 3, label: 'Can do better', color: '#eab308', minScore: 28, maxScore: 43 },
+  { level: 4, label: 'Good',          color: '#84cc16', minScore: 43, maxScore: 57 },
+  { level: 5, label: 'Very Good',     color: '#22c55e', minScore: 57, maxScore: 71 },
+  { level: 6, label: 'Athletic',      color: '#06b6d4', minScore: 71, maxScore: 86 },
+  { level: 7, label: 'Excellent',     color: '#8b5cf6', minScore: 86, maxScore: 100 },
+];
+
+// Score BMI: 18.5–24.9 = 100pts, sliding penalty outside
+export function scoreBMI(bmi) {
+  if (bmi >= 18.5 && bmi <= 24.9) return 100;
+  if (bmi >= 17 && bmi < 18.5) return 70;
+  if (bmi > 24.9 && bmi <= 27.5) return 70;
+  if (bmi >= 15 && bmi < 17) return 40;
+  if (bmi > 27.5 && bmi <= 30) return 40;
+  return 10;
+}
+
+// Score Sit & Reach (cm) by age — general adult norms
+export function scoreSitReach(cm) {
+  if (cm >= 27) return 100;
+  if (cm >= 20) return Math.round(70 + ((cm - 20) / 7) * 30);
+  if (cm >= 10) return Math.round(30 + ((cm - 10) / 10) * 40);
+  if (cm >= 0)  return Math.round((cm / 10) * 30);
+  return 10; // negative reach
+}
+
+// Score 600M Run (seconds) — lower is better; 150s=excellent, 300s=poor
+export function score600MRun(seconds) {
+  if (seconds <= 150) return 100;
+  if (seconds <= 180) return Math.round(80 + ((180 - seconds) / 30) * 20);
+  if (seconds <= 240) return Math.round(50 + ((240 - seconds) / 60) * 30);
+  if (seconds <= 300) return Math.round(20 + ((300 - seconds) / 60) * 30);
+  return 10;
+}
+
+export function computeFitnessScore(bmi, sitReach_cm, run600_seconds) {
+  const bmiScore  = scoreBMI(bmi);
+  const flexScore = scoreSitReach(sitReach_cm);
+  const runScore  = score600MRun(run600_seconds);
+  const overall   = Math.round(bmiScore * 0.25 + flexScore * 0.35 + runScore * 0.40);
+  const band      = FITNESS_TEST_BANDS.find(b => overall >= b.minScore && overall < b.maxScore)
+                    || FITNESS_TEST_BANDS[FITNESS_TEST_BANDS.length - 1];
+  return {
+    overall,
+    level:    band.level,
+    label:    band.label,
+    color:    band.color,
+    bmiScore,
+    flexScore,
+    runScore,
+  };
+}
+
+// ─── Daily Tracker Defaults ──────────────────────────────────────────────────
+export const DAILY_TRACKER_DEFAULTS = {
+  steps:          { current: 5845,  goal: 12000, unit: 'steps',    icon: '👟', label: 'Steps' },
+  activeMin:      { current: 198,   goal: 60,    unit: 'min',      icon: '⏱️', label: 'Active Min' },
+  distanceKm:     { current: 3.25,  goal: 5,     unit: 'km',       icon: '📍', label: 'Distance' },
+  caloriesBurned: { current: 1412,  goal: 500,   unit: 'kcal',     icon: '🔥', label: 'Calories' },
+  calorieIntake:  { current: 1045,  goal: 2100,  unit: 'kcal',     icon: '🥗', label: 'Cal Intake' },
+  water:          { current: 5,     goal: 12,    unit: 'glasses',  icon: '💧', label: 'Water' },
+  sleep:          { current: 0,     goal: 8,     unit: 'hr',       icon: '😴', label: 'Sleep' },
+};
+
+// ─── Home Content Grid (8 tiles) ─────────────────────────────────────────────
+export const HOME_CONTENT_GRID = [
+  { id: 'learn_sports',  label: 'Learn Sports',    emoji: '⚽', color: '#22c55e', route: 'LearnSports' },
+  { id: 'playfields',    label: 'Find Playfields',  emoji: '📍', color: '#06b6d4', route: 'Playfields' },
+  { id: 'yoga',          label: 'Yoga Centres',     emoji: '🧘', color: '#8b5cf6', route: null },
+  { id: 'nutrition',     label: 'Nutrition',        emoji: '🥗', color: '#f97316', route: 'Hub', routeParams: { section: 'nutrition' } },
+  { id: 'pe_lessons',    label: 'PE Lessons',       emoji: '📚', color: '#eab308', route: 'Classes' },
+  { id: 'live_sessions', label: 'Live Sessions',    emoji: '📡', color: '#ef4444', route: 'SocialFeed' },
+  { id: 'quiz',          label: 'Quiz',             emoji: '🧠', color: '#ec4899', route: null },
+  { id: 'assignments',   label: 'Assignments',      emoji: '📝', color: '#84cc16', route: null },
+];
+
+// ─── Featured Banners ─────────────────────────────────────────────────────────
+export const FEATURED_BANNERS = [
+  {
+    id: 'f1',
+    title: 'Indigenous Sports of India',
+    subtitle: 'A special series on traditional sports',
+    badge: 'LIVE',
+    colors: ['#1d4ed8', '#2563eb'],
+    route: 'LearnSports',
+  },
+  {
+    id: 'f2',
+    title: 'Fit India School Week',
+    subtitle: 'Aug 4–10, 2024 · Join 10k+ schools',
+    badge: 'EVENT',
+    colors: ['#15803d', '#16a34a'],
+    route: null,
+  },
+  {
+    id: 'f3',
+    title: 'National Sports Day Challenge',
+    subtitle: 'Compete & earn exclusive badges',
+    badge: 'NEW',
+    colors: ['#7c3aed', '#8b5cf6'],
+    route: 'SocialFeed',
+  },
+];
+
+// ─── Trending Creators (mock) ─────────────────────────────────────────────────
+export const TRENDING_CREATORS = [
+  { id: 'c1', name: 'Fit India Icons',       handle: '@FitIndiaIcons',   initials: 'FI', color: '#f97316' },
+  { id: 'c2', name: 'Fit India Champions',   handle: '@FitChampions',    initials: 'FC', color: '#22c55e' },
+  { id: 'c3', name: 'Fit India Ambassadors', handle: '@FitAmbassadors',  initials: 'FA', color: '#8b5cf6' },
+  { id: 'c4', name: 'Rishi Arora',           handle: '@RishiArora',      initials: 'RA', color: '#06b6d4' },
+  { id: 'c5', name: 'Aditi Dixit',           handle: '@AditiDixit',      initials: 'AD', color: '#ec4899' },
+];
+
+// ─── Get Active — Exercise Categories ────────────────────────────────────────
+export const GET_ACTIVE_CATEGORIES = [
+  { id: 'balance',        label: 'Balance',                     emoji: '🧘', ageGroups: ['Children', 'Adult', 'Senior'], aiEnabled: false },
+  { id: 'abs',            label: 'Abdominal Strength',          emoji: '💪', ageGroups: ['Adult'],                       aiEnabled: true },
+  { id: 'muscular',       label: 'Muscular Endurance',          emoji: '🏋️', ageGroups: ['Adult', 'Senior'],             aiEnabled: true },
+  { id: 'cardio',         label: 'Cardiovascular Endurance',    emoji: '❤️', ageGroups: ['Children', 'Adult', 'Senior'], aiEnabled: false },
+  { id: 'flexibility',    label: 'Flexibility',                 emoji: '🤸', ageGroups: ['Children', 'Adult', 'Senior'], aiEnabled: true },
+  { id: 'yoga',           label: 'Yoga',                        emoji: '🧘‍♀️', ageGroups: ['Children', 'Adult', 'Senior'], aiEnabled: true },
+  { id: 'warmup',         label: 'Warm Up',                     emoji: '🔥', ageGroups: ['Children', 'Adult', 'Senior'], aiEnabled: false },
+  { id: 'cooldown',       label: 'Cool Down',                   emoji: '❄️', ageGroups: ['Children', 'Adult', 'Senior'], aiEnabled: false },
+];
+
+// ─── PE Classes (mock data) ───────────────────────────────────────────────────
+export const PE_CLASSES = [
+  {
+    id: 'cl1',
+    title: '3 V 3 Bounce Ball',
+    sport: 'Basketball',
+    date: '19 May 2024',
+    period: '3rd Period',
+    teacherName: 'Mr. Raj Kumar',
+    teacherRating: 5,
+    teacherFeedback: 'Rahul puts forth the personal best effort in the activity. Is always positive.',
+    studentRating: 0,
+    thumbnail: '🏀',
+    color: '#f97316',
+  },
+  {
+    id: 'cl2',
+    title: 'Kabaddi Fundamentals',
+    sport: 'Kabaddi',
+    date: '15 May 2024',
+    period: '2nd Period',
+    teacherName: 'Ms. Priya Singh',
+    teacherRating: 4,
+    teacherFeedback: 'Shows excellent teamwork and understanding of game strategy.',
+    studentRating: 4,
+    thumbnail: '🤼',
+    color: '#ef4444',
+  },
+  {
+    id: 'cl3',
+    title: '100m Sprint Drills',
+    sport: 'Athletics',
+    date: '12 May 2024',
+    period: '1st Period',
+    teacherName: 'Mr. Arvind Mehta',
+    teacherRating: 5,
+    teacherFeedback: 'Consistent improvement in stride length. Keep it up!',
+    studentRating: 5,
+    thumbnail: '🏃',
+    color: '#22c55e',
+  },
+];
+
+// ─── Social Feed (mock posts) ─────────────────────────────────────────────────
+export const MOCK_FEED_POSTS = [
+  {
+    id: 'p1',
+    author: 'Rishi Arora',
+    handle: '@RishiArora',
+    initials: 'RA',
+    avatarColor: '#06b6d4',
+    sport: 'Athletics',
+    content: 'Just hit a new PB in the 400m! Hard work finally paying off 💪 #FitIndia',
+    likes: 142,
+    comments: 18,
+    timeAgo: '2h',
+    isFollowing: false,
+  },
+  {
+    id: 'p2',
+    author: 'Aditi Dixit',
+    handle: '@AditiDixit',
+    initials: 'AD',
+    avatarColor: '#ec4899',
+    sport: 'Yoga',
+    content: 'Morning session complete ✅ Pranayama + 45 min flow. Your body is your greatest instrument 🧘‍♀️',
+    likes: 287,
+    comments: 34,
+    timeAgo: '4h',
+    isFollowing: true,
+  },
+  {
+    id: 'p3',
+    author: 'Moh. Usman',
+    handle: '@MohUsman',
+    initials: 'MU',
+    avatarColor: '#f97316',
+    sport: 'Kabaddi',
+    content: 'District championships next week! Training twice a day. Who else is competing? 🤼',
+    likes: 98,
+    comments: 22,
+    timeAgo: '6h',
+    isFollowing: false,
+  },
+  {
+    id: 'p4',
+    author: 'Fit India Icons',
+    handle: '@FitIndiaIcons',
+    initials: 'FI',
+    avatarColor: '#22c55e',
+    sport: 'National Program',
+    content: '🏅 Congratulations to all athletes who completed the #FitIndiaSchoolWeek challenge! 10,000+ schools participated this year.',
+    likes: 1450,
+    comments: 203,
+    timeAgo: '1d',
+    isFollowing: true,
+  },
+];
