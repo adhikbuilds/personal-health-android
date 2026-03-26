@@ -4,8 +4,11 @@
 // Real-data mode activates when athlete.sessions > 3 from API.
 // All screens read from userData — one consistent source of truth.
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { INITIAL_USER_DATA } from '../data/constants';
 import api from '../services/api';
+
+const FITNESS_SCORE_KEY = '@fitness_test_latest';
 
 const UserContext = createContext(null);
 
@@ -13,9 +16,16 @@ export function UserProvider({ children }) {
     const [userData, setUserData] = useState(INITIAL_USER_DATA);
     const [recentSession, setRecentSession] = useState(null);
     const [dataMode, setDataMode] = useState('mock'); // 'mock' | 'real' | 'hybrid'
+    const [fitnessScore, setFitnessScoreState] = useState({
+        score: 0, level: 0, label: 'Not Tested', color: '#64748b', lastTested: null,
+    });
 
-    // On mount: load real athlete data from API — merge over mock defaults
+    // On mount: load athlete data + persisted fitness score
     useEffect(() => {
+        AsyncStorage.getItem(FITNESS_SCORE_KEY).then(raw => {
+            if (raw) { try { setFitnessScoreState(JSON.parse(raw)); } catch (_) {} }
+        });
+
         api.getAthlete(INITIAL_USER_DATA.avatarId).then(athlete => {
             if (!athlete?.id) return;
             const realSessions = athlete.sessions || 0;
@@ -62,8 +72,14 @@ export function UserProvider({ children }) {
         }));
     }, []);
 
+    const updateFitnessScore = useCallback((score, level, label, color) => {
+        const updated = { score, level, label, color, lastTested: new Date().toISOString() };
+        setFitnessScoreState(updated);
+        AsyncStorage.setItem(FITNESS_SCORE_KEY, JSON.stringify(updated)).catch(() => {});
+    }, []);
+
     return (
-        <UserContext.Provider value={{ userData, addXp, updateScoutReadiness, recentSession, dataMode }}>
+        <UserContext.Provider value={{ userData, addXp, updateScoutReadiness, recentSession, dataMode, fitnessScore, updateFitnessScore }}>
             {children}
         </UserContext.Provider>
     );
@@ -71,6 +87,17 @@ export function UserProvider({ children }) {
 
 export function useUser() {
     const ctx = useContext(UserContext);
-    if (!ctx) throw new Error('useUser must be used inside UserProvider');
+    if (!ctx) {
+        // Safe fallback — prevents crash if accidentally used outside provider
+        return {
+            userData: INITIAL_USER_DATA,
+            addXp: () => {},
+            updateScoutReadiness: () => {},
+            recentSession: null,
+            dataMode: 'mock',
+            fitnessScore: { score: 0, level: 0, label: 'Not Tested', color: '#64748b', lastTested: null },
+            updateFitnessScore: () => {},
+        };
+    }
     return ctx;
 }

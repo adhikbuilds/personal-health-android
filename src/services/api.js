@@ -144,6 +144,47 @@ export const api = {
     /** Banner check for HomeScreen connectivity widget */
     getBanner: () => fetchJSON('/banner'),
 
+    // ─── Daily Tracker ───────────────────────────────────────────────────
+    getDailyTracker: (athleteId) =>
+        fetchJSON(`/athlete/${athleteId}/daily-tracker`),
+
+    updateDailyTracker: (athleteId, data) =>
+        fetchJSON(`/athlete/${athleteId}/daily-tracker`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    // ─── Fitness Test ────────────────────────────────────────────────────
+    submitFitnessTest: (athleteId, results) =>
+        fetchJSON('/fitness-test', {
+            method: 'POST',
+            body: JSON.stringify({ athlete_id: athleteId, ...results }),
+        }),
+
+    getFitnessTestHistory: (athleteId) =>
+        fetchJSON(`/fitness-test/history/${athleteId}`),
+
+    // ─── Playfields ──────────────────────────────────────────────────────
+    getPlayfields: (lat, lng, radius = 5) =>
+        fetchJSON(`/playfields?lat=${lat}&lng=${lng}&radius=${radius}`),
+
+    // ─── PE Classes ──────────────────────────────────────────────────────
+    getClasses: (athleteId) =>
+        fetchJSON(`/classes?athlete_id=${encodeURIComponent(athleteId)}`),
+
+    // ─── Social Feed ─────────────────────────────────────────────────────
+    getFeed: (athleteId, tab = 'for_you', page = 1) =>
+        fetchJSON(`/feed?athlete_id=${encodeURIComponent(athleteId)}&tab=${tab}&page=${page}`),
+
+    getTrendingCreators: () =>
+        fetchJSON('/creators/trending'),
+
+    followCreator: (athleteId, creatorId) =>
+        fetchJSON('/follow', {
+            method: 'POST',
+            body: JSON.stringify({ follower: athleteId, following: creatorId }),
+        }),
+
     /**
      * PHASE 2 EDGE AI — High-speed WebSocket Metadata Stream.
      * Connects directly to FastAPI to stream pure 33-point float arrays at 60 FPS
