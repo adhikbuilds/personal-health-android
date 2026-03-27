@@ -1,12 +1,6 @@
-// ActiveBharat — API Service Layer
+// Personal Health — API Service Layer
 // All networking config is read from constants.js — edit that file to change
 // your backend IP. No hardcoded addresses here.
-//
-// V1 HTTP flow (Expo Go compatible):
-//   Phone → PROXY_PORT (Node.js frontend, port 8083) → FastAPI (port 8082)
-//
-// Phase 2 WebSocket flow (native build):
-//   Phone → FastAPI WebSocket ws://BACKEND_HOST:FASTAPI_PORT/session/{id}/live-stream
 
 import { Platform } from 'react-native';
 import {
@@ -98,11 +92,7 @@ export const api = {
         body: JSON.stringify({ image_b64: imageB64 }),
     }),
 
-    /**
-     * rPPG heart rate: connect raw Edge AI WebSocket stream for ultra-low latency.
-     * Streams numerical R/G/B data directly. No Base64, no HTTP lag.
-     * Receives continuous computed metrics in return.
-     */
+    /** rPPG heart rate: WebSocket stream. Sends image frames, receives BPM/HRV metrics. */
     connectRPPGLiveStream: (sessionId, onMessage, onError, onClose) => {
         const wsUrl = `${WS_BASE_RESOLVED}/rppg/live-stream/${sessionId}`;
         console.log(`[WS-RPPG] Connecting: ${wsUrl}`);
@@ -185,13 +175,7 @@ export const api = {
             body: JSON.stringify({ follower: athleteId, following: creatorId }),
         }),
 
-    /**
-     * PHASE 2 EDGE AI — High-speed WebSocket Metadata Stream.
-     * Connects directly to FastAPI to stream pure 33-point float arrays at 60 FPS
-     * from the native C++ Frame Processor. No image transfer — coordinates only.
-     *
-     * To change the backend IP, edit src/constants.js (BACKEND_HOST).
-     */
+    /** Biomechanics live stream: WebSocket for real-time keypoint/pose data. */
     connectLiveStream: (sessionId, onMessage, onError, onClose) => {
         const wsUrl = `${WS_BASE_RESOLVED}/session/${sessionId}/live-stream`;
         console.log(`[WS-STREAM] Connecting: ${wsUrl}`);

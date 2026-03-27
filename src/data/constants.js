@@ -1,4 +1,4 @@
-// ActiveBharat — Canonical Data Constants
+// Personal Health — Canonical Data Constants
 // ─────────────────────────────────────────────────────────────────────────────
 // SINGLE SOURCE OF TRUTH for all mock data.
 // Every screen reads from here — no more inconsistent numbers.

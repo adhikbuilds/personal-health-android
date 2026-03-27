@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "ActiveBharat",
-    "slug": "active-bharat",
+    "name": "Personal Health",
+    "slug": "personal-health",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -17,14 +17,14 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.activebharat.app"
+      "bundleIdentifier": "com.personalhealth.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0f172a"
       },
-      "package": "com.activebharat.app",
+      "package": "com.personalhealth.app",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.INTERNET",
@@ -36,12 +36,12 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow ActiveBharat to use camera for AI biomechanics analysis."
+          "cameraPermission": "Allow Personal Health to use camera for AI biomechanics analysis."
         }
       ]
     ],
     "extra": {
-      "backendHost": "10.0.2.2"
+      "backendHost": "192.168.1.16"
     }
   }
 }
