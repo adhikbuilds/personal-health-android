@@ -221,7 +221,7 @@ export default function TrainScreen({ showToast, navigation }) {
                 <Text style={{ fontSize: 40, marginBottom: 16 }}>📷</Text>
                 <Text style={s.title}>Camera Access Required</Text>
                 <Text style={[s.subtitle, { textAlign: 'center', marginBottom: 24 }]}>
-                    ActiveBharat needs camera access to perform real-time biomechanics analysis.
+                    Camera access is needed to perform real-time biomechanics analysis.
                 </Text>
                 <TouchableOpacity style={s.startBtn} onPress={requestPermission}>
                     <Text style={s.startBtnText}>GRANT CAMERA ACCESS</Text>

@@ -1,17 +1,12 @@
 /**
- * ActiveBharat Android — Backend Constants
- * ==========================================
- * Set your Wi-Fi IP in app.json under expo.extra.backendHost,
- * or set the BACKEND_HOST variable below directly for local dev.
+ * Personal Health — Backend Constants
+ * ======================================
+ * Set your Wi-Fi IP in app.json under expo.extra.backendHost.
  *
  *   app.json:  "extra": { "backendHost": "192.168.x.x" }
  *
- * PROXY_PORT (8083)  → activebharat-frontend Node.js server (recommended)
- * BACKEND_PORT (8082) → activebharat-backend FastAPI direct (if no proxy)
- *
- * Fallback hierarchy:
- *   1. expo-constants extra.backendHost (from app.json)
- *   2. 10.0.2.2 (Android emulator → host machine localhost)
+ * PROXY_PORT (8083)  → personal-health-frontend Node.js proxy (recommended)
+ * FASTAPI_PORT (8082) → personal-health-backend FastAPI direct
  */
 import Constants from 'expo-constants';
 
