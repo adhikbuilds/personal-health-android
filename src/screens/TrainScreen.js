@@ -12,19 +12,36 @@ const C = { bg: '#050a14', cyan: '#06b6d4', orange: '#f97316', green: '#22c55e',
 const { width: W } = Dimensions.get('window');
 
 const SPORTS = [
-    { key: 'vertical_jump', label: 'VJ', icon: '⬆️' },
-    { key: 'snatch', label: 'Snatch', icon: '🏋️' },
-    { key: 'sprint', label: 'Sprint', icon: '💨' },
-    { key: 'javelin', label: 'Javelin', icon: '🏹' },
-    { key: 'cricket_bat', label: 'Cricket', icon: '🏏' },
+    { key: 'vertical_jump', label: 'VJ',      icon: '⬆️' },
+    { key: 'snatch',        label: 'Snatch',   icon: '🏋️' },
+    { key: 'sprint',        label: 'Sprint',   icon: '💨' },
+    { key: 'javelin',       label: 'Javelin',  icon: '🏹' },
+    { key: 'cricket_bat',   label: 'Cricket',  icon: '🏏' },
+    { key: 'squat',         label: 'Squat',    icon: '🦵' },
+    { key: 'push_up',       label: 'Push Up',  icon: '💪' },
+    { key: 'pull_up',       label: 'Pull Up',  icon: '🔝' },
 ];
 
 const SPORT_RANGES = {
-    vertical_jump: { knee: [85, 110], hip: [80, 110], trunk: [8, 18], sym: 0.94, jh: [32, 65] },
-    snatch: { knee: [95, 125], hip: [85, 100], trunk: [18, 30], sym: 0.95, jh: [0, 0] },
-    sprint: { knee: [85, 115], hip: [42, 62], trunk: [12, 22], sym: 0.88, jh: [0, 0] },
-    javelin: { knee: [140, 165], hip: [105, 125], trunk: [28, 45], sym: 0.76, jh: [0, 0] },
-    cricket_bat: { knee: [132, 158], hip: [118, 145], trunk: [18, 30], sym: 0.82, jh: [0, 0] },
+    vertical_jump: { knee: [85, 110],  hip: [80, 110],  trunk: [8, 18],  sym: 0.94, jh: [32, 65] },
+    snatch:        { knee: [95, 125],  hip: [85, 100],  trunk: [18, 30], sym: 0.95, jh: [0, 0]  },
+    sprint:        { knee: [85, 115],  hip: [42, 62],   trunk: [12, 22], sym: 0.88, jh: [0, 0]  },
+    javelin:       { knee: [140, 165], hip: [105, 125], trunk: [28, 45], sym: 0.76, jh: [0, 0]  },
+    cricket_bat:   { knee: [132, 158], hip: [118, 145], trunk: [18, 30], sym: 0.82, jh: [0, 0]  },
+    squat:         { knee: [75, 110],  hip: [75, 105],  trunk: [0, 25],  sym: 0.92, jh: [0, 0]  },
+    push_up:       { knee: [165, 180], hip: [165, 180], trunk: [0, 8],   sym: 0.92, jh: [0, 0]  },
+    pull_up:       { knee: [140, 180], hip: [140, 180], trunk: [0, 15],  sym: 0.90, jh: [0, 0]  },
+};
+
+const REP_TRANSITIONS = {
+    vertical_jump: ['descent', 'takeoff'],
+    squat:         ['descent', 'setup'],
+    push_up:       ['descent', 'setup'],
+    pull_up:       ['descent', 'setup'],
+    snatch:        ['descent', 'catch'],
+    sprint:        ['drive', 'flight'],
+    javelin:       ['wind_up', 'release'],
+    cricket_bat:   ['backswing', 'contact'],
 };
 
 function rng(lo, hi) { return lo + Math.random() * (hi - lo); }
@@ -70,6 +87,8 @@ export default function TrainScreen({ showToast, navigation }) {
     const sessionRef = useRef(null);
     const cameraRef = useRef(null);       // CameraView ref for takePictureAsync
     const isCapturingRef = useRef(false); // prevents overlapping captures
+    const lastPhaseRef = useRef(null);
+    const [repCount, setRepCount] = useState(0);
 
     // Request camera permission on mount
     useEffect(() => {
@@ -82,6 +101,15 @@ export default function TrainScreen({ showToast, navigation }) {
     // Separate ref for the result polling interval
     const resultIntervalRef = useRef(null);
 
+    const checkRep = (phase) => {
+        if (!phase) return;
+        const [fromPhase, toPhase] = REP_TRANSITIONS[sport] || [];
+        if (fromPhase && toPhase && lastPhaseRef.current === fromPhase && phase === toPhase) {
+            setRepCount(c => c + 1);
+        }
+        lastPhaseRef.current = phase;
+    };
+
     const startSession = async () => {
         const sData = await api.startSession('athlete_01', sport);
         const sid = sData?.session_id || null;
@@ -93,6 +121,8 @@ export default function TrainScreen({ showToast, navigation }) {
         setShowSummary(false);
         setSummary(null);
         setAnalysisMode('sim');
+        setRepCount(0);
+        lastPhaseRef.current = null;
 
         // ── FRAME CAPTURE LOOP (every 4s) ──────────────────────────────────
         // Fire-and-forget: captures JPEG → sends to server → returns instantly (202).
@@ -148,6 +178,7 @@ export default function TrainScreen({ showToast, navigation }) {
             try {
                 const result = await api.getLatestResult(sessionRef.current);
                 if (result?.pose_detected && result.form_score > 0) {
+                    checkRep(result.phase);
                     const frame = {
                         form_score: result.form_score,
                         form_quality: result.form_quality,
@@ -196,7 +227,7 @@ export default function TrainScreen({ showToast, navigation }) {
         const peakScore = sum?.peak_form_score ?? Math.max(...scoreHistory, 0);
         const peakVj = sum?.peak_jump_height_cm ?? 0;
 
-        const finalSummary = { avgScore, peakScore, peakVj, xpEarned, frames: frameNum };
+        const finalSummary = { avgScore, peakScore, peakVj, xpEarned, frames: frameNum, reps: repCount };
         setSummary(finalSummary);
         setShowSummary(true);
     };
@@ -242,6 +273,7 @@ export default function TrainScreen({ showToast, navigation }) {
                     <SummaryRow label="Avg Form Score" value={`${summary.avgScore}%`} color={qColor} />
                     <SummaryRow label="Peak Score" value={`${summary.peakScore}%`} color={C.green} />
                     <SummaryRow label="Peak Jump Height" value={summary.peakVj > 0 ? `${summary.peakVj.toFixed(1)} cm` : '--'} color={C.orange} />
+                    <SummaryRow label="Reps Counted" value={String(summary.reps ?? 0)} color={C.orange} />
                     <SummaryRow label="Frames Analyzed" value={String(summary.frames)} color="#a78bfa" isLast />
                     <View style={{ alignItems: 'center', marginTop: 16 }}>
                         <View style={s.xpPill}>
@@ -267,10 +299,10 @@ export default function TrainScreen({ showToast, navigation }) {
 
                     <Text style={[s.sectionLabel, { marginTop: 24 }]}>SPORT MODE</Text>
                     <View style={s.sportGrid}>
-                        {SPORTS.map((sp, i) => (
+                        {SPORTS.map((sp) => (
                             <TouchableOpacity
                                 key={sp.key}
-                                style={[s.sportBtn, sport === sp.key && s.sportBtnActive, i % 5 !== 4 && { marginRight: 8 }]}
+                                style={[s.sportBtn, sport === sp.key && s.sportBtnActive]}
                                 onPress={() => setSport(sp.key)}
                             >
                                 <Text style={s.sportIcon}>{sp.icon}</Text>
@@ -369,7 +401,11 @@ export default function TrainScreen({ showToast, navigation }) {
                         {metrics?.primary_feedback || 'Analyzing posture...'}
                     </Text>
                 </View>
-                <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
+                <View style={{ alignItems: 'center', marginHorizontal: 12 }}>
+                    <Text style={s.hudSyncLabel}>REPS</Text>
+                    <Text style={[s.hudScore, { color: C.orange, fontSize: 22 }]}>{repCount}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
                     <Text style={s.hudSyncLabel}>FORM</Text>
                     <Text style={[s.hudScore, { color: qColor }]}>{metrics?.form_score ?? '--'}%</Text>
                 </View>
@@ -395,8 +431,8 @@ const s = StyleSheet.create({
     sectionLabel: { fontSize: 9, fontWeight: '800', color: C.muted, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 10 },
     mutedText: { color: C.muted, fontSize: 14 },
     // Sport grid
-    sportGrid: { flexDirection: 'row', marginBottom: 24 },
-    sportBtn: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    sportGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 24, gap: 8 },
+    sportBtn: { width: '22%', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
     sportBtnActive: { backgroundColor: 'rgba(6,182,212,0.15)', borderColor: 'rgba(6,182,212,0.5)' },
     sportIcon: { fontSize: 20, marginBottom: 4 },
     sportLabel: { fontSize: 9, fontWeight: '700', color: C.muted, textAlign: 'center' },
