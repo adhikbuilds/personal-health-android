@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     View, Text, StyleSheet, SafeAreaView, FlatList,
-    TouchableOpacity, ScrollView, RefreshControl,
+    TouchableOpacity, ScrollView, RefreshControl, Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { C } from '../styles/colors';
@@ -40,7 +40,7 @@ function CreatorChip({ creator, followed, onFollow }) {
     );
 }
 
-function PostCard({ post, onLike, liked }) {
+function PostCard({ post, onLike, liked, onMore }) {
     return (
         <View style={pc.card}>
             <View style={pc.header}>
@@ -56,7 +56,7 @@ function PostCard({ post, onLike, liked }) {
                         </View>
                     </View>
                 </View>
-                <TouchableOpacity style={pc.moreBtn}>
+                <TouchableOpacity style={pc.moreBtn} onPress={() => onMore?.(post)}>
                     <Text style={pc.moreText}>···</Text>
                 </TouchableOpacity>
             </View>
@@ -98,7 +98,10 @@ export default function SocialFeedScreen({ navigation }) {
         AsyncStorage.getItem(FOLLOWED_KEY).then(raw => {
             if (raw) { try { setFollowed(JSON.parse(raw)); } catch (_) {} }
         });
-        api.getTrendingCreators().then(data => { if (data?.length) setCreators(data); });
+        api.getTrendingCreators().then(data => {
+            const arr = Array.isArray(data) ? data : data?.creators;
+            if (arr?.length) setCreators(arr);
+        });
     }, []);
 
     const handleFollow = useCallback((creatorId) => {
@@ -117,12 +120,16 @@ export default function SocialFeedScreen({ navigation }) {
     const handleRefresh = useCallback(() => {
         setRefreshing(true);
         api.getFeed(userData.avatarId, tab === 'For You' ? 'for_you' : 'following').then(data => {
-            if (data?.length) setPosts(data);
+            const arr = Array.isArray(data) ? data : data?.posts;
+            if (arr?.length) setPosts(arr);
         }).finally(() => setRefreshing(false));
     }, [userData.avatarId, tab]);
 
+    const followedHandles = new Set(
+        creators.filter(c => followed[c.id]).map(c => c.handle)
+    );
     const filtered = tab === 'Following'
-        ? posts.filter(p => p.isFollowing || followed[p.id])
+        ? posts.filter(p => p.isFollowing || followedHandles.has(p.handle))
         : posts;
 
     return (
@@ -139,7 +146,7 @@ export default function SocialFeedScreen({ navigation }) {
                         </TouchableOpacity>
                     ))}
                 </View>
-                <TouchableOpacity style={s.createBtn}>
+                <TouchableOpacity style={s.createBtn} onPress={() => Alert.alert('Create Post', 'Post creation coming soon!')}>
                     <Text style={s.createIcon}>✏️</Text>
                 </TouchableOpacity>
             </View>
@@ -170,7 +177,7 @@ export default function SocialFeedScreen({ navigation }) {
                         {/* FOLLOW section header */}
                         <View style={s.followHeader}>
                             <Text style={s.followHeaderText}>FOLLOW</Text>
-                            <TouchableOpacity>
+                            <TouchableOpacity onPress={() => setTab('Following')}>
                                 <Text style={s.expandBtn}>⤢</Text>
                             </TouchableOpacity>
                         </View>
@@ -181,6 +188,11 @@ export default function SocialFeedScreen({ navigation }) {
                         post={item}
                         liked={!!liked[item.id]}
                         onLike={handleLike}
+                        onMore={(post) => Alert.alert(post.author, 'Report, Mute, or Block', [
+                            { text: 'Report', style: 'destructive' },
+                            { text: 'Mute' },
+                            { text: 'Cancel', style: 'cancel' },
+                        ])}
                     />
                 )}
                 ListEmptyComponent={() => (

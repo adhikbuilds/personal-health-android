@@ -143,7 +143,7 @@ export default function MetricsScreen() {
                 {/* Spider Chart Integration */}
                 <Text style={s.sectionLabel}>AI CAPABILITY ANALYSIS</Text>
                 <View style={s.chartContainer}>
-                    <SpiderChart data={[85, 70, 78]} /> 
+                    <SpiderChart data={(userData.stats || []).map(s => s.A ?? 0).slice(0, 3).concat(Array(3).fill(50)).slice(0, 3)} />
                 </View>
                 
                 <Text style={[s.sectionLabel, { marginTop: 16 }]}>DETAILED TRENDS</Text>
