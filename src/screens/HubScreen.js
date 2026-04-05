@@ -350,7 +350,10 @@ export default function HubScreen({ showToast, navigation }) {
                         
                         <View style={s.menuDivider} />
 
-                        <TouchableOpacity style={s.menuItem} onPress={() => setProfileMenuVisible(false)}>
+                        <TouchableOpacity style={s.menuItem} onPress={() => {
+                            setProfileMenuVisible(false);
+                            Alert.alert('Settings', 'App settings coming soon!');
+                        }}>
                             <Text style={s.menuItemIcon}>⚙️</Text>
                             <Text style={s.menuItemText}>Settings</Text>
                         </TouchableOpacity>

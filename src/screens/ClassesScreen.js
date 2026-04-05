@@ -110,7 +110,8 @@ export default function ClassesScreen({ navigation }) {
 
     useEffect(() => {
         api.getClasses(userData.avatarId).then(data => {
-            if (data?.length) setClasses(data);
+            const arr = Array.isArray(data) ? data : data?.classes;
+            if (arr?.length) setClasses(arr);
         });
     }, [userData.avatarId]);
 

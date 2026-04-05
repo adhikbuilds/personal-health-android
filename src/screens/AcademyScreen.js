@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import {
     View, Text, ScrollView, StyleSheet, TouchableOpacity,
-    SafeAreaView, FlatList, Dimensions,
+    SafeAreaView, FlatList, Dimensions, TextInput,
 } from 'react-native';
 import { C } from '../styles/colors';
 import { SPORTS_LIBRARY, SPORTS_ACADEMY } from '../data/constants';
@@ -27,10 +27,13 @@ function SportTile({ sport, onPress }) {
 
 export default function AcademyScreen({ navigation, showToast }) {
     const [activeCategory, setActiveCategory] = useState('All');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showSearch, setShowSearch] = useState(false);
 
-    const filtered = activeCategory === 'All'
+    const filtered = (activeCategory === 'All'
         ? SPORTS_LIBRARY
-        : SPORTS_LIBRARY.filter(s => s.category === activeCategory);
+        : SPORTS_LIBRARY.filter(s => s.category === activeCategory)
+    ).filter(s => !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const handleSportPress = (sport) => {
         navigation.navigate('LearnSports', { sport });
@@ -41,10 +44,21 @@ export default function AcademyScreen({ navigation, showToast }) {
             {/* Top bar */}
             <View style={s.topbar}>
                 <Text style={s.title}>Sports Academy</Text>
-                <TouchableOpacity style={s.searchBtn}>
-                    <Text style={{ fontSize: 18 }}>🔍</Text>
+                <TouchableOpacity style={s.searchBtn} onPress={() => { setShowSearch(v => !v); setSearchQuery(''); }}>
+                    <Text style={{ fontSize: 18 }}>{showSearch ? '✕' : '🔍'}</Text>
                 </TouchableOpacity>
             </View>
+
+            {showSearch && (
+                <TextInput
+                    style={s.searchInput}
+                    placeholder="Search sports..."
+                    placeholderTextColor={C.muted}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    autoFocus
+                />
+            )}
 
             {/* Category filter tabs */}
             <ScrollView
@@ -91,6 +105,7 @@ const s = StyleSheet.create({
     topbar:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 16, paddingBottom: 8 },
     title:         { fontSize: 20, fontWeight: '900', color: C.text },
     searchBtn:     { width: 40, height: 40, borderRadius: 12, backgroundColor: C.surf, alignItems: 'center', justifyContent: 'center' },
+    searchInput:   { marginHorizontal: 16, backgroundColor: C.surf, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, color: C.text, fontSize: 14, borderWidth: 1, borderColor: C.border, marginBottom: 8 },
     catScroll:     { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
     catChip:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99, backgroundColor: C.surf, borderWidth: 1, borderColor: C.border },
     catChipActive: { backgroundColor: C.cyan, borderColor: C.cyan },

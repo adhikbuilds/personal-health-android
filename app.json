@@ -17,14 +17,14 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.personalhealth.app"
+      "bundleIdentifier": "com.activebharat.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0f172a"
       },
-      "package": "com.personalhealth.app",
+      "package": "com.activebharat.app",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.INTERNET",
@@ -41,7 +41,7 @@
       ]
     ],
     "extra": {
-      "backendHost": "192.168.1.16"
+      "backendHost": ""
     }
   }
 }
