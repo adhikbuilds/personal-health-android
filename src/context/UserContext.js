@@ -1,4 +1,4 @@
-// ActiveBharat — Global User Context (with DataBridge)
+// Personal Health — Global User Context (with DataBridge)
 // ─────────────────────────────────────────────────────────────────────────────
 // DataBridge: tracks whether we're on mock or real data.
 // Real-data mode activates when athlete.sessions > 3 from API.

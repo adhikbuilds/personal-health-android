@@ -1,5 +1,5 @@
-// ActiveBharat — Root App with Navigation
-// 6 tabs + 9 stack screens (modals + full-screen flows)
+// Personal Health — Root App with Navigation
+// 6 tabs + stack screens organised by domain: core/, fitness/, social/, wellness/
 import React, { useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
