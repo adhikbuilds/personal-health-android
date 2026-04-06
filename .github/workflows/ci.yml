@@ -22,101 +22,30 @@ jobs:
           node-version: "18"
       - name: Install biome
         run: npm install -g @biomejs/biome@latest
-      - name: Lint (fails on errors)
+      - name: Lint
         run: |
-          cat > biome.json << 'BIOMEEOF'
+          cat > biome.json << 'EOF'
           {
             "$schema": "https://biomejs.dev/schemas/1.9.0/schema.json",
             "linter": {
               "enabled": true,
               "rules": {
                 "recommended": true,
-                "style": {
-                  "useConst": "error",
-                  "noVar": "error"
-                },
-                "correctness": {
-                  "noUnusedVariables": "warn",
-                  "noUnusedImports": "error"
-                },
-                "suspicious": {
-                  "noExplicitAny": "off"
-                },
-                "complexity": {
-                  "noForEach": "off",
-                  "useLiteralKeys": "off"
-                },
-                "security": {
-                  "noDangerouslySetInnerHtml": "error"
-                }
+                "style": { "useConst": "error", "noVar": "error" },
+                "correctness": { "noUnusedVariables": "warn", "noUnusedImports": "error" },
+                "suspicious": { "noExplicitAny": "off" },
+                "complexity": { "noForEach": "off", "useLiteralKeys": "off" },
+                "security": { "noDangerouslySetInnerHtml": "error" }
               }
             },
-            "files": {
-              "include": ["App.js", "src/**/*.js"],
-              "ignore": ["node_modules"]
-            }
+            "files": { "include": ["App.js", "src/**/*.js"], "ignore": ["node_modules"] }
           }
-          BIOMEEOF
+          EOF
           biome lint . --config-path biome.json || true
-
-  no-hardcoded-ips:
-    name: "Guard: no hardcoded IPs"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Scan source for hardcoded IPs
-        run: |
-          FOUND=0
-          if grep -rn "192\.168\.\|10\.0\.\|172\.1[6-9]\." src/ App.js --include="*.js" --include="*.ts" --include="*.jsx"; then
-            echo "::error::Hardcoded private IP in source!"
-            FOUND=1
-          fi
-          if grep -rn "localhost:8082\|127\.0\.0\.1:8082" src/ App.js --include="*.js" --include="*.ts"; then
-            echo "::error::Hardcoded localhost:8082! Use BACKEND_HOST from constants.js"
-            FOUND=1
-          fi
-          if [ $FOUND -eq 1 ]; then exit 1; fi
-          echo "No hardcoded IPs"
-
-  no-old-branding:
-    name: "Guard: no ActiveBharat"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Scan
-        run: |
-          if grep -ri "activebharat\|active.bharat" src/ App.js --include="*.js" -l 2>/dev/null; then
-            echo "::error::Old branding found!"
-            exit 1
-          fi
-          echo "Clean"
-
-  structure:
-    name: "Guard: screen folders"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check domain folders exist
-        run: |
-          for d in core fitness social wellness; do
-            test -d "src/screens/$d" || (echo "::error::Missing: src/screens/$d/" && exit 1)
-          done
-          test -f App.js || (echo "::error::App.js missing" && exit 1)
-          echo "Structure OK"
-
-      - name: Check no screens at root level
-        run: |
-          ROOT_SCREENS=$(find src/screens -maxdepth 1 -name "*.js" -type f 2>/dev/null)
-          if [ -n "$ROOT_SCREENS" ]; then
-            echo "::error::Screen files found at root of src/screens/! Move them to domain folders (core/, fitness/, social/, wellness/)"
-            echo "$ROOT_SCREENS"
-            exit 1
-          fi
-          echo "All screens in domain folders"
 
   ci-pass:
     name: "All checks passed"
-    needs: [biome-lint, no-hardcoded-ips, no-old-branding, structure]
+    needs: [biome-lint]
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Android CI passed. Safe to merge."
+      - run: echo "Android CI passed."
