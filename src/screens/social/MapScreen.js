@@ -105,7 +105,7 @@ export default function MapScreen() {
             {/* Floating top bar */}
             <View style={s.topBar}>
                 <View style={s.titleRow}>
-                    <Text style={s.title}>Eklavya Map</Text>
+                    <Text style={s.title}>Playfield Map</Text>
                     <View style={s.gpsBadge}>
                         <View style={[s.gpsDot, { backgroundColor: gpsDot }]} />
                         <Text style={[s.gpsText, { color: gpsDot }]}>
@@ -147,7 +147,7 @@ export default function MapScreen() {
                 onHttpError={(e) => console.warn('[WebView HTTP Error]', e.nativeEvent.statusCode)}
                 renderLoading={() => (
                     <View style={s.loadingView}>
-                        <Text style={s.loadingText}>🗺️ Loading Eklavya Map...</Text>
+                        <Text style={s.loadingText}>🗺️ Loading Playfield Map...</Text>
                         <Text style={s.loadingHint}>
                             {'Make sure VS Code Live Server is running on port 5500,\nor: npx serve . --port 5500'}
                         </Text>
