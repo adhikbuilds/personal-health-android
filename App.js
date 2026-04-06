@@ -9,23 +9,29 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { StatusBar } from 'expo-status-bar';
 import { UserProvider } from './src/context/UserContext';
 
-// Tabs
-import HomeScreen         from './src/screens/HomeScreen';
-import MetricsScreen      from './src/screens/MetricsScreen';
-import TrainScreen        from './src/screens/TrainScreen';
-import AcademyScreen      from './src/screens/AcademyScreen';
-import HubScreen          from './src/screens/HubScreen';
-import MapScreen          from './src/screens/MapScreen';
+// Core tabs
+import HomeScreen         from './src/screens/core/HomeScreen';
+import MetricsScreen      from './src/screens/core/MetricsScreen';
+import AcademyScreen      from './src/screens/core/AcademyScreen';
+import HubScreen          from './src/screens/core/HubScreen';
 
-// Stack screens
-import GhostSkeletonScreen from './src/screens/GhostSkeletonScreen';
-import RPPGScreen          from './src/screens/RPPGScreen';
-import FieldBookingScreen  from './src/screens/FieldBookingScreen';
-import LearnSportsScreen   from './src/screens/LearnSportsScreen';
-import FitnessTestScreen   from './src/screens/FitnessTestScreen';
-import GetActiveScreen     from './src/screens/GetActiveScreen';
-import ClassesScreen       from './src/screens/ClassesScreen';
-import SocialFeedScreen    from './src/screens/SocialFeedScreen';
+// Fitness domain
+import TrainScreen         from './src/screens/fitness/TrainScreen';
+import GhostSkeletonScreen from './src/screens/fitness/GhostSkeletonScreen';
+import RPPGScreen          from './src/screens/fitness/RPPGScreen';
+import FitnessTestScreen   from './src/screens/fitness/FitnessTestScreen';
+
+// Social domain
+import MapScreen           from './src/screens/social/MapScreen';
+import FieldBookingScreen  from './src/screens/social/FieldBookingScreen';
+import LearnSportsScreen   from './src/screens/social/LearnSportsScreen';
+import GetActiveScreen     from './src/screens/social/GetActiveScreen';
+import ClassesScreen       from './src/screens/social/ClassesScreen';
+import SocialFeedScreen    from './src/screens/social/SocialFeedScreen';
+
+// Wellness domain (sprint W&N-01 — screens will be added here)
+// import NutritionScreen  from './src/screens/wellness/NutritionScreen';
+// import WellnessScreen   from './src/screens/wellness/WellnessScreen';
 
 const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
