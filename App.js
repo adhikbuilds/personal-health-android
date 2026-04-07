@@ -7,6 +7,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { UserProvider } from './src/context/UserContext';
 
 // Core tabs
@@ -29,9 +30,8 @@ import GetActiveScreen     from './src/screens/social/GetActiveScreen';
 import ClassesScreen       from './src/screens/social/ClassesScreen';
 import SocialFeedScreen    from './src/screens/social/SocialFeedScreen';
 
-// Wellness domain (sprint W&N-01 — screens will be added here)
-// import NutritionScreen  from './src/screens/wellness/NutritionScreen';
-// import WellnessScreen   from './src/screens/wellness/WellnessScreen';
+// Wellness domain (AN-05: placeholder until interns ship the real screens)
+import WellnessPlaceholderScreen from './src/screens/wellness/WellnessPlaceholderScreen';
 
 const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -40,13 +40,14 @@ const CYAN  = '#06b6d4';
 const MUTED = '#64748b';
 const BG    = '#0f172a';
 
+// AN-04: Vector tab icons (Ionicons), no emojis
 const TAB_ICONS = {
-    Home:    '🏠',
-    Lab:     '📊',
-    Camera:  '📷',
-    Academy: '📚',
-    Hub:     '👤',
-    Map:     '🗺️',
+    Home:    'home-outline',
+    Lab:     'analytics-outline',
+    Camera:  'videocam-outline',
+    Academy: 'library-outline',
+    Hub:     'person-outline',
+    Map:     'map-outline',
 };
 
 // ─── Toast Overlay ────────────────────────────────────────────────────────────
@@ -67,7 +68,11 @@ function TabNavigator({ showToast }) {
             screenOptions={({ route }) => ({
                 tabBarIcon: ({ focused }) => (
                     <View style={[styles.tabIconWrap, focused && styles.tabIconActive]}>
-                        <Text style={styles.tabIconText}>{TAB_ICONS[route.name] || '•'}</Text>
+                        <Ionicons
+                            name={TAB_ICONS[route.name] || 'ellipse-outline'}
+                            size={22}
+                            color={focused ? CYAN : MUTED}
+                        />
                     </View>
                 ),
                 tabBarLabel: ({ focused }) => (
@@ -143,6 +148,13 @@ function AppNavigator({ showToast }) {
             <Stack.Screen
                 name="SocialFeed"
                 component={SocialFeedScreen}
+                options={{ animation: 'slide_from_right' }}
+            />
+
+            {/* AN-05: Wellness placeholder until interns ship the real screens */}
+            <Stack.Screen
+                name="Wellness"
+                component={WellnessPlaceholderScreen}
                 options={{ animation: 'slide_from_right' }}
             />
         </Stack.Navigator>
