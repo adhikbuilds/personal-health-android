@@ -1,6 +1,8 @@
 // Personal Health — Shared Color System
-// Import this in every screen instead of duplicating the C object.
-// To change the theme, edit here once.
+// Legacy exports — new code should import from './tokens.js' for PH-DLS v2 colors.
+// Kept for backwards compatibility with existing screens.
+
+export { COLORS, STATUS_COLORS, TIER_COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOW, EASING, ANIM } from './tokens';
 
 export const C = {
     bg:      '#0f172a',
