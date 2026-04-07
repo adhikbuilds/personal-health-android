@@ -287,6 +287,7 @@ export const HOME_CONTENT_GRID = [
   { id: 'live_sessions', label: 'Live Sessions',    emoji: '📡', color: '#ef4444', route: 'SocialFeed' },
   { id: 'quiz',          label: 'Quiz',             emoji: '🧠', color: '#ec4899', route: null },
   { id: 'assignments',   label: 'Assignments',      emoji: '📝', color: '#84cc16', route: null },
+  { id: 'wellness',      label: 'Wellness',         emoji: '💚', color: '#06b6d4', route: 'Wellness' },
 ];
 
 // ─── Featured Banners ─────────────────────────────────────────────────────────
