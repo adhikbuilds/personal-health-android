@@ -1,4 +1,4 @@
-// ActiveBharat — Shared Color System
+// Personal Health — Shared Color System
 // Import this in every screen instead of duplicating the C object.
 // To change the theme, edit here once.
 

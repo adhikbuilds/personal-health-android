@@ -9,7 +9,7 @@
 //   Sessions: 8 | Avg Form: 79% | Scout Readiness: 68%
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const API_BASE = 'http://10.0.2.2:8082'; // Unused — api.js handles URL
+// API_BASE is handled by src/constants.js + src/services/api.js // Unused — api.js handles URL
 
 export const INITIAL_USER_DATA = {
   name: 'Viraj Sharma',
