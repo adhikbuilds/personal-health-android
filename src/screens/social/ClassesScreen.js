@@ -5,10 +5,10 @@ import {
     View, Text, StyleSheet, SafeAreaView, ScrollView,
     TouchableOpacity, FlatList, Dimensions,
 } from 'react-native';
-import { C } from '../styles/colors';
-import { PE_CLASSES } from '../data/constants';
-import { useUser } from '../context/UserContext';
-import api from '../services/api';
+import { C } from '../../styles/colors';
+import { PE_CLASSES } from '../../data/constants';
+import { useUser } from '../../context/UserContext';
+import api from '../../services/api';
 
 const { width: SW } = Dimensions.get('window');
 

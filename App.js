@@ -8,6 +8,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import { UserProvider } from './src/context/UserContext';
 
 // Core tabs
@@ -62,9 +64,15 @@ function ToastOverlay({ message }) {
 }
 
 // ─── Tab Navigator ────────────────────────────────────────────────────────────
+// PH-V2-A-06: BlurView background + haptic feedback on tab press
 function TabNavigator({ showToast }) {
     return (
         <Tab.Navigator
+            screenListeners={{
+                tabPress: () => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                },
+            }}
             screenOptions={({ route }) => ({
                 tabBarIcon: ({ focused }) => (
                     <View style={[styles.tabIconWrap, focused && styles.tabIconActive]}>
@@ -79,6 +87,10 @@ function TabNavigator({ showToast }) {
                     <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{route.name}</Text>
                 ),
                 tabBarStyle:  styles.tabBar,
+                tabBarBackground: () => (
+                    <BlurView intensity={80} tint="dark" style={{ flex: 1, backgroundColor: 'rgba(10,10,12,0.85)' }} />
+                ),
+                tabBarActiveTintColor: CYAN,
                 headerShown:  false,
             })}
         >

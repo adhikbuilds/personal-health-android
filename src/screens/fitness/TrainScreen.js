@@ -3,10 +3,11 @@
 // CameraView from expo-camera/next does NOT have takePictureAsync — that's why
 // real AI analysis was always falling back to simulation mode.
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions, ScrollView, Animated } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
-import { useUser } from '../context/UserContext';
-import api from '../services/api';
+import { BlurView } from 'expo-blur';
+import { useUser } from '../../context/UserContext';
+import api from '../../services/api';
 
 const C = { bg: '#050a14', cyan: '#06b6d4', orange: '#f97316', green: '#22c55e', red: '#ef4444', text: '#f1f5f9', muted: '#64748b', surf: 'rgba(255,255,255,0.05)' };
 const { width: W } = Dimensions.get('window');
@@ -366,6 +367,24 @@ export default function TrainScreen({ showToast, navigation }) {
         <View style={s.cameraWrap}>
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={'front'} />
 
+            {/* PH-V2-A-04: Glass live header */}
+            <BlurView intensity={60} tint="dark" style={s.glassHeader} pointerEvents="box-none">
+                <View style={s.glassHeaderInner}>
+                    <View style={s.glassLeft}>
+                        <View style={s.livePulseDot} />
+                        <Text style={s.liveLabel}>LIVE</Text>
+                    </View>
+                    <View style={s.glassCenter}>
+                        <Text style={s.glassFormScore}>{metrics?.form_score ?? '--'}</Text>
+                        <Text style={s.glassFormUnit}>/ 100</Text>
+                    </View>
+                    <View style={s.glassRight}>
+                        <Text style={s.glassPhase}>{metrics?.phase ? metrics.phase.toUpperCase() : 'READY'}</Text>
+                        {repCount > 0 && <Text style={s.glassReps}>{repCount} REPS</Text>}
+                    </View>
+                </View>
+            </BlurView>
+
             {/* Top bar */}
             <View style={s.camTopBar}>
                 <View style={s.recBadge}>
@@ -471,4 +490,28 @@ const s = StyleSheet.create({
     toolBtnIcon: { fontSize: 22, marginBottom: 5 },
     toolBtnLabel: { fontSize: 12, fontWeight: '800', color: C.text, marginBottom: 2 },
     toolBtnSub: { fontSize: 9, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+    // PH-V2-A-04: Glass live header
+    glassHeader: {
+        position: 'absolute', top: 0, left: 0, right: 0,
+        paddingTop: 44, paddingBottom: 12, paddingHorizontal: 16,
+        borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
+        overflow: 'hidden',
+    },
+    glassHeaderInner: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    },
+    glassLeft: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 70 },
+    livePulseDot: {
+        width: 8, height: 8, borderRadius: 4,
+        backgroundColor: '#10b981',
+        shadowColor: '#10b981', shadowOpacity: 0.6, shadowRadius: 6,
+    },
+    liveLabel: { color: '#10b981', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+    glassCenter: { flexDirection: 'row', alignItems: 'baseline' },
+    glassFormScore: { color: '#f59e0b', fontSize: 32, fontWeight: '900', letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+    glassFormUnit: { color: '#8a8f98', fontSize: 12, fontWeight: '600', marginLeft: 2 },
+    glassRight: { alignItems: 'flex-end', minWidth: 70 },
+    glassPhase: { color: '#06b6d4', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+    glassReps: { color: '#8a8f98', fontSize: 10, fontWeight: '600', marginTop: 2, letterSpacing: 0.5 },
 });

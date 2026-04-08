@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Svg, { Polyline, Line } from 'react-native-svg';
-import api from '../services/api';
+import api from '../../services/api';
 
 const { width: W } = Dimensions.get('window');
 const WF_H = 80;

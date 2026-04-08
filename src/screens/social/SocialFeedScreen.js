@@ -5,10 +5,10 @@ import {
     TouchableOpacity, ScrollView, RefreshControl,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { C } from '../styles/colors';
-import { MOCK_FEED_POSTS, TRENDING_CREATORS } from '../data/constants';
-import { useUser } from '../context/UserContext';
-import api from '../services/api';
+import { C } from '../../styles/colors';
+import { MOCK_FEED_POSTS, TRENDING_CREATORS } from '../../data/constants';
+import { useUser } from '../../context/UserContext';
+import api from '../../services/api';
 
 const FOLLOWED_KEY = '@followed_creators';
 const TABS = ['For You', 'Following'];

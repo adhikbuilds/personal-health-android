@@ -4,9 +4,9 @@ import {
     View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView,
     Modal, Pressable, FlatList, Alert,
 } from 'react-native';
-import { useUser } from '../context/UserContext';
-import { NUTRITION_PLANS, PLAYFIELDS } from '../data/constants';
-import api from '../services/api';
+import { useUser } from '../../context/UserContext';
+import { NUTRITION_PLANS, PLAYFIELDS } from '../../data/constants';
+import api from '../../services/api';
 
 const C = {
     bg: '#0f172a', surf: '#1e293b', deep: '#0d1829', cyan: '#06b6d4',
