@@ -2,8 +2,8 @@
 // Fixes: gap→margin in flex layouts, useUser() hook
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
-import { useUser } from '../context/UserContext';
-import { METRICS_DB } from '../data/constants';
+import { useUser } from '../../context/UserContext';
+import { METRICS_DB } from '../../data/constants';
 import Svg, { Polygon, Circle, Line, Text as SvgText } from 'react-native-svg';
 
 const C = { bg: '#0f172a', surf: '#1e293b', cyan: '#06b6d4', orange: '#f97316', green: '#22c55e', yellow: '#facc15', muted: '#64748b', text: '#f1f5f9', border: 'rgba(255,255,255,0.08)' };

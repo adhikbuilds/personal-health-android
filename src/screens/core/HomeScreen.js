@@ -8,15 +8,17 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useUser } from '../context/UserContext';
-import api from '../services/api';
-import { C } from '../styles/colors';
+import { useUser } from '../../context/UserContext';
+import api from '../../services/api';
+import { C } from '../../styles/colors';
+import StatCard from '../../components/StatCard';
+import InsightCard from '../../components/InsightCard';
 import {
     DAILY_TRACKER_DEFAULTS,
     HOME_CONTENT_GRID,
     FEATURED_BANNERS,
     TRENDING_CREATORS,
-} from '../data/constants';
+} from '../../data/constants';
 
 const { width: SW } = Dimensions.get('window');
 const TODAY_KEY = `@daily_tracker_${new Date().toISOString().slice(0, 10)}`;
@@ -209,6 +211,65 @@ export default function HomeScreen({ navigation, showToast }) {
                     <FitnessScoreCard fitnessScore={fitnessScore} streak={streak} />
                 </LinearGradient>
 
+                {/* PH-V2-A-05: Premium 2x2 KPI grid using StatCard */}
+                <View style={sc.section}>
+                    <Text style={sc.sectionTitle}>TODAY'S SNAPSHOT</Text>
+                    <View style={sc.statGrid}>
+                        <View style={sc.statGridItem}>
+                            <StatCard
+                                label="BPI"
+                                value={user?.bpi?.toLocaleString() || '0'}
+                                icon="trending-up"
+                                color="brand"
+                            />
+                        </View>
+                        <View style={sc.statGridItem}>
+                            <StatCard
+                                label="Sessions"
+                                value={user?.sessions || '0'}
+                                icon="calendar"
+                                color="info"
+                            />
+                        </View>
+                        <View style={sc.statGridItem}>
+                            <StatCard
+                                label="Form Score"
+                                value={fitnessScore?.score || '—'}
+                                icon="pulse"
+                                color="pb"
+                            />
+                        </View>
+                        <View style={sc.statGridItem}>
+                            <StatCard
+                                label="Streak"
+                                value={`${streak}d`}
+                                icon="flame"
+                                color="caution"
+                            />
+                        </View>
+                    </View>
+                </View>
+
+                {/* PH-V2-A-05: Optional InsightCard surface */}
+                {fitnessScore?.score >= 75 && (
+                    <View style={sc.section}>
+                        <InsightCard
+                            type="success"
+                            title="Strong Form Today"
+                            message={`Your form score of ${fitnessScore.score} puts you in the top tier. Keep this consistency through the week.`}
+                        />
+                    </View>
+                )}
+                {fitnessScore?.score > 0 && fitnessScore?.score < 55 && (
+                    <View style={sc.section}>
+                        <InsightCard
+                            type="caution"
+                            title="Form Needs Attention"
+                            message="Your recent sessions show room for improvement. Consider reviewing fundamentals before your next hard session."
+                        />
+                    </View>
+                )}
+
                 {/* ── Daily Tracker ── */}
                 <View style={sc.section}>
                     <View style={sc.sectionHeader}>
@@ -383,4 +444,16 @@ const sc = StyleSheet.create({
     followBtn:     { backgroundColor: 'rgba(249,115,22,0.15)', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(249,115,22,0.4)' },
     followBtnActive:{ backgroundColor: C.orange },
     followBtnText: { fontSize: 10, color: C.orange, fontWeight: '800' },
+
+    // PH-V2-A-05: 2x2 stat grid
+    statGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginHorizontal: -6,
+    },
+    statGridItem: {
+        width: '50%',
+        paddingHorizontal: 6,
+        paddingBottom: 12,
+    },
 });

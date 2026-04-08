@@ -7,10 +7,10 @@ import {
     TouchableOpacity, TextInput, Animated, Dimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { C, LEVEL_COLORS, LEVEL_LABELS } from '../styles/colors';
-import { computeFitnessScore, FITNESS_TEST_BANDS } from '../data/constants';
-import { useUser } from '../context/UserContext';
-import api from '../services/api';
+import { C, LEVEL_COLORS, LEVEL_LABELS } from '../../styles/colors';
+import { computeFitnessScore, FITNESS_TEST_BANDS } from '../../data/constants';
+import { useUser } from '../../context/UserContext';
+import api from '../../services/api';
 
 const HISTORY_KEY = '@fitness_test_history';
 const { width: SW } = Dimensions.get('window');

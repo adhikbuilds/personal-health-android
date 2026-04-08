@@ -6,8 +6,8 @@ import {
     View, Text, StyleSheet, SafeAreaView, ScrollView,
     TouchableOpacity, FlatList, Linking, Dimensions,
 } from 'react-native';
-import { C } from '../styles/colors';
-import { SPORTS_LIBRARY } from '../data/constants';
+import { C } from '../../styles/colors';
+import { SPORTS_LIBRARY } from '../../data/constants';
 
 const { width: SW } = Dimensions.get('window');
 const CARD_W = (SW - 48) / 2;

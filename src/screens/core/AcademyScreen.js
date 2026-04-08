@@ -6,8 +6,8 @@ import {
     View, Text, ScrollView, StyleSheet, TouchableOpacity,
     SafeAreaView, FlatList, Dimensions,
 } from 'react-native';
-import { C } from '../styles/colors';
-import { SPORTS_LIBRARY, SPORTS_ACADEMY } from '../data/constants';
+import { C } from '../../styles/colors';
+import { SPORTS_LIBRARY, SPORTS_ACADEMY } from '../../data/constants';
 
 const { width: SW } = Dimensions.get('window');
 const CATEGORIES = ['All', 'team', 'court', 'combat', 'track', 'aquatic', 'precision'];

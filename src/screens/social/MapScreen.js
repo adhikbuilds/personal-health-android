@@ -4,8 +4,8 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
-import { PLAYFIELDS } from '../data/constants';
-import { API_BASE } from '../services/api';
+import { PLAYFIELDS } from '../../data/constants';
+import { API_BASE } from '../../services/api';
 
 // Map served from the proxy-server /map route (no Live Server needed)
 const DEV_MAP_URL = `${API_BASE}/map`;

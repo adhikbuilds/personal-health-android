@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
 import Svg, { Line, Circle, Text as SvgText } from 'react-native-svg';
-import api from '../services/api';
+import api from '../../services/api';
 
 const { width: W, height: H } = Dimensions.get('window');
 
