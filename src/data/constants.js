@@ -279,14 +279,15 @@ export const DAILY_TRACKER_DEFAULTS = {
 
 // ─── Home Content Grid (8 tiles) ─────────────────────────────────────────────
 export const HOME_CONTENT_GRID = [
+  { id: 'training_plan', label: 'Training Plan',   emoji: '📋', color: '#06b6d4', route: 'TrainingPlan' },
+  { id: 'huddle',        label: 'Huddle Mode',     emoji: '👥', color: '#8b5cf6', route: 'Huddle' },
   { id: 'learn_sports',  label: 'Learn Sports',    emoji: '⚽', color: '#22c55e', route: 'LearnSports' },
-  { id: 'playfields',    label: 'Find Playfields',  emoji: '📍', color: '#06b6d4', route: 'Playfields' },
+  { id: 'playfields',    label: 'Find Playfields',  emoji: '📍', color: '#3b82f6', route: 'Playfields' },
   { id: 'yoga',          label: 'Yoga Centres',     emoji: '🧘', color: '#8b5cf6', route: null },
   { id: 'nutrition',     label: 'Nutrition',        emoji: '🥗', color: '#f97316', route: 'Hub', routeParams: { section: 'nutrition' } },
   { id: 'pe_lessons',    label: 'PE Lessons',       emoji: '📚', color: '#eab308', route: 'Classes' },
   { id: 'live_sessions', label: 'Live Sessions',    emoji: '📡', color: '#ef4444', route: 'SocialFeed' },
   { id: 'quiz',          label: 'Quiz',             emoji: '🧠', color: '#ec4899', route: null },
-  { id: 'assignments',   label: 'Assignments',      emoji: '📝', color: '#84cc16', route: null },
 ];
 
 // ─── Featured Banners ─────────────────────────────────────────────────────────

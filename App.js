@@ -26,6 +26,9 @@ import FitnessTestScreen   from './src/screens/FitnessTestScreen';
 import GetActiveScreen     from './src/screens/GetActiveScreen';
 import ClassesScreen       from './src/screens/ClassesScreen';
 import SocialFeedScreen    from './src/screens/SocialFeedScreen';
+import TrainingPlanScreen  from './src/screens/TrainingPlanScreen';
+import ScoreCardScreen     from './src/screens/ScoreCardScreen';
+import HuddleScreen        from './src/screens/HuddleScreen';
 
 const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -137,6 +140,21 @@ function AppNavigator({ showToast }) {
             <Stack.Screen
                 name="SocialFeed"
                 component={SocialFeedScreen}
+                options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+                name="TrainingPlan"
+                component={TrainingPlanScreen}
+                options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+                name="ScoreCard"
+                component={ScoreCardScreen}
+                options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }}
+            />
+            <Stack.Screen
+                name="Huddle"
+                component={HuddleScreen}
                 options={{ animation: 'slide_from_right' }}
             />
         </Stack.Navigator>

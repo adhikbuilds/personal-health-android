@@ -175,6 +175,70 @@ export const api = {
             body: JSON.stringify({ follower: athleteId, following: creatorId }),
         }),
 
+    // ─── Dynamic Training Plan ───────────────────────────────────────────
+    /** Get this week's personalized training plan (generates if missing) */
+    getWeeklyPlan: (athleteId) =>
+        fetchJSON(`/plan/${athleteId}/weekly`),
+
+    /** Force a fresh plan for the current week */
+    regeneratePlan: (athleteId) =>
+        fetchJSON(`/plan/${athleteId}/regenerate`, { method: 'POST' }),
+
+    /** Mark a plan day as completed (adherence tracking) */
+    completePlanDay: (athleteId, dateStr) =>
+        fetchJSON(`/plan/${athleteId}/day/${dateStr}/complete`, { method: 'POST' }),
+
+    /** Fetch up to N past weeks of plans */
+    getPlanHistory: (athleteId, limit = 4) =>
+        fetchJSON(`/plan/${athleteId}/history?limit=${limit}`),
+
+    // ─── Weekly Summary ────────────────────────────────────────────────
+    /** Structured weekly recap with coaching note */
+    getWeeklySummary: (athleteId, days = 7) =>
+        fetchJSON(`/athlete/${athleteId}/weekly-summary?days=${days}`),
+
+    // ─── Progressive Load ────────────────────────────────────────────────
+    /** ACWR-based load recommendation */
+    getLoadRecommendation: (athleteId) =>
+        fetchJSON(`/athlete/${athleteId}/load-recommendation`),
+
+    // ─── Score Card ──────────────────────────────────────────────────────
+    /** Get JSON scorecard data for a completed session */
+    getScorecard: (sessionId) =>
+        fetchJSON(`/session/${sessionId}/scorecard`),
+
+    /** Get scorecard PNG URL (for sharing) */
+    getScorecardImageUrl: (sessionId) =>
+        `${API_BASE}/session/${sessionId}/scorecard.png`,
+
+    // ─── Huddle Mode ─────────────────────────────────────────────────────
+    /** Create a group training huddle */
+    createHuddle: (name, sport, coachId = null) =>
+        fetchJSON('/huddle/create', {
+            method: 'POST',
+            body: JSON.stringify({ name, sport, coach_id: coachId }),
+        }),
+
+    /** Join an existing huddle */
+    joinHuddle: (huddleId, athleteId) =>
+        fetchJSON(`/huddle/${huddleId}/join`, {
+            method: 'POST',
+            body: JSON.stringify({ athlete_id: athleteId }),
+        }),
+
+    /** Get live huddle leaderboard */
+    getHuddleLive: (huddleId) =>
+        fetchJSON(`/huddle/${huddleId}/live`),
+
+    /** List all huddles */
+    getHuddles: (status = '') =>
+        fetchJSON(`/huddles${status ? `?status=${status}` : ''}`),
+
+    // ─── Data Export ─────────────────────────────────────────────────────
+    /** Get dataset stats (data flywheel monitoring) */
+    getExportStats: () =>
+        fetchJSON('/admin/export/stats'),
+
     /** Biomechanics live stream: WebSocket for real-time keypoint/pose data. */
     connectLiveStream: (sessionId, onMessage, onError, onClose) => {
         const wsUrl = `${WS_BASE_RESOLVED}/session/${sessionId}/live-stream`;
