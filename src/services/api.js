@@ -192,6 +192,23 @@ export const api = {
     getPlanHistory: (athleteId, limit = 4) =>
         fetchJSON(`/plan/${athleteId}/history?limit=${limit}`),
 
+    // ─── Progress & Readiness ──────────────────────────────────────────
+    /** Multi-day form trend, BPI curve, session stats */
+    getProgress: (id, days = 30) =>
+        fetchJSON(`/progress/${id}?days=${days}`),
+
+    /** Joints deviating most from ideal ranges */
+    getWeakJoints: (id, days = 30) =>
+        fetchJSON(`/weak-joints/${id}?days=${days}`),
+
+    /** Injury risk band + symmetry deviation */
+    getInjuryRisk: (id, days = 14) =>
+        fetchJSON(`/injury-risk/${id}?days=${days}`),
+
+    /** Competition readiness score with component breakdown */
+    getReadiness: (id, days = 14) =>
+        fetchJSON(`/readiness/${id}?days=${days}`),
+
     // ─── Weekly Summary ────────────────────────────────────────────────
     /** Structured weekly recap with coaching note */
     getWeeklySummary: (athleteId, days = 7) =>
