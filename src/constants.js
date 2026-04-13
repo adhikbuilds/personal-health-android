@@ -1,13 +1,11 @@
 /**
  * Backend Constants
- * Change BACKEND_HOST to your server IP.
+ * Uses localhost — adb reverse tunnels USB to computer.
+ * Works regardless of wifi network.
  */
 
-// ──────────────────────────────────────────────────
-// CHANGE THIS to your server's IP address
-const BACKEND_HOST = '172.17.62.56';
+const BACKEND_HOST = 'localhost';
 const BACKEND_PORT = 8082;
-// ──────────────────────────────────────────────────
 
 export { BACKEND_HOST };
 export const FASTAPI_PORT = BACKEND_PORT;

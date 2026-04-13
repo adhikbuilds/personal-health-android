@@ -183,11 +183,20 @@ export default function RPPGScreen({ navigation, route }) {
                 {/* Instructions or BPM */}
                 {!scanning ? (
                     <Fade style={$.instructions}>
-                        <View style={$.fingerCircle}>
-                            <Text style={$.fingerIcon}>{'☝'}</Text>
+                        <View style={$.pulseRing}>
+                            <View style={$.pulseInner}>
+                                <Text style={$.heartIcon}>{'♥'}</Text>
+                            </View>
                         </View>
-                        <Text style={$.instrTitle}>Place your finger</Text>
-                        <Text style={$.instrSub}>Cover the back camera completely with your fingertip, then tap START</Text>
+                        <Text style={$.instrTitle}>Measure your pulse</Text>
+                        <Text style={$.instrSub}>Place your fingertip gently over the{'\n'}back camera lens, then tap START</Text>
+                        <View style={$.stepsRow}>
+                            <View style={$.step}><Text style={$.stepNum}>1</Text><Text style={$.stepText}>Cover{'\n'}camera</Text></View>
+                            <View style={$.stepLine} />
+                            <View style={$.step}><Text style={$.stepNum}>2</Text><Text style={$.stepText}>Hold{'\n'}still</Text></View>
+                            <View style={$.stepLine} />
+                            <View style={$.step}><Text style={$.stepNum}>3</Text><Text style={$.stepText}>Get{'\n'}results</Text></View>
+                        </View>
                     </Fade>
                 ) : (
                     <Fade>
@@ -256,10 +265,16 @@ const $ = StyleSheet.create({
     body: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
 
     instructions: { alignItems: 'center' },
-    fingerCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
-    fingerIcon: { fontSize: 40 },
-    instrTitle: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 8 },
-    instrSub: { fontSize: 14, color: '#555', textAlign: 'center', lineHeight: 22 },
+    pulseRing: { width: 120, height: 120, borderRadius: 60, borderWidth: 2, borderColor: 'rgba(239,68,68,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 28 },
+    pulseInner: { width: 90, height: 90, borderRadius: 45, backgroundColor: 'rgba(239,68,68,0.08)', alignItems: 'center', justifyContent: 'center' },
+    heartIcon: { fontSize: 36, color: '#ef4444' },
+    instrTitle: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 10, fontFamily: CONDENSED, letterSpacing: 1 },
+    instrSub: { fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 22, marginBottom: 32 },
+    stepsRow: { flexDirection: 'row', alignItems: 'center' },
+    step: { alignItems: 'center', width: 64 },
+    stepNum: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#111', color: '#06b6d4', fontSize: 13, fontWeight: '800', textAlign: 'center', lineHeight: 28, overflow: 'hidden', marginBottom: 6 },
+    stepText: { fontSize: 10, color: '#555', textAlign: 'center', lineHeight: 14 },
+    stepLine: { width: 24, height: 1, backgroundColor: '#1a1a1a', marginBottom: 14 },
 
     bpmNum: { fontSize: 96, fontWeight: '900', fontFamily: CONDENSED },
     bpmLabel: { fontSize: 12, fontWeight: '700', color: '#444', letterSpacing: 4, marginTop: -10, marginBottom: 8 },
