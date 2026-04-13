@@ -339,19 +339,23 @@ export default function TrainScreen({ showToast, navigation, route }) {
     // ── Setup Screen ─────────────────────────────────────────────────────────────
 
     if (!isActive) {
+        const sportLabel = SPORTS.find(sp => sp.key === sport)?.label || 'VERTICAL JUMP';
         return (
-            <View style={[s.root, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
-                <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: ins.bottom + 20 }} showsVerticalScrollIndicator={false}>
-                    <Fade>
-                        <Text style={s.title}>TRAIN</Text>
-                        <Text style={s.subtitle}>Select your sport and start a session</Text>
+            <View style={[s.root, { paddingTop: ins.top }]}>
+                <ScrollView contentContainerStyle={{ paddingBottom: ins.bottom + 40 }} showsVerticalScrollIndicator={false}>
+
+                    {/* Hero section — the sport is the visual focus */}
+                    <Fade style={s.setupHero}>
+                        <Text style={s.setupEyebrow}>ACTIVEBHARAT</Text>
+                        <Text style={s.setupTitle}>{sportLabel}</Text>
+                        <Text style={s.setupSub}>AI-powered biomechanics session</Text>
                     </Fade>
 
+                    {/* Sport selector — horizontal tabs */}
                     <Fade delay={80}>
-                        <Text style={[s.sectionLabel, { marginTop: 28 }]}>SPORT MODE</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 28 }}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sportScroll}>
                             {SPORTS.map((sp) => (
-                                <Tap key={sp.key} onPress={() => setSport(sp.key)} style={{ marginRight: 24 }}>
+                                <Tap key={sp.key} onPress={() => setSport(sp.key)} style={s.sportItem} haptic={true}>
                                     <Text style={[s.sportTab, sport === sp.key && s.sportTabActive]}>{sp.label}</Text>
                                     {sport === sp.key && <View style={s.sportUnderline} />}
                                 </Tap>
@@ -359,24 +363,31 @@ export default function TrainScreen({ showToast, navigation, route }) {
                         </ScrollView>
                     </Fade>
 
+                    {/* CTA — dominant, full bleed gradient */}
                     <Fade delay={160}>
-                        <Text style={[s.sectionLabel, { marginBottom: 14 }]}>BEFORE YOU START</Text>
-                        {[
-                            'Good lighting — face a window',
-                            'Full body visible — head to feet',
-                            'Prop phone at waist height, 2m away',
-                            'Wear fitted clothes for best tracking',
-                        ].map((item, i) => (
-                            <Text key={item} style={s.tipText}>{item}</Text>
-                        ))}
-                    </Fade>
-
-                    <Fade delay={240} style={{ marginTop: 32 }}>
                         <Tap onPress={startSession}>
-                            <LinearGradient colors={['#0c4a6e','#0891b2','#06b6d4']} start={{x:0,y:0}} end={{x:1,y:1}} style={s.gradientBtn}>
-                                <Text style={s.gradientBtnText}>START SESSION</Text>
+                            <LinearGradient colors={['#0c4a6e','#0891b2','#06b6d4']} start={{x:0,y:0}} end={{x:1,y:1}} style={s.setupCta}>
+                                <Text style={s.setupCtaLabel}>TAP TO BEGIN</Text>
+                                <Text style={s.setupCtaTitle}>START{'\n'}SESSION</Text>
+                                <View style={s.setupCtaCircle}><Text style={s.setupCtaGo}>GO</Text></View>
                             </LinearGradient>
                         </Tap>
+                    </Fade>
+
+                    {/* Tips — minimal, tucked at bottom */}
+                    <Fade delay={240} style={s.tipsSection}>
+                        <Text style={s.sectionLabel}>SETUP TIPS</Text>
+                        {[
+                            'Good lighting — face a window',
+                            'Full body in frame — head to feet',
+                            'Phone at waist height, 2m away',
+                            'Fitted clothes for best tracking',
+                        ].map((item) => (
+                            <View key={item} style={s.tipRow}>
+                                <View style={s.tipDot} />
+                                <Text style={s.tipText}>{item}</Text>
+                            </View>
+                        ))}
                     </Fade>
                 </ScrollView>
             </View>
@@ -470,21 +481,37 @@ const s = StyleSheet.create({
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' },
     mutedText: { color: '#64748b', fontSize: 14 },
 
-    // Setup
-    title: { fontSize: 32, fontWeight: '900', color: '#fff', letterSpacing: 2, fontFamily: CONDENSED, marginBottom: 4 },
-    subtitle: { fontSize: 13, color: '#4b5563', fontWeight: '400' },
-    sectionLabel: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 16 },
+    // Setup hero
+    setupHero: { alignItems: 'center', paddingTop: 40, paddingBottom: 32 },
+    setupEyebrow: { fontSize: 10, fontWeight: '800', color: '#4b5563', letterSpacing: 4, marginBottom: 16 },
+    setupTitle: { fontSize: 52, fontWeight: '900', color: '#fff', letterSpacing: -1, fontFamily: CONDENSED, textAlign: 'center' },
+    setupSub: { fontSize: 13, color: '#4b5563', fontWeight: '400', marginTop: 8 },
 
     // Sport tabs
-    sportTab: { fontSize: 13, fontWeight: '700', color: '#6b7280', letterSpacing: 2, paddingBottom: 8 },
+    sportScroll: { paddingHorizontal: 24, paddingBottom: 4, marginBottom: 24 },
+    sportItem: { marginRight: 24 },
+    sportTab: { fontSize: 13, fontWeight: '700', color: '#4b5563', letterSpacing: 2, paddingBottom: 8 },
     sportTabActive: { color: '#fff' },
     sportUnderline: { height: 2, backgroundColor: '#06b6d4', borderRadius: 1 },
 
-    // Tips
-    tipText: { fontSize: 13, color: '#6b7280', fontWeight: '400', marginBottom: 10, lineHeight: 18 },
+    // Setup CTA
+    setupCta: { marginHorizontal: 20, borderRadius: 8, paddingVertical: 40, paddingHorizontal: 28, marginBottom: 36, position: 'relative',
+        ...Platform.select({ android: { elevation: 16 }, ios: { shadowColor: '#06b6d4', shadowOpacity: 0.35, shadowOffset: { width: 0, height: 14 }, shadowRadius: 28 } }),
+    },
+    setupCtaLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.35)', letterSpacing: 4, marginBottom: 8 },
+    setupCtaTitle: { fontSize: 48, fontWeight: '900', color: '#fff', lineHeight: 50, letterSpacing: -1, fontFamily: CONDENSED },
+    setupCtaCircle: { position: 'absolute', bottom: 28, right: 28, width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+    setupCtaGo: { fontSize: 16, fontWeight: '900', color: '#fff', letterSpacing: 1 },
 
-    // Gradient CTA
-    gradientBtn: { borderRadius: 6, paddingVertical: 18, alignItems: 'center' },
+    // Tips
+    tipsSection: { paddingHorizontal: 24 },
+    sectionLabel: { fontSize: 11, fontWeight: '800', color: '#374151', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 14 },
+    tipRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+    tipDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#374151', marginRight: 12 },
+    tipText: { fontSize: 13, color: '#6b7280', fontWeight: '400', lineHeight: 18 },
+
+    // Gradient CTA (used in permission + summary)
+    gradientBtn: { borderRadius: 6, paddingVertical: 18, alignItems: 'center', marginHorizontal: 20 },
     gradientBtnText: { color: '#fff', fontWeight: '900', fontSize: 14, letterSpacing: 3, fontFamily: CONDENSED },
 
     // Camera view
