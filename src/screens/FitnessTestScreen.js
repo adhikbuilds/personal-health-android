@@ -3,9 +3,10 @@
 // Scoring: L1 (Work Harder) → L7 (Excellent) matching the Fit India framework
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, SafeAreaView, ScrollView,
+    View, Text, StyleSheet, ScrollView,
     TouchableOpacity, TextInput, Animated, Dimensions, Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { C, LEVEL_COLORS, LEVEL_LABELS } from '../styles/colors';
 import { computeFitnessScore, FITNESS_TEST_BANDS } from '../data/constants';
@@ -146,6 +147,7 @@ function RunTimer({ onTimeSet }) {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function FitnessTestScreen({ navigation }) {
+    const ins = useSafeAreaInsets();
     const { userData, updateFitnessScore } = useUser();
     const [step, setStep] = useState('intro'); // intro | bmi | results
     const [saving, setSaving] = useState(false);
@@ -228,7 +230,7 @@ export default function FitnessTestScreen({ navigation }) {
     // ── INTRO ────────────────────────────────────────────────────────────
     if (step === 'intro') {
         return (
-            <SafeAreaView style={s.safe}>
+            <View style={[s.safe, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
                 <View style={s.topbar}>
                     <TouchableOpacity onPress={() => navigation.goBack()}>
                         <Text style={s.back}>‹ Back</Text>
@@ -236,7 +238,7 @@ export default function FitnessTestScreen({ navigation }) {
                     <Text style={s.title}>Fitness Test</Text>
                     <View style={{ width: 60 }} />
                 </View>
-                <ScrollView contentContainerStyle={s.introContent}>
+                <ScrollView contentContainerStyle={[s.introContent, { paddingBottom: ins.bottom + 20 }]}>
                     <Text style={s.introEmoji}>🏃</Text>
                     <Text style={s.introTitle}>Take your Fitness Test</Text>
                     <Text style={s.introDesc}>
@@ -264,14 +266,14 @@ export default function FitnessTestScreen({ navigation }) {
                         <Text style={s.startBtnText}>Start Test →</Text>
                     </TouchableOpacity>
                 </ScrollView>
-            </SafeAreaView>
+            </View>
         );
     }
 
     // ── BMI + FLEXIBILITY + RUN ──────────────────────────────────────────
     if (step === 'bmi') {
         return (
-            <SafeAreaView style={s.safe}>
+            <View style={[s.safe, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
                 <View style={s.topbar}>
                     <TouchableOpacity onPress={() => setStep('intro')}>
                         <Text style={s.back}>‹ Back</Text>
@@ -282,7 +284,7 @@ export default function FitnessTestScreen({ navigation }) {
                 <View style={s.userBadge}>
                     <Text style={s.userBadgeText}>👤 {userData.name}</Text>
                 </View>
-                <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+                <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: ins.bottom + 20 }}>
 
                     {/* BMI */}
                     <View style={s.inputCard}>
@@ -400,13 +402,13 @@ export default function FitnessTestScreen({ navigation }) {
                         <Text style={s.startBtnText}>Calculate Score →</Text>
                     </TouchableOpacity>
                 </ScrollView>
-            </SafeAreaView>
+            </View>
         );
     }
 
     // ── RESULTS ──────────────────────────────────────────────────────────
     return (
-        <SafeAreaView style={s.safe}>
+        <View style={[s.safe, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
             <View style={s.topbar}>
                 <TouchableOpacity onPress={() => setStep('bmi')}>
                     <Text style={s.back}>‹ Retake</Text>
@@ -414,7 +416,7 @@ export default function FitnessTestScreen({ navigation }) {
                 <Text style={s.title}>Your Results</Text>
                 <View style={{ width: 60 }} />
             </View>
-            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: ins.bottom + 20 }}>
 
                 <Text style={s.overallLabel}>Overall Fitness Score</Text>
                 <LevelBand score={results.overall} level={results.level} />
@@ -451,7 +453,7 @@ export default function FitnessTestScreen({ navigation }) {
                     <Text style={s.ghostBtnText}>Retake Test ↺</Text>
                 </TouchableOpacity>
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 

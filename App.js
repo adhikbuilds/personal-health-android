@@ -121,7 +121,7 @@ export default function App() {
 
     return (
         <SafeAreaProvider>
-            <StatusBar style="light" backgroundColor={BG} />
+            <StatusBar style="light" backgroundColor="transparent" translucent />
             <UserProvider>
                 <NavigationContainer>
                     <AppNavigator showToast={showToast} />

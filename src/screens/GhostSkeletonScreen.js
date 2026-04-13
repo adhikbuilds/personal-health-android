@@ -17,10 +17,11 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
+    View, Text, StyleSheet, TouchableOpacity,
     Dimensions, Animated, Easing,
 } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Line, Circle, Text as SvgText } from 'react-native-svg';
 import api from '../services/api';
 
@@ -240,6 +241,7 @@ const cd = StyleSheet.create({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function GhostSkeletonScreen({ navigation, route }) {
+    const ins = useSafeAreaInsets();
     const sport = route?.params?.sport || 'vertical_jump';
     const idealKP = getIdeal(sport);
 
@@ -327,10 +329,10 @@ export default function GhostSkeletonScreen({ navigation, route }) {
 
     const getFeedbackMsg = (score) => {
         if (!score) return 'Align your body with the green ghost skeleton';
-        if (score >= 85) return '✅ Excellent! Hold this position...';
-        if (score >= 70) return '👍 Good — straighten up a bit more';
-        if (score >= 50) return '⚠️ Move closer to the ghost skeleton position';
-        return '❌ Form too different — check camera angle and distance';
+        if (score >= 85) return 'Excellent! Hold this position...';
+        if (score >= 70) return 'Good — straighten up a bit more';
+        if (score >= 50) return 'Move closer to the ghost skeleton position';
+        return 'Form too different — check camera angle and distance';
     };
 
     const handleStart = useCallback(() => {
@@ -344,15 +346,15 @@ export default function GhostSkeletonScreen({ navigation, route }) {
 
     if (!permission.granted) {
         return (
-            <SafeAreaView style={s.safeBg}>
+            <View style={[s.safeBg, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
                 <View style={s.center}>
-                    <Text style={s.permTitle}>📷 Camera Permission</Text>
+                    <Text style={s.permTitle}>Camera Permission</Text>
                     <Text style={s.permText}>Camera access is needed to show the skeleton overlay and compare your form with the AI model.</Text>
                     <TouchableOpacity style={s.grantBtn} onPress={() => Camera.requestCameraPermissionsAsync().then(({ status }) => setPermission({ granted: status === 'granted' }))}>
                         <Text style={s.btnText}>Grant Camera Access</Text>
                     </TouchableOpacity>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
@@ -381,7 +383,7 @@ export default function GhostSkeletonScreen({ navigation, route }) {
             {phase === 'countdown' && <CountdownOverlay seconds={countdown} />}
 
             {/* ── Top HUD ── */}
-            <SafeAreaView style={s.hud}>
+            <View style={[s.hud, { paddingTop: ins.top + 8 }]}>
                 <View style={s.hudRow}>
                     <TouchableOpacity style={s.backBtn} onPress={() => navigation?.goBack()}>
                         <Text style={s.backTxt}>← Back</Text>
@@ -417,10 +419,10 @@ export default function GhostSkeletonScreen({ navigation, route }) {
                         <Text style={s.labelToggleTxt}>{showLabels ? 'Hide Labels' : 'Labels'}</Text>
                     </TouchableOpacity>
                 </View>
-            </SafeAreaView>
+            </View>
 
             {/* ── Bottom Panel ── */}
-            <View style={s.bottom}>
+            <View style={[s.bottom, { paddingBottom: ins.bottom + 20 }]}>
                 {/* Calibration dots */}
                 {phase === 'calibrating' || phase === 'ready' ? (
                     <View style={s.calibRow}>
@@ -431,7 +433,7 @@ export default function GhostSkeletonScreen({ navigation, route }) {
                             ]} />
                         ))}
                         <Text style={s.calibHint}>
-                            {calibReady ? '✅ Ready to start!' : `${Math.max(0, 3 - goodFrames)} more good frames needed`}
+                            {calibReady ? 'Ready to start!' : `${Math.max(0, 3 - goodFrames)} more good frames needed`}
                         </Text>
                     </View>
                 ) : (
@@ -453,7 +455,7 @@ export default function GhostSkeletonScreen({ navigation, route }) {
                     disabled={!calibReady}
                 >
                     <Text style={[s.btnText, !calibReady && { color: 'rgba(0,0,0,0.5)' }]}>
-                        {calibReady ? '🚀 Start Session' : phase === 'countdown' ? 'Positioning...' : 'Calibrating...'}
+                        {calibReady ? 'Start Session' : phase === 'countdown' ? 'Positioning...' : 'Calibrating...'}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -470,7 +472,7 @@ const s = StyleSheet.create({
     permText: { color: C.muted, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
     grantBtn: { backgroundColor: C.cyan, borderRadius: 12, paddingHorizontal: 28, paddingVertical: 13 },
     hud: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-    hudRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 8, gap: 8 },
+    hudRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 8 },
     backBtn: { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, paddingHorizontal: 13, paddingVertical: 8 },
     backTxt: { color: C.text, fontWeight: '700', fontSize: 13 },
     sportChip: { flex: 1, backgroundColor: 'rgba(6,182,212,0.12)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, alignItems: 'center' },
@@ -488,7 +490,7 @@ const s = StyleSheet.create({
         position: 'absolute', bottom: 0, left: 0, right: 0,
         backgroundColor: 'rgba(15,23,42,0.90)',
         borderTopLeftRadius: 22, borderTopRightRadius: 22,
-        padding: 20, paddingBottom: 34,
+        padding: 20,
     },
     calibRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
     calibDot: { width: 13, height: 13, borderRadius: 7, marginRight: 9 },
