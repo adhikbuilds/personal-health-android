@@ -151,6 +151,8 @@ export default function HomeScreen({ navigation }) {
                     <GradientDivider color="#ef4444" />
                     <ActionRow label="WEEKLY PLAN" color="#22c55e" onPress={() => navigation.navigate('TrainingPlan')} />
                     <GradientDivider color="#22c55e" />
+                    <ActionRow label="NUTRITION" color="#f97316" onPress={() => navigation.navigate('Nutrition')} />
+                    <GradientDivider color="#f97316" />
                     <ActionRow label="FITNESS TEST" color="#06b6d4" onPress={() => navigation.navigate('FitnessTest')} />
                 </Fade>
 

@@ -251,6 +251,14 @@ export const api = {
     getHuddles: (status = '') =>
         fetchJSON(`/huddles${status ? `?status=${status}` : ''}`),
 
+    // ─── Nutrition AI ────────────────────────────────────────────────────
+    /** Analyze food photo via Claude vision */
+    analyzeFood: (athleteId, imageBase64) =>
+        fetchJSON('/nutrition/analyze', {
+            method: 'POST',
+            body: JSON.stringify({ athlete_id: athleteId, image_b64: imageBase64 }),
+        }),
+
     // ─── Data Export ─────────────────────────────────────────────────────
     /** Get dataset stats (data flywheel monitoring) */
     getExportStats: () =>

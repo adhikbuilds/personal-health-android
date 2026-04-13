@@ -150,42 +150,40 @@ export default function TrainScreen({ showToast, navigation, route }) {
         setScoreHistory([]);
         setShowSummary(false);
         setSummary(null);
-        setAnalysisMode('sim');
-        analysisModeRef.current = 'sim';
+        setAnalysisMode('waiting');
+        analysisModeRef.current = 'waiting';
         setRepCount(0);
         lastPhaseRef.current = null;
 
-        // ── FRAME CAPTURE LOOP (every 4s) ──────────────────────────────────
-        // Fire-and-forget: captures JPEG → sends to server → returns instantly (202).
-        // Server queues MediaPipe analysis. Results come via the POLLING loop below.
-        intervalRef.current = setInterval(async () => {
+        // ── FRAME CAPTURE ────────────────────────────────────────────────────
+        const captureAndSend = async () => {
             try {
                 if (cameraRef.current && !isCapturingRef.current && sessionRef.current) {
                     isCapturingRef.current = true;
                     const photo = await cameraRef.current.takePictureAsync({
                         base64: true,
-                        quality: 0.4,        // Higher quality for reliable pose detection
-                        skipProcessing: false, // Let camera process for correct orientation
+                        quality: 0.4,
+                        skipProcessing: false,
                     });
                     isCapturingRef.current = false;
-
                     if (photo?.base64) {
-                        console.log(`[FRAME] Captured ${photo.base64.length} chars, sending to session ${sessionRef.current?.slice(0,8)}`);
-                        // Fire and forget — DO NOT await the result here
+                        setFrameNum(n => n + 1);
                         api.sendFrame(sessionRef.current, {
                             image_b64: photo.base64,
                             sport,
                             form_score: 0, form_quality: 'unknown', primary_feedback: ''
-                        }).then(r => {
-                            if (r) console.log(`[FRAME] Server response: frame=${r.frame_num} status=${r.status} score=${r.last_form_score}`);
-                            else console.log('[FRAME] Server returned null');
-                        }).catch(e => console.log(`[FRAME] Error: ${e.message}`));
+                        }).catch(() => {});
                     }
                 }
             } catch {
                 isCapturingRef.current = false;
             }
-        }, 4000); // capture every 4s
+        };
+
+        // Capture first frame after 1.5s (camera needs time to initialize)
+        setTimeout(captureAndSend, 1500);
+        // Then every 3s
+        intervalRef.current = setInterval(captureAndSend, 3000);
 
         // Simulation disabled — only real AI data shown.
         // If no pose detected, UI shows "NO POSE" instead of fake numbers.
@@ -234,9 +232,13 @@ export default function TrainScreen({ showToast, navigation, route }) {
                     }
                 }
             } catch (e) {
-                console.log('[POLL] Error:', e.message);
+                // If we can't reach the server, show error state
+                if (analysisModeRef.current !== 'real') {
+                    setAnalysisMode('error');
+                    analysisModeRef.current = 'error';
+                }
             }
-        }, 3000);
+        }, 2000);
 
     };
 
@@ -408,10 +410,12 @@ export default function TrainScreen({ showToast, navigation, route }) {
     const modeLabel = analysisMode === 'real' ? 'REAL AI'
         : analysisMode === 'no_pose' ? 'NO POSE'
         : analysisMode === 'waiting' ? 'ANALYZING...'
-        : 'SIMULATION';
+        : analysisMode === 'error' ? 'CONNECTION LOST'
+        : 'WAITING';
     const modeColor = analysisMode === 'real' ? '#22c55e'
         : analysisMode === 'no_pose' ? '#f97316'
         : analysisMode === 'waiting' ? '#06b6d4'
+        : analysisMode === 'error' ? '#ef4444'
         : '#64748b';
 
     return (
@@ -451,14 +455,19 @@ export default function TrainScreen({ showToast, navigation, route }) {
                 <View style={s.hudContent}>
                     <View style={{ flex: 1 }}>
                         <Text style={[s.hudLabel, { color: analysisMode === 'real' ? qColor : modeColor }]}>
-                            {analysisMode === 'real' ? 'LIVE CORRECTION' : analysisMode === 'no_pose' ? 'NO PERSON DETECTED' : 'WAITING FOR ANALYSIS'}
+                            {analysisMode === 'real' ? 'LIVE CORRECTION'
+                                : analysisMode === 'no_pose' ? 'NO PERSON DETECTED'
+                                : analysisMode === 'error' ? 'CONNECTION ERROR'
+                                : `ANALYZING · FRAME ${frameNum}`}
                         </Text>
                         <Text style={s.hudFeedback} numberOfLines={2}>
                             {analysisMode === 'no_pose'
-                                ? 'Stand back so your full body is visible (head to feet)'
+                                ? 'Stand back — full body must be visible, head to feet'
+                                : analysisMode === 'error'
+                                ? 'Check your connection. Frames will be analyzed when reconnected.'
                                 : analysisMode === 'real'
                                 ? (metrics?.primary_feedback || 'Great form!')
-                                : 'Point camera at your full body, hold steady...'}
+                                : 'Point camera at your full body. Stay still...'}
                         </Text>
                     </View>
                     <View style={{ alignItems: 'center', marginHorizontal: 12 }}>
