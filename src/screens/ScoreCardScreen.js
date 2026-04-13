@@ -4,9 +4,10 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-    View, Text, StyleSheet, SafeAreaView, ScrollView,
+    View, Text, StyleSheet, ScrollView,
     TouchableOpacity, ActivityIndicator, Share, Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C } from '../styles/colors';
 import api from '../services/api';
 
@@ -55,6 +56,7 @@ function QualityBar({ dist }) {
 }
 
 export default function ScoreCardScreen({ navigation, route }) {
+    const insets = useSafeAreaInsets();
     const sessionId = route?.params?.sessionId;
     const [card, setCard] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -89,22 +91,22 @@ export default function ScoreCardScreen({ navigation, route }) {
 
     if (loading) {
         return (
-            <SafeAreaView style={s.container}>
+            <View style={[s.container, { paddingTop: insets.top }]}>
                 <ActivityIndicator size="large" color={C.cyan} style={{ marginTop: 100 }} />
-            </SafeAreaView>
+            </View>
         );
     }
 
     if (!card) {
         return (
-            <SafeAreaView style={s.container}>
+            <View style={[s.container, { paddingTop: insets.top }]}>
                 <View style={s.empty}>
                     <Text style={s.emptyText}>Score card not available.</Text>
                     <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
                         <Text style={s.backBtnText}>Go Back</Text>
                     </TouchableOpacity>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
@@ -113,7 +115,7 @@ export default function ScoreCardScreen({ navigation, route }) {
     const dist = card.quality_distribution || {};
 
     return (
-        <SafeAreaView style={s.container}>
+        <View style={[s.container, { paddingTop: insets.top }]}>
             <ScrollView contentContainerStyle={s.scroll}>
                 {/* Header */}
                 <View style={s.header}>
@@ -167,7 +169,7 @@ export default function ScoreCardScreen({ navigation, route }) {
 
                 <Text style={s.watermark}>activebharat.in</Text>
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 

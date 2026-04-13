@@ -2,8 +2,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
     View, Text, ScrollView, StyleSheet, TouchableOpacity,
-    SafeAreaView, ActivityIndicator, Dimensions,
+    ActivityIndicator, Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
 import { C, LEVEL_COLORS, LEVEL_LABELS } from '../styles/colors';
@@ -232,6 +233,7 @@ function SettingsSection({ isOnline, dataMode }) {
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProfileScreen({ navigation }) {
+    const insets = useSafeAreaInsets();
     const { userData, fitnessScore, dataMode } = useUser();
     const athleteId = userData?.avatarId || 'athlete_01';
 
@@ -269,7 +271,7 @@ export default function ProfileScreen({ navigation }) {
     const sessionList = Array.isArray(sessions) ? sessions.slice(0, 10) : [];
 
     return (
-        <SafeAreaView style={s.root}>
+        <View style={[s.root, { paddingTop: insets.top }]}>
             <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
                 {/* Athlete Card */}
                 <AthleteCard userData={userData} />
@@ -306,7 +308,7 @@ export default function ProfileScreen({ navigation }) {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 
