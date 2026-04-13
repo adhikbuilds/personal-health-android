@@ -336,7 +336,7 @@ export default function GhostSkeletonScreen({ navigation, route }) {
     const handleStart = useCallback(() => {
         clearInterval(intervalRef.current);
         // Navigate to Camera tab via root Stack → Tabs navigator
-        navigation?.navigate('Tabs', { screen: 'Camera', params: { sport } });
+        navigation?.navigate('Tabs', { screen: 'Train', params: { sport } });
     }, [sport, navigation]);
 
     // ── Permission states ────────────────────────────────────────────────────

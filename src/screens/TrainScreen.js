@@ -71,7 +71,7 @@ function simulateFrame(sport) {
 const Q_COLORS = { elite: '#22c55e', good: '#06b6d4', average: '#f97316', poor: '#ef4444' };
 
 export default function TrainScreen({ showToast, navigation, route }) {
-    const { addXp } = useUser();
+    const { addXp, userData } = useUser();
     const [permission, setPermission] = useState(null);
     const initialSport = route?.params?.sport || 'vertical_jump';
     const [sport, setSport] = useState(initialSport);
@@ -132,7 +132,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
         if (simIntervalRef.current) clearInterval(simIntervalRef.current);
         if (resultIntervalRef.current) clearInterval(resultIntervalRef.current);
 
-        const sData = await api.startSession('athlete_01', sport);
+        const sData = await api.startSession(userData?.avatarId || 'athlete_01', sport);
         const sid = sData?.session_id || null;
         setSessionId(sid);
         sessionRef.current = sid;
@@ -155,18 +155,22 @@ export default function TrainScreen({ showToast, navigation, route }) {
                     isCapturingRef.current = true;
                     const photo = await cameraRef.current.takePictureAsync({
                         base64: true,
-                        quality: 0.1,        // ~8-15KB JPEG — enough for MediaPipe
-                        skipProcessing: true,
+                        quality: 0.4,        // Higher quality for reliable pose detection
+                        skipProcessing: false, // Let camera process for correct orientation
                     });
                     isCapturingRef.current = false;
 
                     if (photo?.base64) {
+                        console.log(`[FRAME] Captured ${photo.base64.length} chars, sending to session ${sessionRef.current?.slice(0,8)}`);
                         // Fire and forget — DO NOT await the result here
                         api.sendFrame(sessionRef.current, {
                             image_b64: photo.base64,
                             sport,
                             form_score: 0, form_quality: 'unknown', primary_feedback: ''
-                        }).catch(() => { });
+                        }).then(r => {
+                            if (r) console.log(`[FRAME] Server response: frame=${r.frame_num} status=${r.status} score=${r.last_form_score}`);
+                            else console.log('[FRAME] Server returned null');
+                        }).catch(e => console.log(`[FRAME] Error: ${e.message}`));
                     }
                 }
             } catch {
@@ -174,24 +178,8 @@ export default function TrainScreen({ showToast, navigation, route }) {
             }
         }, 4000); // capture every 4s
 
-        // ── SIMULATED FRAME LOOP (every 2s) ─────────────────────────────────
-        // Keeps UI ticking with simulated data while real analysis is in flight.
-        // When real results arrive (poll below), they override the simulated values.
-        simIntervalRef.current = setInterval(() => {
-            setMetrics(prev => {
-                // Only use simulation if we haven't received real data yet
-                if (analysisModeRef.current === 'real') return prev;
-                const frame = simulateFrame(sport);
-                setFrameNum(n => n + 1);
-                setScoreHistory(h => {
-                    const next = [...h, frame.form_score];
-                    if (next.length > 30) next.shift();
-                    setAvgScore(Math.round(next.reduce((a, b) => a + b, 0) / next.length));
-                    return next;
-                });
-                return frame;
-            });
-        }, 2000);
+        // Simulation disabled — only real AI data shown.
+        // If no pose detected, UI shows "NO POSE" instead of fake numbers.
 
         // ── RESULT POLLING LOOP (every 3s) ─────────────────────────────────
         // Polls /latest-result → when AI finishes, real metrics appear in UI.
@@ -200,6 +188,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
             try {
                 const result = await api.getLatestResult(sessionRef.current);
                 if (result?.pose_detected && result.form_score > 0) {
+                    // Real AI result — update UI
                     checkRep(result.phase);
                     const frame = {
                         form_score: result.form_score,
@@ -224,11 +213,20 @@ export default function TrainScreen({ showToast, navigation, route }) {
                         setAvgScore(Math.round(next.reduce((a, b) => a + b, 0) / next.length));
                         return next;
                     });
+                } else if (result?.pose_detected === false) {
+                    // Backend processed frame but no person detected
+                    setAnalysisMode('no_pose');
+                    analysisModeRef.current = 'no_pose';
                 } else if (result?.data_source === 'none') {
-                    setAnalysisMode('sim');
-                    analysisModeRef.current = 'sim'; // no AI result yet
+                    // No frames analyzed yet — waiting
+                    if (analysisModeRef.current !== 'real') {
+                        setAnalysisMode('waiting');
+                        analysisModeRef.current = 'waiting';
+                    }
                 }
-            } catch { }
+            } catch (e) {
+                console.log('[POLL] Error:', e.message);
+            }
         }, 3000);
 
     };
@@ -315,8 +313,8 @@ export default function TrainScreen({ showToast, navigation, route }) {
         return (
             <SafeAreaView style={s.safe}>
                 <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-                    <Text style={s.title}>AI Vision Engine</Text>
-                    <Text style={s.subtitle}>Select sport and start your session</Text>
+                    <Text style={s.title}>Train</Text>
+                    <Text style={s.subtitle}>Select your sport and start a session</Text>
 
                     <Text style={[s.sectionLabel, { marginTop: 24 }]}>SPORT MODE</Text>
                     <View style={s.sportGrid}>
@@ -333,22 +331,22 @@ export default function TrainScreen({ showToast, navigation, route }) {
                     </View>
 
                     <View style={s.checklistCard}>
-                        <Text style={s.sectionLabel}>PRE-FLIGHT CHECK</Text>
+                        <Text style={s.sectionLabel}>BEFORE YOU START</Text>
                         {[
-                            'Sufficient lighting in the room',
-                            'Full body visible to camera',
-                            'Position camera at waist/hip height',
-                            'Wear form-fitting clothes for best tracking',
+                            'Good lighting — face a window',
+                            'Full body visible — head to feet',
+                            'Prop phone at waist height, 2m away',
+                            'Wear fitted clothes for best tracking',
                         ].map(item => (
                             <View key={item} style={s.checkItem}>
-                                <Text style={{ color: C.cyan, fontSize: 14 }}>{'✓'}</Text>
+                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.cyan, marginRight: 10, marginTop: 3 }} />
                                 <Text style={s.checkText}>{item}</Text>
                             </View>
                         ))}
                     </View>
 
                     <TouchableOpacity style={s.startBtn} onPress={startSession} activeOpacity={0.85}>
-                        <Text style={s.startBtnText}>INITIALIZE VISION ENGINE</Text>
+                        <Text style={s.startBtnText}>START SESSION</Text>
                     </TouchableOpacity>
 
                     {/* Quick-access tool buttons */}
@@ -381,11 +379,18 @@ export default function TrainScreen({ showToast, navigation, route }) {
     // ── Live Camera View ──────────────────────────────────────────────────────────
 
     const qColor = metrics ? (Q_COLORS[metrics.form_quality] || C.cyan) : C.cyan;
-    const modeLabel = analysisMode === 'real' ? '🟢 REAL AI' : analysisMode === 'no_pose' ? '🟡 NO POSE' : '🔵 SIM';
+    const modeLabel = analysisMode === 'real' ? 'REAL AI'
+        : analysisMode === 'no_pose' ? 'NO POSE — step back'
+        : analysisMode === 'waiting' ? 'ANALYZING...'
+        : 'SIMULATION';
+    const modeColor = analysisMode === 'real' ? C.green
+        : analysisMode === 'no_pose' ? C.orange
+        : analysisMode === 'waiting' ? C.cyan
+        : C.muted;
 
     return (
         <View style={s.cameraWrap}>
-            <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={'front'} />
+            <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={'back'} />
 
             {/* Top bar */}
             <View style={s.camTopBar}>
@@ -400,7 +405,11 @@ export default function TrainScreen({ showToast, navigation, route }) {
 
             {/* Telemetry overlay */}
             <View style={s.overlayMetrics}>
-                <Text style={s.overlayLabel}>{`FRAME: ${frameNum}  AVG: ${avgScore}%  ${modeLabel}`}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: modeColor, marginRight: 6 }} />
+                    <Text style={[s.overlayLabel, { color: modeColor }]}>{modeLabel}</Text>
+                </View>
+                <Text style={s.overlayLabel}>{`FRAME: ${frameNum}  AVG: ${avgScore}%`}</Text>
                 {metrics && (
                     <>
                         <Text style={s.overlayMetric}>{`KNEE_L : ${metrics.knee_angle_l?.toFixed(0)}°`}</Text>
@@ -415,11 +424,17 @@ export default function TrainScreen({ showToast, navigation, route }) {
             </View>
 
             {/* Bottom HUD */}
-            <View style={[s.camBottomHUD, { borderLeftColor: qColor }]}>
+            <View style={[s.camBottomHUD, { borderLeftColor: analysisMode === 'real' ? qColor : modeColor }]}>
                 <View style={{ flex: 1 }}>
-                    <Text style={[s.hudLabel, { color: qColor }]}>LIVE CORRECTION</Text>
+                    <Text style={[s.hudLabel, { color: analysisMode === 'real' ? qColor : modeColor }]}>
+                        {analysisMode === 'real' ? 'LIVE CORRECTION' : analysisMode === 'no_pose' ? 'NO PERSON DETECTED' : 'WAITING FOR ANALYSIS'}
+                    </Text>
                     <Text style={s.hudFeedback} numberOfLines={2}>
-                        {metrics?.primary_feedback || 'Analyzing posture...'}
+                        {analysisMode === 'no_pose'
+                            ? 'Stand back so your full body is visible (head to feet)'
+                            : analysisMode === 'real'
+                            ? (metrics?.primary_feedback || 'Great form!')
+                            : 'Point camera at your full body, hold steady...'}
                     </Text>
                 </View>
                 <View style={{ alignItems: 'center', marginHorizontal: 12 }}>
