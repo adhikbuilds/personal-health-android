@@ -96,6 +96,12 @@ export default function TrainScreen({ showToast, navigation, route }) {
     const analysisModeRef = useRef('sim');
     const [repCount, setRepCount] = useState(0);
 
+    // #3 Bouncy CTA on mount
+    const ctaBounce = useRef(new Animated.Value(0.85)).current;
+    useEffect(() => {
+        Animated.spring(ctaBounce, { toValue: 1, useNativeDriver: true, speed: 4, bounciness: 14 }).start();
+    }, []);
+
     // Request camera permission on mount
     useEffect(() => {
         Camera.requestCameraPermissionsAsync().then(({ status }) => {
@@ -355,7 +361,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
                     <Fade delay={80}>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sportScroll}>
                             {SPORTS.map((sp) => (
-                                <Tap key={sp.key} onPress={() => setSport(sp.key)} style={s.sportItem} haptic={true}>
+                                <Tap key={sp.key} onPress={() => setSport(sp.key)} style={[s.sportItem, sport === sp.key && s.sportPill]} haptic={true}>
                                     <Text style={[s.sportTab, sport === sp.key && s.sportTabActive]}>{sp.label}</Text>
                                     {sport === sp.key && <View style={s.sportUnderline} />}
                                 </Tap>
@@ -365,13 +371,15 @@ export default function TrainScreen({ showToast, navigation, route }) {
 
                     {/* CTA — dominant, full bleed gradient */}
                     <Fade delay={160}>
-                        <Tap onPress={startSession}>
-                            <LinearGradient colors={['#0c4a6e','#0891b2','#06b6d4']} start={{x:0,y:0}} end={{x:1,y:1}} style={s.setupCta}>
-                                <Text style={s.setupCtaLabel}>TAP TO BEGIN</Text>
-                                <Text style={s.setupCtaTitle}>START{'\n'}SESSION</Text>
-                                <View style={s.setupCtaCircle}><Text style={s.setupCtaGo}>GO</Text></View>
-                            </LinearGradient>
-                        </Tap>
+                        <Animated.View style={{ transform: [{ scale: ctaBounce }] }}>
+                            <Tap onPress={startSession}>
+                                <LinearGradient colors={['#0c4a6e','#0891b2','#06b6d4']} start={{x:0,y:0}} end={{x:1,y:1}} style={s.setupCta}>
+                                    <Text style={s.setupCtaLabel}>TAP TO BEGIN</Text>
+                                    <Text style={s.setupCtaTitle}>START{'\n'}SESSION</Text>
+                                    <View style={s.setupCtaCircle}><Text style={s.setupCtaGo}>GO</Text></View>
+                                </LinearGradient>
+                            </Tap>
+                        </Animated.View>
                     </Fade>
 
                     {/* Tips — minimal, tucked at bottom */}
@@ -490,6 +498,7 @@ const s = StyleSheet.create({
     // Sport tabs
     sportScroll: { paddingHorizontal: 24, paddingBottom: 4, marginBottom: 24 },
     sportItem: { marginRight: 24 },
+    sportPill: { backgroundColor: 'rgba(6,182,212,0.12)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, marginRight: 16 },
     sportTab: { fontSize: 13, fontWeight: '700', color: '#4b5563', letterSpacing: 2, paddingBottom: 8 },
     sportTabActive: { color: '#fff' },
     sportUnderline: { height: 2, backgroundColor: '#06b6d4', borderRadius: 1 },

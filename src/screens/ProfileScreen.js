@@ -4,8 +4,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
     View, Text, ScrollView, StyleSheet, Pressable, Animated,
-    Dimensions, Platform, ActivityIndicator, StatusBar,
+    Dimensions, Platform, ActivityIndicator, StatusBar, RefreshControl,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
@@ -72,6 +73,7 @@ export default function ProfileScreen({ navigation }) {
     const [sessions, setSessions] = useState(null);
     const [isOnline, setIsOnline] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -90,6 +92,11 @@ export default function ProfileScreen({ navigation }) {
     }, [athleteId]);
 
     useEffect(() => { load(); }, [load]);
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        load().finally(() => setRefreshing(false));
+    }, [load]);
 
     const handleRetake = useCallback(() => {
         navigation.navigate('FitnessTest');
@@ -110,7 +117,9 @@ export default function ProfileScreen({ navigation }) {
     return (
         <View style={[$.root, { paddingTop: ins.top }]}>
             <StatusBar barStyle="light-content" backgroundColor="#000" />
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333" progressBackgroundColor="#000" colors={['#06b6d4']} />}
+            >
 
                 {/* ═══ Identity ═══ */}
                 <Fade style={$.identitySection}>
@@ -161,7 +170,7 @@ export default function ProfileScreen({ navigation }) {
                                 <Text style={[$.levelScore, { color: lvlColor }]}>{fitnessScore?.score || 0}</Text>
                                 <Text style={[$.levelName, { color: lvlColor }]}>L{lvl} — {lvlLabel}</Text>
                             </View>
-                            <View style={$.divider} />
+                            <LinearGradient colors={['transparent', '#06b6d4', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1, opacity: 0.2 }} />
                             <Tap onPress={handleRetake} style={$.actionRow}>
                                 <Text style={$.actionTitle}>RETAKE TEST</Text>
                                 <Text style={$.actionArrow}>›</Text>
@@ -170,7 +179,7 @@ export default function ProfileScreen({ navigation }) {
                     ) : (
                         <>
                             <Text style={$.emptyHint}>No fitness test taken yet</Text>
-                            <View style={$.divider} />
+                            <LinearGradient colors={['transparent', '#06b6d4', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1, opacity: 0.2 }} />
                             <Tap onPress={handleRetake} style={$.actionRow}>
                                 <Text style={$.actionTitle}>TAKE FITNESS TEST</Text>
                                 <Text style={$.actionArrow}>›</Text>
@@ -207,7 +216,9 @@ export default function ProfileScreen({ navigation }) {
                                         <Text style={$.sessionXp}>+{xp} XP</Text>
                                         <Text style={$.sessionArrow}>›</Text>
                                     </Tap>
-                                    {i < sessionList.length - 1 && <View style={$.divider} />}
+                                    {i < sessionList.length - 1 && (
+                                        <LinearGradient colors={['transparent', '#06b6d4', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1, opacity: 0.2 }} />
+                                    )}
                                 </React.Fragment>
                             );
                         })
@@ -227,7 +238,7 @@ export default function ProfileScreen({ navigation }) {
                             </Text>
                         </View>
                     </View>
-                    <View style={$.divider} />
+                    <LinearGradient colors={['transparent', '#06b6d4', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1, opacity: 0.2 }} />
 
                     <View style={$.systemRow}>
                         <Text style={$.systemLabel}>Data Mode</Text>
@@ -235,7 +246,7 @@ export default function ProfileScreen({ navigation }) {
                             {(dataMode || 'mock').toUpperCase()}
                         </Text>
                     </View>
-                    <View style={$.divider} />
+                    <LinearGradient colors={['transparent', '#06b6d4', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1, opacity: 0.2 }} />
 
                     <View style={$.systemRow}>
                         <Text style={$.systemLabel}>Version</Text>
