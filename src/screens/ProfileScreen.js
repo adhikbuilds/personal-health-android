@@ -1,239 +1,71 @@
-// ProfileScreen — Athlete identity, session history, system status
-import React, { useEffect, useState, useCallback } from 'react';
+// ProfileScreen — Nike-inspired. Pure black canvas. Bold typography IS the design.
+// No cards. No borders. No containers. Content floats on black.
+
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-    View, Text, ScrollView, StyleSheet, TouchableOpacity,
-    ActivityIndicator, Dimensions,
+    View, Text, ScrollView, StyleSheet, Pressable, Animated,
+    Dimensions, Platform, ActivityIndicator, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
-import { C, LEVEL_COLORS, LEVEL_LABELS } from '../styles/colors';
+import { LEVEL_COLORS, LEVEL_LABELS } from '../styles/colors';
 import { SPORT_LABELS } from '../data/constants';
 
-const { width: SW } = Dimensions.get('window');
-const PAD = 20;
+const { width: W } = Dimensions.get('window');
+const FONT_CONDENSED = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ── Shared: Tap with scale ──────────────────────────────────────────────────
+
+function Tap({ onPress, children, style }) {
+    const s = useRef(new Animated.Value(1)).current;
+    return (
+        <Pressable onPress={onPress}
+            onPressIn={() => Animated.spring(s, { toValue: 0.96, useNativeDriver: true, speed: 50 }).start()}
+            onPressOut={() => Animated.spring(s, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 6 }).start()}>
+            <Animated.View style={[style, { transform: [{ scale: s }] }]}>{children}</Animated.View>
+        </Pressable>
+    );
+}
+
+// ── Shared: Fade in on mount ────────────────────────────────────────────────
+
+function Fade({ delay = 0, children, style }) {
+    const o = useRef(new Animated.Value(0)).current;
+    const y = useRef(new Animated.Value(20)).current;
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(o, { toValue: 1, duration: 600, delay, useNativeDriver: true }),
+            Animated.spring(y, { toValue: 0, delay, useNativeDriver: true, speed: 12 }),
+        ]).start();
+    }, []);
+    return <Animated.View style={[style, { opacity: o, transform: [{ translateY: y }] }]}>{children}</Animated.View>;
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function initials(name) {
-    return (name || 'AB')
-        .split(' ')
-        .map(w => w[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2);
+    return (name || 'AB').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 
 function scoreColor(v) {
-    if (v >= 75) return C.green;
-    if (v >= 50) return C.orange;
-    return C.red;
+    if (v >= 75) return '#22c55e';
+    if (v >= 50) return '#f97316';
+    return '#ef4444';
 }
 
 function fmtDate(d) {
     if (!d) return '--';
     const dt = new Date(d);
     const day = dt.getDate();
-    const mon = dt.toLocaleString('en', { month: 'short' });
+    const mon = dt.toLocaleString('en', { month: 'short' }).toUpperCase();
     return `${day} ${mon}`;
 }
 
-// ─── Micro-label ─────────────────────────────────────────────────────────────
-
-function MicroLabel({ children, style }) {
-    return <Text style={[s.micro, style]}>{children}</Text>;
-}
-
-// ─── Glassmorphic card ───────────────────────────────────────────────────────
-
-function GlassCard({ children, style }) {
-    return <View style={[s.card, style]}>{children}</View>;
-}
-
-// ─── Athlete Card ────────────────────────────────────────────────────────────
-
-function AthleteCard({ userData }) {
-    const sportLabel = SPORT_LABELS[userData?.sport] || SPORT_LABELS['vertical_jump'] || 'Athlete';
-
-    return (
-        <GlassCard style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {/* Initials avatar */}
-            <View style={s.avatar}>
-                <Text style={s.avatarText}>{initials(userData?.name)}</Text>
-            </View>
-
-            <View style={{ flex: 1, marginLeft: 16 }}>
-                <Text style={s.athleteName}>{userData?.name || 'Athlete'}</Text>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-                    {/* Sport pill */}
-                    <View style={s.sportPill}>
-                        <Text style={s.sportPillText}>{sportLabel}</Text>
-                    </View>
-                </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 12 }}>
-                    {/* Tier */}
-                    <Text style={s.tierText}>{userData?.tier || 'District'}</Text>
-                    {/* Dot separator */}
-                    <View style={s.dotSep} />
-                    {/* BPI */}
-                    <Text style={s.bpiText}>
-                        BPI <Text style={s.bpiNum}>{(userData?.bpi ?? 0).toLocaleString()}</Text>
-                    </Text>
-                </View>
-            </View>
-        </GlassCard>
-    );
-}
-
-// ─── Stats Strip ─────────────────────────────────────────────────────────────
-
-function StatsStrip({ userData }) {
-    const stats = [
-        { label: 'SESSIONS', value: userData?.sessions ?? 0 },
-        { label: 'STREAK', value: `${userData?.streak ?? 0}d` },
-        { label: 'BPI', value: (userData?.bpi ?? 0).toLocaleString() },
-    ];
-
-    return (
-        <View style={s.stripRow}>
-            {stats.map((st, i) => (
-                <View key={i} style={[s.stripItem, i < stats.length - 1 && s.stripBorder]}>
-                    <MicroLabel>{st.label}</MicroLabel>
-                    <Text style={s.stripNum}>{st.value}</Text>
-                </View>
-            ))}
-        </View>
-    );
-}
-
-// ─── Fitness Level ───────────────────────────────────────────────────────────
-
-function FitnessLevel({ fitnessScore, onRetake }) {
-    const hasTested = fitnessScore?.level > 0;
-
-    if (!hasTested) {
-        return (
-            <GlassCard>
-                <MicroLabel>FITNESS LEVEL</MicroLabel>
-                <View style={{ alignItems: 'center', paddingVertical: 16 }}>
-                    <View style={s.emptyDot} />
-                    <Text style={s.emptyTitle}>No Fitness Test</Text>
-                    <Text style={s.emptySubtext}>Take your first fitness test</Text>
-                    <TouchableOpacity style={s.actionBtn} onPress={onRetake} activeOpacity={0.7}>
-                        <Text style={s.actionBtnText}>Take Test</Text>
-                    </TouchableOpacity>
-                </View>
-            </GlassCard>
-        );
-    }
-
-    const lvl = fitnessScore.level;
-    const color = fitnessScore.color || LEVEL_COLORS[lvl] || C.cyan;
-    const label = fitnessScore.label || LEVEL_LABELS[lvl] || '';
-    const score = fitnessScore.score;
-
-    return (
-        <GlassCard>
-            <MicroLabel>FITNESS LEVEL</MicroLabel>
-
-            {/* Level band */}
-            <View style={s.levelBandRow}>
-                {[1, 2, 3, 4, 5, 6, 7].map(l => (
-                    <View
-                        key={l}
-                        style={[
-                            s.levelSegment,
-                            {
-                                backgroundColor: l <= lvl ? (LEVEL_COLORS[l] || C.muted) : 'rgba(255,255,255,0.06)',
-                            },
-                            l === 1 && { borderTopLeftRadius: 4, borderBottomLeftRadius: 4 },
-                            l === 7 && { borderTopRightRadius: 4, borderBottomRightRadius: 4 },
-                        ]}
-                    />
-                ))}
-            </View>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
-                <Text style={[s.levelNum, { color }]}>{score}</Text>
-                <View style={{ marginLeft: 12 }}>
-                    <Text style={[s.levelLabel, { color }]}>L{lvl} - {label}</Text>
-                    {fitnessScore.lastTested && (
-                        <Text style={s.levelDate}>Tested {fmtDate(fitnessScore.lastTested)}</Text>
-                    )}
-                </View>
-                <TouchableOpacity style={s.retakeBtn} onPress={onRetake} activeOpacity={0.7}>
-                    <Text style={s.retakeBtnText}>Retake</Text>
-                </TouchableOpacity>
-            </View>
-        </GlassCard>
-    );
-}
-
-// ─── Session Row ─────────────────────────────────────────────────────────────
-
-function SessionRow({ session, onPress }) {
-    const formScore = session.avg_form_score ?? session.form_score ?? 0;
-    const sport = SPORT_LABELS[session.sport] || session.sport || 'Session';
-    const xp = session.xp_earned ?? session.xp ?? 0;
-    const color = scoreColor(formScore);
-    const date = fmtDate(session.ended_at || session.started_at || session.date);
-
-    return (
-        <TouchableOpacity style={s.sessionRow} onPress={onPress} activeOpacity={0.7}>
-            <View style={{ flex: 1 }}>
-                <Text style={s.sessionSport}>{sport}</Text>
-                <Text style={s.sessionDate}>{date}</Text>
-            </View>
-            <Text style={[s.sessionScore, { color }]}>{formScore.toFixed(0)}</Text>
-            <Text style={s.sessionXp}>+{xp} XP</Text>
-        </TouchableOpacity>
-    );
-}
-
-// ─── Settings Section ────────────────────────────────────────────────────────
-
-function SettingsSection({ isOnline, dataMode }) {
-    const modeColors = { mock: C.orange, hybrid: C.yellow, real: C.green };
-    const modeColor = modeColors[dataMode] || C.muted;
-
-    return (
-        <GlassCard>
-            <MicroLabel>SYSTEM</MicroLabel>
-
-            {/* Backend status */}
-            <View style={s.settingRow}>
-                <Text style={s.settingLabel}>Backend</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={[s.statusDot, { backgroundColor: isOnline ? C.green : C.red }]} />
-                    <Text style={[s.settingValue, { color: isOnline ? C.green : C.red }]}>
-                        {isOnline ? 'Connected' : 'Offline'}
-                    </Text>
-                </View>
-            </View>
-
-            {/* Data mode */}
-            <View style={s.settingRow}>
-                <Text style={s.settingLabel}>Data Mode</Text>
-                <View style={[s.modePill, { backgroundColor: modeColor + '18', borderColor: modeColor + '40' }]}>
-                    <Text style={[s.modePillText, { color: modeColor }]}>{(dataMode || 'mock').toUpperCase()}</Text>
-                </View>
-            </View>
-
-            {/* App version */}
-            <View style={[s.settingRow, { borderBottomWidth: 0 }]}>
-                <Text style={s.settingLabel}>Version</Text>
-                <Text style={s.settingValue}>2.0.0</Text>
-            </View>
-        </GlassCard>
-    );
-}
-
-// ─── Main Screen ─────────────────────────────────────────────────────────────
+// ── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProfileScreen({ navigation }) {
-    const insets = useSafeAreaInsets();
+    const ins = useSafeAreaInsets();
     const { userData, fitnessScore, dataMode } = useUser();
     const athleteId = userData?.avatarId || 'athlete_01';
 
@@ -269,42 +101,147 @@ export default function ProfileScreen({ navigation }) {
     }, [navigation]);
 
     const sessionList = Array.isArray(sessions) ? sessions.slice(0, 10) : [];
+    const sportLabel = SPORT_LABELS[userData?.sport] || 'Athlete';
+    const hasTested = fitnessScore?.level > 0;
+    const lvl = fitnessScore?.level || 0;
+    const lvlColor = fitnessScore?.color || LEVEL_COLORS[lvl] || '#06b6d4';
+    const lvlLabel = fitnessScore?.label || LEVEL_LABELS[lvl] || '';
 
     return (
-        <View style={[s.root, { paddingTop: insets.top }]}>
-            <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-                {/* Athlete Card */}
-                <AthleteCard userData={userData} />
+        <View style={[$.root, { paddingTop: ins.top }]}>
+            <StatusBar barStyle="light-content" backgroundColor="#000" />
+            <ScrollView showsVerticalScrollIndicator={false}>
 
-                {/* Stats Strip */}
-                <StatsStrip userData={userData} />
+                {/* ═══ Identity ═══ */}
+                <Fade style={$.identitySection}>
+                    <View style={$.avatarCircle}>
+                        <Text style={$.avatarText}>{initials(userData?.name)}</Text>
+                    </View>
+                    <Text style={$.nameText}>{(userData?.name || 'Athlete').toUpperCase()}</Text>
+                    <Text style={$.metaText}>{sportLabel.toUpperCase()}  ·  {(userData?.tier || 'District').toUpperCase()}</Text>
+                </Fade>
 
-                {/* Fitness Level */}
-                <FitnessLevel fitnessScore={fitnessScore} onRetake={handleRetake} />
-
-                {/* Session History */}
-                <GlassCard>
-                    <MicroLabel>RECENT SESSIONS</MicroLabel>
-                    {loading ? (
-                        <ActivityIndicator size="small" color={C.cyan} style={{ marginTop: 16 }} />
-                    ) : sessionList.length === 0 ? (
-                        <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                            <View style={s.emptyDot} />
-                            <Text style={s.emptySubtext}>No sessions recorded yet</Text>
+                {/* ═══ Stats Row ═══ */}
+                <Fade delay={100} style={$.statsSection}>
+                    <View style={$.statsRow}>
+                        <View style={$.statItem}>
+                            <Text style={[$.statNumber, { color: '#06b6d4' }]}>{(userData?.bpi ?? 0).toLocaleString()}</Text>
+                            <Text style={$.statLabel}>BPI</Text>
                         </View>
-                    ) : (
-                        sessionList.map((sess, i) => (
-                            <SessionRow
-                                key={sess.session_id || sess.id || i}
-                                session={sess}
-                                onPress={() => handleSessionTap(sess)}
-                            />
-                        ))
-                    )}
-                </GlassCard>
+                        <View style={$.statDivider} />
+                        <View style={$.statItem}>
+                            <Text style={[$.statNumber, { color: '#f97316' }]}>{userData?.sessions ?? 0}</Text>
+                            <Text style={$.statLabel}>SESSIONS</Text>
+                        </View>
+                        <View style={$.statDivider} />
+                        <View style={$.statItem}>
+                            <Text style={[$.statNumber, { color: '#22c55e' }]}>{userData?.streak ?? 0}</Text>
+                            <Text style={$.statLabel}>DAY STREAK</Text>
+                        </View>
+                    </View>
+                </Fade>
 
-                {/* Settings */}
-                <SettingsSection isOnline={isOnline} dataMode={dataMode} />
+                {/* ═══ Fitness Level ═══ */}
+                <Fade delay={200} style={$.section}>
+                    <Text style={$.sectionLabel}>FITNESS LEVEL</Text>
+                    {hasTested ? (
+                        <>
+                            <View style={$.levelBandRow}>
+                                {[1, 2, 3, 4, 5, 6, 7].map(l => (
+                                    <View
+                                        key={l}
+                                        style={[
+                                            $.levelSeg,
+                                            { backgroundColor: l <= lvl ? (LEVEL_COLORS[l] || '#4b5563') : '#1a1a1a' },
+                                        ]}
+                                    />
+                                ))}
+                            </View>
+                            <View style={$.levelInfoRow}>
+                                <Text style={[$.levelScore, { color: lvlColor }]}>{fitnessScore?.score || 0}</Text>
+                                <Text style={[$.levelName, { color: lvlColor }]}>L{lvl} — {lvlLabel}</Text>
+                            </View>
+                            <View style={$.divider} />
+                            <Tap onPress={handleRetake} style={$.actionRow}>
+                                <Text style={$.actionTitle}>RETAKE TEST</Text>
+                                <Text style={$.actionArrow}>›</Text>
+                            </Tap>
+                        </>
+                    ) : (
+                        <>
+                            <Text style={$.emptyHint}>No fitness test taken yet</Text>
+                            <View style={$.divider} />
+                            <Tap onPress={handleRetake} style={$.actionRow}>
+                                <Text style={$.actionTitle}>TAKE FITNESS TEST</Text>
+                                <Text style={$.actionArrow}>›</Text>
+                            </Tap>
+                        </>
+                    )}
+                </Fade>
+
+                {/* ═══ Recent Sessions ═══ */}
+                <Fade delay={300} style={$.section}>
+                    <Text style={$.sectionLabel}>RECENT SESSIONS</Text>
+                    {loading ? (
+                        <ActivityIndicator size="small" color="#06b6d4" style={{ marginTop: 16 }} />
+                    ) : sessionList.length === 0 ? (
+                        <Text style={$.emptyHint}>No sessions recorded yet</Text>
+                    ) : (
+                        sessionList.map((sess, i) => {
+                            const formScore = sess.avg_form_score ?? sess.form_score ?? 0;
+                            const sport = SPORT_LABELS[sess.sport] || sess.sport || 'Session';
+                            const xp = sess.xp_earned ?? sess.xp ?? 0;
+                            const color = scoreColor(formScore);
+                            const date = fmtDate(sess.ended_at || sess.started_at || sess.date);
+                            return (
+                                <React.Fragment key={sess.session_id || sess.id || i}>
+                                    <Tap onPress={() => handleSessionTap(sess)} style={$.sessionRow}>
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Text style={$.sessionDate}>{date}</Text>
+                                                <Text style={$.sessionSep}>|</Text>
+                                                <Text style={$.sessionSport}>{sport}</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={[$.sessionScore, { color }]}>{formScore.toFixed(0)}</Text>
+                                        <Text style={$.sessionXp}>+{xp} XP</Text>
+                                        <Text style={$.sessionArrow}>›</Text>
+                                    </Tap>
+                                    {i < sessionList.length - 1 && <View style={$.divider} />}
+                                </React.Fragment>
+                            );
+                        })
+                    )}
+                </Fade>
+
+                {/* ═══ System ═══ */}
+                <Fade delay={400} style={$.section}>
+                    <Text style={$.sectionLabel}>SYSTEM</Text>
+
+                    <View style={$.systemRow}>
+                        <Text style={$.systemLabel}>Backend</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={[$.statusDot, { backgroundColor: isOnline ? '#22c55e' : '#ef4444' }]} />
+                            <Text style={[$.systemValue, { color: isOnline ? '#22c55e' : '#ef4444' }]}>
+                                {isOnline ? 'CONNECTED' : 'OFFLINE'}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={$.divider} />
+
+                    <View style={$.systemRow}>
+                        <Text style={$.systemLabel}>Data Mode</Text>
+                        <Text style={[$.systemValue, { color: dataMode === 'real' ? '#22c55e' : dataMode === 'hybrid' ? '#facc15' : '#f97316' }]}>
+                            {(dataMode || 'mock').toUpperCase()}
+                        </Text>
+                    </View>
+                    <View style={$.divider} />
+
+                    <View style={$.systemRow}>
+                        <Text style={$.systemLabel}>Version</Text>
+                        <Text style={$.systemValue}>2.0.0</Text>
+                    </View>
+                </Fade>
 
                 <View style={{ height: 40 }} />
             </ScrollView>
@@ -312,104 +249,65 @@ export default function ProfileScreen({ navigation }) {
     );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// ── Styles ───────────────────────────────────────────────────────────────────
+// Pure black. No cards. No borders. Bold uppercase type. Nike DNA.
 
-const s = StyleSheet.create({
-    root: { flex: 1, backgroundColor: C.bg },
-    scroll: { paddingHorizontal: PAD, paddingTop: 16, paddingBottom: 32 },
+const $ = StyleSheet.create({
+    root: { flex: 1, backgroundColor: '#000' },
 
-    // Card (glass)
-    card: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-        borderRadius: 18, padding: 18, marginBottom: 16,
+    // Identity
+    identitySection: { alignItems: 'center', paddingTop: 32, paddingBottom: 32 },
+    avatarCircle: {
+        width: 80, height: 80, borderRadius: 40, backgroundColor: '#111',
+        alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+        borderWidth: 2, borderColor: '#06b6d4',
     },
+    avatarText: { fontSize: 28, fontWeight: '900', color: '#06b6d4', fontFamily: FONT_CONDENSED },
+    nameText: { fontSize: 22, fontWeight: '900', color: '#fff', fontFamily: FONT_CONDENSED, letterSpacing: 4, marginBottom: 6 },
+    metaText: { fontSize: 11, fontWeight: '700', color: '#4b5563', letterSpacing: 3 },
 
-    // Micro label
-    micro: {
-        fontSize: 9, fontWeight: '800', letterSpacing: 2, color: C.muted,
-        textTransform: 'uppercase',
-    },
+    // Stats row
+    statsSection: { paddingHorizontal: 24, marginBottom: 40 },
+    statsRow: { flexDirection: 'row', alignItems: 'center' },
+    statItem: { flex: 1, alignItems: 'center' },
+    statNumber: { fontSize: 24, fontWeight: '800', fontFamily: FONT_CONDENSED },
+    statLabel: { fontSize: 9, fontWeight: '600', color: '#4b5563', letterSpacing: 2, marginTop: 4 },
+    statDivider: { width: 1, height: 28, backgroundColor: '#1a1a1a' },
 
-    // ─── Athlete Card ────────────────────────────────────────────────────
-    avatar: {
-        width: 64, height: 64, borderRadius: 32,
-        backgroundColor: C.surf, borderWidth: 2, borderColor: C.cyan,
-        alignItems: 'center', justifyContent: 'center',
-    },
-    avatarText: { fontSize: 22, fontWeight: '900', color: C.cyan },
-    athleteName: { fontSize: 18, fontWeight: '800', color: C.text },
-    sportPill: {
-        backgroundColor: C.cyan + '18', borderRadius: 99,
-        paddingHorizontal: 10, paddingVertical: 3,
-    },
-    sportPillText: { fontSize: 10, fontWeight: '800', color: C.cyan, letterSpacing: 1 },
-    tierText: { fontSize: 12, fontWeight: '700', color: C.muted },
-    dotSep: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.muted },
-    bpiText: { fontSize: 12, fontWeight: '600', color: C.muted },
-    bpiNum: { fontWeight: '900', fontFamily: 'monospace', color: C.text },
+    // Section
+    section: { paddingHorizontal: 24, marginBottom: 32 },
+    sectionLabel: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginBottom: 16 },
 
-    // ─── Stats Strip ─────────────────────────────────────────────────────
-    stripRow: {
-        flexDirection: 'row',
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-        borderRadius: 18, marginBottom: 16, overflow: 'hidden',
-    },
-    stripItem: { flex: 1, alignItems: 'center', paddingVertical: 16 },
-    stripBorder: { borderRightWidth: 1, borderRightColor: 'rgba(255,255,255,0.06)' },
-    stripNum: {
-        fontSize: 22, fontWeight: '900', fontFamily: 'monospace', color: C.text, marginTop: 6,
-    },
+    // Divider
+    divider: { height: 1, backgroundColor: '#1a1a1a' },
 
-    // ─── Fitness Level ───────────────────────────────────────────────────
-    levelBandRow: {
-        flexDirection: 'row', marginTop: 14, gap: 3, height: 8,
-    },
-    levelSegment: { flex: 1, height: 8 },
-    levelNum: { fontSize: 32, fontWeight: '900', fontFamily: 'monospace' },
-    levelLabel: { fontSize: 14, fontWeight: '800' },
-    levelDate: { fontSize: 10, fontWeight: '600', color: C.muted, marginTop: 2 },
-    retakeBtn: {
-        marginLeft: 'auto', backgroundColor: C.surf, borderRadius: 99,
-        paddingHorizontal: 16, paddingVertical: 8, borderWidth: 1, borderColor: C.border,
-    },
-    retakeBtnText: { fontSize: 12, fontWeight: '800', color: C.cyan },
+    // Fitness level
+    levelBandRow: { flexDirection: 'row', gap: 3, height: 4, marginBottom: 16 },
+    levelSeg: { flex: 1, borderRadius: 2 },
+    levelInfoRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 16 },
+    levelScore: { fontSize: 32, fontWeight: '900', fontFamily: FONT_CONDENSED, marginRight: 12 },
+    levelName: { fontSize: 14, fontWeight: '700', letterSpacing: 2 },
 
-    // ─── Session History ─────────────────────────────────────────────────
-    sessionRow: {
-        flexDirection: 'row', alignItems: 'center', paddingVertical: 14,
-        borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
-    },
-    sessionSport: { fontSize: 14, fontWeight: '700', color: C.text },
-    sessionDate: { fontSize: 10, fontWeight: '600', color: C.muted, marginTop: 2 },
-    sessionScore: { fontSize: 20, fontWeight: '900', fontFamily: 'monospace', marginRight: 14 },
-    sessionXp: { fontSize: 11, fontWeight: '800', color: C.green, fontFamily: 'monospace' },
+    // Action row (Nike style)
+    actionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18 },
+    actionTitle: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 2 },
+    actionArrow: { fontSize: 22, color: '#4b5563', fontWeight: '300' },
 
-    // ─── Settings ────────────────────────────────────────────────────────
-    settingRow: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
-    },
-    settingLabel: { fontSize: 13, fontWeight: '700', color: C.textSub },
-    settingValue: { fontSize: 13, fontWeight: '700', color: C.muted, fontFamily: 'monospace' },
+    // Sessions
+    sessionRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+    sessionDate: { fontSize: 12, fontWeight: '700', color: '#4b5563', letterSpacing: 1 },
+    sessionSep: { fontSize: 12, color: '#1a1a1a', marginHorizontal: 8 },
+    sessionSport: { fontSize: 13, fontWeight: '600', color: '#9ca3af' },
+    sessionScore: { fontSize: 20, fontWeight: '900', fontFamily: FONT_CONDENSED, marginRight: 10 },
+    sessionXp: { fontSize: 11, fontWeight: '800', color: '#22c55e', fontFamily: FONT_CONDENSED, marginRight: 10 },
+    sessionArrow: { fontSize: 18, color: '#4b5563', fontWeight: '300' },
+
+    // System
+    systemRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
+    systemLabel: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
+    systemValue: { fontSize: 12, fontWeight: '800', color: '#4b5563', letterSpacing: 1, fontFamily: FONT_CONDENSED },
     statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-    modePill: {
-        borderRadius: 99, paddingHorizontal: 12, paddingVertical: 4,
-        borderWidth: 1,
-    },
-    modePillText: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
 
-    // ─── Empty states ────────────────────────────────────────────────────
-    emptyDot: {
-        width: 36, height: 36, borderRadius: 18, backgroundColor: C.surf,
-        marginBottom: 10, borderWidth: 2, borderColor: C.cyan + '30',
-    },
-    emptyTitle: { fontSize: 16, fontWeight: '800', color: C.text, marginBottom: 4 },
-    emptySubtext: { fontSize: 12, fontWeight: '600', color: C.muted, textAlign: 'center' },
-    actionBtn: {
-        backgroundColor: C.cyan, borderRadius: 99, paddingHorizontal: 24, paddingVertical: 10,
-        marginTop: 14,
-    },
-    actionBtnText: { fontSize: 13, fontWeight: '800', color: C.bg },
+    // Empty
+    emptyHint: { fontSize: 13, fontWeight: '500', color: '#374151', marginBottom: 8 },
 });

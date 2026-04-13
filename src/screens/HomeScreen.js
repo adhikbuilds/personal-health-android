@@ -32,14 +32,16 @@ function Tap({ onPress, children, style }) {
 
 // ── Fade in on mount ─────────────────────────────────────────────────────────
 
-function Fade({ delay = 0, children, style }) {
+function Fade({ delay = 0, children, style, distance = 24 }) {
     const o = useRef(new Animated.Value(0)).current;
-    const y = useRef(new Animated.Value(20)).current;
+    const y = useRef(new Animated.Value(distance)).current;
     useEffect(() => {
-        Animated.stagger(0, [
-            Animated.timing(o, { toValue: 1, duration: 600, delay, useNativeDriver: true }),
-            Animated.spring(y, { toValue: 0, delay, useNativeDriver: true, speed: 12 }),
-        ]).start();
+        const anim = Animated.parallel([
+            Animated.timing(o, { toValue: 1, duration: 700, delay, useNativeDriver: true }),
+            Animated.timing(y, { toValue: 0, duration: 700, delay, useNativeDriver: true }),
+        ]);
+        anim.start();
+        return () => anim.stop();
     }, []);
     return <Animated.View style={[style, { opacity: o, transform: [{ translateY: y }] }]}>{children}</Animated.View>;
 }
@@ -101,17 +103,17 @@ export default function HomeScreen({ navigation }) {
                     <Text style={$.heroName}>{first.toUpperCase()}</Text>
                     <View style={$.statsRow}>
                         <View style={$.statItem}>
-                            <Text style={$.statNumber}>{(userData.bpi||0).toLocaleString()}</Text>
+                            <Text style={[$.statNumber, { color: '#06b6d4' }]}>{(userData.bpi||0).toLocaleString()}</Text>
                             <Text style={$.statLabel}>BPI</Text>
                         </View>
                         <View style={$.statDivider} />
                         <View style={$.statItem}>
-                            <Text style={$.statNumber}>{userData.sessions||0}</Text>
+                            <Text style={[$.statNumber, { color: '#22c55e' }]}>{userData.sessions||0}</Text>
                             <Text style={$.statLabel}>SESSIONS</Text>
                         </View>
                         <View style={$.statDivider} />
                         <View style={$.statItem}>
-                            <Text style={$.statNumber}>{userData.streak||0}</Text>
+                            <Text style={[$.statNumber, { color: '#f97316' }]}>{userData.streak||0}</Text>
                             <Text style={$.statLabel}>DAY STREAK</Text>
                         </View>
                     </View>
@@ -131,17 +133,26 @@ export default function HomeScreen({ navigation }) {
                 {/* ═══ Quick Actions — simple text links, Nike style ═══ */}
                 <Fade delay={300} style={$.actionsSection}>
                     <Tap onPress={() => navigation.navigate('HeartRate', { sessionId: 'rppg_'+Date.now() })} style={$.actionRow}>
-                        <Text style={$.actionTitle}>HEART RATE</Text>
+                        <View style={$.actionLeft}>
+                            <View style={[$.actionDot, { backgroundColor: '#ef4444' }]} />
+                            <Text style={$.actionTitle}>HEART RATE</Text>
+                        </View>
                         <Text style={$.actionArrow}>›</Text>
                     </Tap>
                     <View style={$.actionDivider} />
                     <Tap onPress={() => navigation.navigate('TrainingPlan')} style={$.actionRow}>
-                        <Text style={$.actionTitle}>WEEKLY PLAN</Text>
+                        <View style={$.actionLeft}>
+                            <View style={[$.actionDot, { backgroundColor: '#22c55e' }]} />
+                            <Text style={$.actionTitle}>WEEKLY PLAN</Text>
+                        </View>
                         <Text style={$.actionArrow}>›</Text>
                     </Tap>
                     <View style={$.actionDivider} />
                     <Tap onPress={() => navigation.navigate('FitnessTest')} style={$.actionRow}>
-                        <Text style={$.actionTitle}>FITNESS TEST</Text>
+                        <View style={$.actionLeft}>
+                            <View style={[$.actionDot, { backgroundColor: '#06b6d4' }]} />
+                            <Text style={$.actionTitle}>FITNESS TEST</Text>
+                        </View>
                         <Text style={$.actionArrow}>›</Text>
                     </Tap>
                 </Fade>
@@ -205,6 +216,8 @@ const $ = StyleSheet.create({
     // Actions
     actionsSection: { paddingHorizontal: 24, marginBottom: 40 },
     actionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18 },
+    actionLeft: { flexDirection: 'row', alignItems: 'center' },
+    actionDot: { width: 8, height: 8, borderRadius: 4, marginRight: 14 },
     actionTitle: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 2 },
     actionArrow: { fontSize: 22, color: '#4b5563', fontWeight: '300' },
     actionDivider: { height: 1, backgroundColor: '#1a1a1a' },

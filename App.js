@@ -28,11 +28,10 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 const CYAN = '#06b6d4';
-const MUTED = '#64748b';
-const BG = '#0f172a';
+const MUTED = '#4b5563';
+const BG = '#000';
 
-const TAB_ICONS = { Home: '●', Train: '◉', Progress: '◈', Profile: '○' };
-const TAB_LABELS = { Home: 'Home', Train: 'Train', Progress: 'Progress', Profile: 'Profile' };
+const TAB_LABELS = { Home: 'HOME', Train: 'TRAIN', Progress: 'PROGRESS', Profile: 'YOU' };
 
 // ─── Toast ──────────────────────────────────────────────────────────────────
 
@@ -52,13 +51,7 @@ function TabNavigator({ showToast }) {
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
-                tabBarIcon: ({ focused }) => (
-                    <View style={[styles.tabDot, focused && styles.tabDotActive]}>
-                        <Text style={[styles.tabDotText, focused && { color: CYAN }]}>
-                            {TAB_ICONS[route.name]}
-                        </Text>
-                    </View>
-                ),
+                tabBarIcon: () => null,
                 tabBarLabel: ({ focused }) => (
                     <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>
                         {TAB_LABELS[route.name]}
@@ -143,22 +136,16 @@ export default function App() {
 
 const styles = StyleSheet.create({
     tabBar: {
-        backgroundColor: BG,
-        borderTopColor: 'rgba(255,255,255,0.06)',
+        backgroundColor: '#000',
+        borderTopColor: '#111',
         borderTopWidth: 1,
-        height: 64,
-        paddingBottom: 8,
-        paddingTop: 8,
+        height: 60,
+        paddingBottom: 6,
+        paddingTop: 6,
         elevation: 0,
     },
-    tabDot: {
-        width: 28, height: 28, borderRadius: 14,
-        alignItems: 'center', justifyContent: 'center',
-    },
-    tabDotActive: { backgroundColor: 'rgba(6,182,212,0.12)' },
-    tabDotText: { fontSize: 14, color: MUTED, fontWeight: '600' },
-    tabLabel: { fontSize: 9, fontWeight: '700', color: MUTED, marginTop: 1 },
-    tabLabelActive: { color: CYAN },
+    tabLabel: { fontSize: 10, fontWeight: '700', color: '#4b5563', letterSpacing: 1.5 },
+    tabLabelActive: { color: '#fff' },
     toast: {
         position: 'absolute', left: 20, right: 20,
         backgroundColor: 'rgba(6,182,212,0.95)',
