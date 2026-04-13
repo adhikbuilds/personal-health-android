@@ -1,6 +1,5 @@
-// HomeScreen — Minimal, focused, beautiful
-// Shows: greeting, fitness card, daily tracker, 3 core action cards
-// No clutter. Every element earns its place.
+// HomeScreen — The athlete's daily landing pad.
+// Warm, functional, zero clutter.
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -15,86 +14,53 @@ import { C } from '../styles/colors';
 import { DAILY_TRACKER_DEFAULTS } from '../data/constants';
 
 const { width: SW } = Dimensions.get('window');
+const HALF = (SW - 50) / 2;
 const TODAY_KEY = `@daily_tracker_${new Date().toISOString().slice(0, 10)}`;
 
-// ─── Fitness Score Card ─────────────────────────────────────────────────────
+function getGreeting() {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+}
 
-function FitnessCard({ fitnessScore, streak }) {
-    const score = fitnessScore?.score || 0;
-    const label = fitnessScore?.label || 'Not Tested';
-    const color = fitnessScore?.color || C.muted;
+// ─── Score Ring ──────────────────────────────────────────────────────────────
 
+function ScoreRing({ score, label, color, streak }) {
     return (
-        <View style={s.fitnessCard}>
-            <View style={s.fitnessLeft}>
-                <Text style={s.fitnessLabel}>FITNESS SCORE</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 6 }}>
-                    <Text style={[s.fitnessScore, { color }]}>{score}</Text>
-                    <Text style={s.fitnessUnit}> pts</Text>
-                </View>
-                <View style={[s.fitnessBadge, { backgroundColor: color + '18', borderColor: color + '40' }]}>
-                    <Text style={[s.fitnessBadgeText, { color }]}>{label}</Text>
+        <View style={s.ringWrap}>
+            <View style={[s.ringOuter, { borderColor: color + '30' }]}>
+                <View style={[s.ringInner, { borderColor: color, borderTopColor: color + '15', borderRightColor: color + '15' }]}>
+                    <Text style={[s.ringScore, { color }]}>{score || '—'}</Text>
                 </View>
             </View>
-            <View style={s.fitnessRight}>
-                <View style={[s.ring, { borderColor: color + '50' }]}>
-                    <Text style={[s.ringText, { color }]}>{score > 0 ? score : '--'}</Text>
+            <Text style={s.ringLabel}>{label}</Text>
+            {streak > 0 && (
+                <View style={s.streakChip}>
+                    <View style={[s.streakDot, { backgroundColor: C.orange }]} />
+                    <Text style={s.streakNum}>{streak}d</Text>
                 </View>
-                {streak > 0 && (
-                    <View style={s.streakPill}>
-                        <Text style={s.streakText}>{streak}d streak</Text>
-                    </View>
-                )}
-            </View>
+            )}
         </View>
     );
 }
 
-// ─── Tracker Row ────────────────────────────────────────────────────────────
+// ─── Tracker ────────────────────────────────────────────────────────────────
 
-function TrackerRow({ icon, label, current, goal, unit }) {
+function TrackerItem({ label, current, goal, unit, color }) {
     const pct = goal > 0 ? Math.min(1, current / goal) : 0;
-    const done = current >= goal;
-    const barColor = done ? C.green : C.cyan;
-
+    const display = typeof current === 'number' && current % 1 !== 0 ? current.toFixed(1) : current;
     return (
-        <View style={s.trackerRow}>
-            <Text style={s.trackerIcon}>{icon}</Text>
-            <View style={{ flex: 1 }}>
-                <View style={s.trackerMeta}>
-                    <Text style={s.trackerLabel}>{label}</Text>
-                    <Text style={[s.trackerVal, done && { color: C.green }]}>
-                        {typeof current === 'number' && current % 1 !== 0 ? current.toFixed(1) : current}
-                        <Text style={s.trackerUnit}> / {goal} {unit}</Text>
-                    </Text>
-                </View>
-                <View style={s.trackerBarBg}>
-                    <View style={[s.trackerBarFill, { width: `${pct * 100}%`, backgroundColor: barColor }]} />
-                </View>
+        <View style={s.trackerItem}>
+            <View style={s.trackerTop}>
+                <Text style={s.trackerNum}>{display}</Text>
+                <Text style={s.trackerGoal}>/{goal}</Text>
             </View>
+            <View style={s.trackerBar}>
+                <View style={[s.trackerFill, { width: `${pct * 100}%`, backgroundColor: color || C.cyan }]} />
+            </View>
+            <Text style={s.trackerLabel}>{label}</Text>
         </View>
-    );
-}
-
-// ─── Action Card ────────────────────────────────────────────────────────────
-
-function ActionCard({ title, subtitle, colors, onPress, wide }) {
-    return (
-        <TouchableOpacity
-            style={[s.actionCard, wide && s.actionCardWide]}
-            activeOpacity={0.85}
-            onPress={onPress}
-        >
-            <LinearGradient
-                colors={colors}
-                style={s.actionGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-            >
-                <Text style={s.actionTitle}>{title}</Text>
-                <Text style={s.actionSub}>{subtitle}</Text>
-            </LinearGradient>
-        </TouchableOpacity>
     );
 }
 
@@ -102,97 +68,103 @@ function ActionCard({ title, subtitle, colors, onPress, wide }) {
 
 export default function HomeScreen({ navigation, showToast }) {
     const { userData, fitnessScore } = useUser();
-    const { name, streak } = userData;
+    const { name, streak, bpi, sessions } = userData;
 
-    const [apiStatus, setApiStatus] = useState('checking');
+    const [apiOk, setApiOk] = useState(null);
     const [tracker, setTracker] = useState(DAILY_TRACKER_DEFAULTS);
 
     useEffect(() => {
         AsyncStorage.getItem(TODAY_KEY).then(raw => {
             if (raw) { try { setTracker(JSON.parse(raw)); } catch (_) {} }
         });
-        api.ping().then(ok => setApiStatus(ok ? 'online' : 'offline'));
+        api.ping().then(ok => setApiOk(!!ok));
     }, []);
 
     useEffect(() => {
         AsyncStorage.setItem(TODAY_KEY, JSON.stringify(tracker)).catch(() => {});
     }, [tracker]);
 
-    const trackerItems = Object.values(tracker);
+    const score = fitnessScore?.score || 0;
+    const scoreColor = fitnessScore?.color || C.muted;
+    const trackerArr = Object.values(tracker);
+    const firstName = name?.split(' ')[0] || 'Athlete';
 
     return (
         <SafeAreaView style={s.safe}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
-                {/* Header */}
-                <LinearGradient colors={['#1a1040', C.bg]} style={s.header}>
-                    {/* Status */}
-                    <View style={[s.statusBadge, {
-                        backgroundColor: apiStatus === 'online' ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)',
-                        borderColor: apiStatus === 'online' ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)',
-                    }]}>
-                        <View style={[s.statusDot, {
-                            backgroundColor: apiStatus === 'online' ? C.green : apiStatus === 'checking' ? C.yellow : C.red,
-                        }]} />
-                        <Text style={[s.statusText, {
-                            color: apiStatus === 'online' ? C.green : apiStatus === 'checking' ? C.yellow : C.red,
-                        }]}>
-                            {apiStatus === 'checking' ? 'Connecting' : apiStatus === 'online' ? 'AI Online' : 'Offline'}
-                        </Text>
+                {/* ─── Header ─── */}
+                <View style={s.header}>
+                    <View style={s.headerTop}>
+                        <View>
+                            <Text style={s.greeting}>{getGreeting()},</Text>
+                            <Text style={s.name}>{firstName}</Text>
+                        </View>
+                        <View style={s.statusWrap}>
+                            <View style={[s.statusDot, { backgroundColor: apiOk ? C.green : apiOk === false ? C.red : C.yellow }]} />
+                            <Text style={[s.statusLabel, { color: apiOk ? C.green : apiOk === false ? C.red : C.yellow }]}>
+                                {apiOk ? 'Online' : apiOk === false ? 'Offline' : '...'}
+                            </Text>
+                        </View>
                     </View>
 
-                    {/* Greeting */}
-                    <Text style={s.greeting}>Hi, {name?.split(' ')[0] || 'Athlete'}</Text>
-                    <Text style={s.greetSub}>Ready to train today?</Text>
-
-                    {/* Fitness Card */}
-                    <FitnessCard fitnessScore={fitnessScore} streak={streak} />
-                </LinearGradient>
-
-                {/* Daily Tracker */}
-                <View style={s.section}>
-                    <Text style={s.sectionLabel}>DAILY TRACKER</Text>
-                    <View style={s.card}>
-                        {trackerItems.map((item, i) => (
-                            <TrackerRow
-                                key={i}
-                                icon={item.icon}
-                                label={item.label}
-                                current={item.current}
-                                goal={item.goal}
-                                unit={item.unit}
-                            />
-                        ))}
+                    {/* Score + Stats */}
+                    <View style={s.heroRow}>
+                        <ScoreRing score={score} label={fitnessScore?.label || 'Take Test'} color={scoreColor} streak={streak} />
+                        <View style={s.heroStats}>
+                            <View style={s.heroStat}>
+                                <Text style={s.heroNum}>{(bpi || 0).toLocaleString()}</Text>
+                                <Text style={s.heroKey}>BPI</Text>
+                            </View>
+                            <View style={s.heroDivider} />
+                            <View style={s.heroStat}>
+                                <Text style={s.heroNum}>{sessions || 0}</Text>
+                                <Text style={s.heroKey}>Sessions</Text>
+                            </View>
+                        </View>
                     </View>
                 </View>
 
-                {/* Core Actions */}
+                {/* ─── Primary CTA ─── */}
+                <TouchableOpacity activeOpacity={0.9} onPress={() => navigation.navigate('GhostSkeleton', { sport: userData.sport || 'vertical_jump' })} style={s.ctaWrap}>
+                    <LinearGradient colors={['#1e3a5f', '#0e7490']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.cta}>
+                        <View>
+                            <Text style={s.ctaTitle}>Start Training</Text>
+                            <Text style={s.ctaSub}>AI watches your form and coaches you in real time</Text>
+                        </View>
+                        <View style={s.ctaArrow}>
+                            <Text style={s.ctaArrowText}>{'>'}</Text>
+                        </View>
+                    </LinearGradient>
+                </TouchableOpacity>
+
+                {/* ─── Secondary Actions ─── */}
+                <View style={s.secondaryRow}>
+                    <TouchableOpacity activeOpacity={0.9} onPress={() => navigation.navigate('HeartRate', { sessionId: 'rppg_' + Date.now() })} style={[s.secondaryCard, { borderColor: 'rgba(239,68,68,0.2)' }]}>
+                        <View style={[s.secondaryIcon, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
+                            <Text style={{ fontSize: 20 }}>{'♥'}</Text>
+                        </View>
+                        <Text style={s.secondaryTitle}>Heart Rate</Text>
+                        <Text style={s.secondarySub}>Camera rPPG</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity activeOpacity={0.9} onPress={() => navigation.navigate('TrainingPlan')} style={[s.secondaryCard, { borderColor: 'rgba(34,197,94,0.2)' }]}>
+                        <View style={[s.secondaryIcon, { backgroundColor: 'rgba(34,197,94,0.1)' }]}>
+                            <Text style={{ fontSize: 18, color: C.green, fontWeight: '700' }}>{'▤'}</Text>
+                        </View>
+                        <Text style={s.secondaryTitle}>Weekly Plan</Text>
+                        <Text style={s.secondarySub}>Personalized drills</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* ─── Daily Tracker ─── */}
                 <View style={s.section}>
-                    <Text style={s.sectionLabel}>QUICK START</Text>
-
-                    {/* Start Training — full width, prominent */}
-                    <ActionCard
-                        title="Start Training"
-                        subtitle="AI form analysis with real-time coaching"
-                        colors={['#312e81', '#0e7490']}
-                        onPress={() => navigation.navigate('GhostSkeleton', { sport: userData.sport || 'vertical_jump' })}
-                        wide
-                    />
-
-                    {/* Two half-width cards */}
-                    <View style={s.actionRow}>
-                        <ActionCard
-                            title="Heart Rate"
-                            subtitle="Camera-based rPPG"
-                            colors={['#7f1d1d', '#991b1b']}
-                            onPress={() => navigation.navigate('HeartRate', { sessionId: 'rppg_' + Date.now() })}
-                        />
-                        <ActionCard
-                            title="Training Plan"
-                            subtitle="Your weekly drills"
-                            colors={['#14532d', '#166534']}
-                            onPress={() => navigation.navigate('TrainingPlan')}
-                        />
+                    <Text style={s.sectionHead}>Today</Text>
+                    <View style={s.trackerGrid}>
+                        {trackerArr.slice(0, 4).map((t, i) => (
+                            <TrackerItem key={i} label={t.label} current={t.current} goal={t.goal} unit={t.unit}
+                                color={[C.cyan, C.orange, C.green, C.yellow][i % 4]} />
+                        ))}
                     </View>
                 </View>
 
@@ -205,80 +177,66 @@ export default function HomeScreen({ navigation, showToast }) {
 
 const s = StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.bg },
+    scroll: { paddingBottom: 32 },
 
     // Header
-    header: { padding: 20, paddingTop: 14, paddingBottom: 28 },
-    statusBadge: {
-        flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
-        borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4,
-        borderWidth: 1, marginBottom: 20,
-    },
-    statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
-    statusText: { fontSize: 10, fontWeight: '700' },
+    header: { paddingHorizontal: 22, paddingTop: 16, paddingBottom: 24 },
+    headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 },
+    greeting: { fontSize: 14, color: C.muted, fontWeight: '500' },
+    name: { fontSize: 28, fontWeight: '900', color: C.text, letterSpacing: -0.8, marginTop: 2 },
+    statusWrap: { flexDirection: 'row', alignItems: 'center', paddingTop: 4 },
+    statusDot: { width: 7, height: 7, borderRadius: 4, marginRight: 5 },
+    statusLabel: { fontSize: 11, fontWeight: '700' },
 
-    greeting: { fontSize: 26, fontWeight: '900', color: C.text, letterSpacing: -0.5 },
-    greetSub: { fontSize: 13, color: C.muted, fontWeight: '500', marginTop: 2, marginBottom: 20 },
+    // Hero
+    heroRow: { flexDirection: 'row', alignItems: 'center' },
+    ringWrap: { alignItems: 'center', marginRight: 24 },
+    ringOuter: { width: 88, height: 88, borderRadius: 44, borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
+    ringInner: { width: 72, height: 72, borderRadius: 36, borderWidth: 3, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.02)' },
+    ringScore: { fontSize: 24, fontWeight: '900', fontFamily: 'monospace' },
+    ringLabel: { fontSize: 10, color: C.muted, fontWeight: '600', marginTop: 6 },
+    streakChip: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+    streakDot: { width: 5, height: 5, borderRadius: 3, marginRight: 4 },
+    streakNum: { fontSize: 10, color: C.orange, fontWeight: '800' },
 
-    // Fitness Card
-    fitnessCard: {
-        backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 18, padding: 18,
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
-    },
-    fitnessLeft: { flex: 1 },
-    fitnessLabel: { fontSize: 9, color: C.muted, fontWeight: '800', letterSpacing: 2 },
-    fitnessScore: { fontSize: 40, fontWeight: '900', fontFamily: 'monospace' },
-    fitnessUnit: { fontSize: 14, color: C.muted, fontWeight: '600', marginBottom: 6 },
-    fitnessBadge: {
-        alignSelf: 'flex-start', marginTop: 8, borderRadius: 99,
-        paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1,
-    },
-    fitnessBadgeText: { fontSize: 11, fontWeight: '800' },
-    fitnessRight: { alignItems: 'center', gap: 10 },
-    ring: {
-        width: 60, height: 60, borderRadius: 30, borderWidth: 3,
-        alignItems: 'center', justifyContent: 'center',
-        backgroundColor: 'rgba(255,255,255,0.03)',
-    },
-    ringText: { fontSize: 18, fontWeight: '900', fontFamily: 'monospace' },
-    streakPill: {
-        backgroundColor: 'rgba(249,115,22,0.12)', borderRadius: 99,
-        paddingHorizontal: 10, paddingVertical: 4,
-        borderWidth: 1, borderColor: 'rgba(249,115,22,0.25)',
-    },
-    streakText: { color: C.orange, fontSize: 10, fontWeight: '800' },
+    heroStats: { flex: 1 },
+    heroStat: { paddingVertical: 8 },
+    heroNum: { fontSize: 22, fontWeight: '900', color: C.text, fontFamily: 'monospace' },
+    heroKey: { fontSize: 10, color: C.muted, fontWeight: '600', marginTop: 2 },
+    heroDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginVertical: 2 },
 
-    // Sections
-    section: { paddingHorizontal: 20, marginTop: 8 },
-    sectionLabel: {
-        fontSize: 9, fontWeight: '800', color: C.muted,
-        letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12,
-    },
+    // Primary CTA
+    ctaWrap: { marginHorizontal: 20, marginBottom: 12, borderRadius: 20, overflow: 'hidden' },
+    cta: { padding: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 88 },
+    ctaTitle: { fontSize: 19, fontWeight: '900', color: '#fff' },
+    ctaSub: { fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 4, maxWidth: 220 },
+    ctaArrow: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+    ctaArrowText: { color: '#fff', fontSize: 18, fontWeight: '300' },
 
-    // Card
-    card: {
-        backgroundColor: C.surf, borderRadius: 18, padding: 16,
+    // Secondary
+    secondaryRow: { flexDirection: 'row', marginHorizontal: 20, gap: 10, marginBottom: 20 },
+    secondaryCard: {
+        flex: 1, backgroundColor: C.surf, borderRadius: 16, padding: 16,
         borderWidth: 1, borderColor: C.border,
     },
+    secondaryIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+    secondaryTitle: { fontSize: 14, fontWeight: '800', color: C.text, marginBottom: 2 },
+    secondarySub: { fontSize: 10, color: C.muted, fontWeight: '500' },
 
-    // Tracker
-    trackerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-    trackerIcon: { fontSize: 18, width: 30, textAlign: 'center', marginRight: 10 },
-    trackerMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-    trackerLabel: { fontSize: 11, color: C.muted, fontWeight: '600' },
-    trackerVal: { fontSize: 11, fontWeight: '800', color: C.text },
-    trackerUnit: { fontSize: 10, color: C.muted, fontWeight: '600' },
-    trackerBarBg: { height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' },
-    trackerBarFill: { height: '100%', borderRadius: 99 },
+    // Section
+    section: { paddingHorizontal: 22 },
+    sectionHead: { fontSize: 16, fontWeight: '800', color: C.text, marginBottom: 14 },
 
-    // Action Cards
-    actionCard: { marginBottom: 10, borderRadius: 18, overflow: 'hidden' },
-    actionCardWide: {},
-    actionGradient: { padding: 20, minHeight: 80, justifyContent: 'flex-end' },
-    actionTitle: { fontSize: 17, fontWeight: '900', color: '#fff', marginBottom: 4 },
-    actionSub: { fontSize: 11, color: 'rgba(255,255,255,0.65)', fontWeight: '500' },
-    actionRow: { flexDirection: 'row', gap: 10 },
+    // Tracker Grid
+    trackerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    trackerItem: {
+        width: HALF, backgroundColor: C.surf, borderRadius: 14, padding: 14,
+        borderWidth: 1, borderColor: C.border,
+    },
+    trackerTop: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 },
+    trackerNum: { fontSize: 22, fontWeight: '900', color: C.text, fontFamily: 'monospace' },
+    trackerGoal: { fontSize: 11, color: C.muted, fontWeight: '600' },
+    trackerBar: { height: 3, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden', marginBottom: 8 },
+    trackerFill: { height: '100%', borderRadius: 99 },
+    trackerLabel: { fontSize: 10, color: C.muted, fontWeight: '600' },
 });
-
-// Override actionCard width for the row layout
-s.actionRow = { ...s.actionRow };
