@@ -49,6 +49,7 @@ function ToastOverlay({ message }) {
 // ─── Tabs ───────────────────────────────────────────────────────────────────
 
 function TabNavigator({ showToast }) {
+    const insets = useSafeAreaInsets();
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
@@ -58,7 +59,7 @@ function TabNavigator({ showToast }) {
                         {TAB_LABELS[route.name]}
                     </Text>
                 ),
-                tabBarStyle: styles.tabBar,
+                tabBarStyle: [styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) + 4, height: 52 + Math.max(insets.bottom, 8) }],
                 headerShown: false,
             })}
         >
