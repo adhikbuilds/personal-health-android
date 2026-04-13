@@ -142,9 +142,10 @@ export default function RPPGScreen({ navigation, route }) {
         );
 
         captureRef.current = setInterval(async () => {
-            if (!runningRef.current || !cameraRef.current) return;
+            if (!runningRef.current || !cameraRef.current || !wsRef.current) return;
             try {
-                const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.15, skipProcessing: true });
+                const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.1, skipProcessing: true });
+                if (!runningRef.current) return; // re-check after async
                 if (wsRef.current?.readyState === WebSocket.OPEN && photo?.base64) {
                     wsRef.current.send(JSON.stringify({ face_found: true, image_b64: photo.base64, ts: Date.now() / 1000 }));
                     setFrames(n => n + 1);
