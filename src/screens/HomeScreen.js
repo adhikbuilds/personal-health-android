@@ -20,6 +20,14 @@ function greet() {
     return h < 5 ? 'Late night' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
 }
 
+function motivation(streak) {
+    if (streak >= 14) return "You're on fire. Keep it up.";
+    if (streak >= 7) return "A full week. That's real consistency.";
+    if (streak >= 3) return "Building momentum. Stay with it.";
+    if (streak >= 1) return "Yesterday was good. Make today better.";
+    return "Every champion started with one session.";
+}
+
 // ── Animated bar ─────────────────────────────────────────────────────────────
 
 function Bar({ pct, color, delay }) {
@@ -72,8 +80,14 @@ export default function HomeScreen({ navigation }) {
                     <View style={[$.liveDot, { backgroundColor: online ? '#22c55e' : online === false ? '#ef4444' : '#facc15' }]} />
                 </Fade>
 
+                {/* ═══ Greeting ═══ */}
+                <Fade delay={40} style={$.greetSection}>
+                    <Text style={$.greetText}>{greet()}, <Text style={$.greetName}>{first}</Text></Text>
+                    <Text style={$.motivText}>{motivation(userData.streak || 0)}</Text>
+                </Fade>
+
                 {/* ═══ Hero ═══ */}
-                <Fade delay={80} style={$.hero}>
+                <Fade delay={100} style={$.hero}>
                     <View style={$.ringWrap}>
                         <ProgressRing pct={sc} color={scColor} size={150} stroke={6} />
                         <View style={$.ringInner}>
@@ -81,8 +95,6 @@ export default function HomeScreen({ navigation }) {
                             <Text style={$.scoreUnit}>SCORE</Text>
                         </View>
                     </View>
-                    <Text style={$.heroName}>{first.toUpperCase()}</Text>
-                    <Text style={$.heroTier}>{userData.tier || 'BLOCK'} · {userData.sport?.replace('_',' ').toUpperCase() || 'ATHLETE'}</Text>
                 </Fade>
 
                 {/* ═══ Stats ═══ */}
@@ -158,13 +170,18 @@ const $ = StyleSheet.create({
     brand: { fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 3 },
     liveDot: { width: 8, height: 8, borderRadius: 4 },
 
-    hero: { alignItems: 'center', paddingTop: 16, paddingBottom: 32 },
+    // Greeting
+    greetSection: { paddingHorizontal: 24, marginBottom: 8 },
+    greetText: { fontSize: 22, fontWeight: '400', color: '#9ca3af' },
+    greetName: { fontWeight: '800', color: '#fff' },
+    motivText: { fontSize: 13, color: '#4b5563', fontWeight: '400', marginTop: 6, fontStyle: 'italic' },
+
+    hero: { alignItems: 'center', paddingTop: 16, paddingBottom: 24 },
     ringWrap: { marginBottom: 16 },
     ringInner: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
     scoreNum: { fontSize: 48, fontWeight: '900' },
     scoreUnit: { fontSize: 9, fontWeight: '700', color: '#4b5563', letterSpacing: 3, marginTop: -4 },
-    heroName: { fontSize: 18, fontWeight: '700', color: '#6b7280', letterSpacing: 8, marginBottom: 6 },
-    heroTier: { fontSize: 10, fontWeight: '600', color: '#374151', letterSpacing: 2 },
+    // (name moved to greeting section)
 
     statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 36 },
     stat: { alignItems: 'center', paddingHorizontal: 24 },
