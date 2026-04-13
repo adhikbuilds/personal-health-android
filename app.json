@@ -38,10 +38,12 @@
         {
           "cameraPermission": "Allow Personal Health to use camera for AI biomechanics analysis."
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font"
     ],
     "extra": {
-      "backendHost": ""
+      "backendHost": "172.17.62.56"
     }
   }
 }

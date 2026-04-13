@@ -5,9 +5,10 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, SafeAreaView, ScrollView,
+    View, Text, StyleSheet, ScrollView,
     TouchableOpacity, ActivityIndicator, Alert, RefreshControl,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C } from '../styles/colors';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
@@ -92,6 +93,7 @@ function DayCard({ day, isToday, onComplete }) {
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function TrainingPlanScreen({ navigation }) {
+    const insets = useSafeAreaInsets();
     const { userData } = useUser();
     const athleteId = userData?.avatarId || 'athlete_01';
 
@@ -147,22 +149,22 @@ export default function TrainingPlanScreen({ navigation }) {
     // ─── Render ──────────────────────────────────────────────────────────
     if (loading && !plan) {
         return (
-            <SafeAreaView style={s.container}>
+            <View style={[s.container, { paddingTop: insets.top }]}>
                 <ActivityIndicator size="large" color={C.cyan} style={{ marginTop: 100 }} />
-            </SafeAreaView>
+            </View>
         );
     }
 
     if (!plan) {
         return (
-            <SafeAreaView style={s.container}>
+            <View style={[s.container, { paddingTop: insets.top }]}>
                 <View style={s.emptyState}>
                     <Text style={s.emptyText}>Could not load training plan.</Text>
                     <TouchableOpacity style={s.retryBtn} onPress={fetchPlan}>
                         <Text style={s.retryText}>Retry</Text>
                     </TouchableOpacity>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
@@ -170,7 +172,7 @@ export default function TrainingPlanScreen({ navigation }) {
     const days = plan.days || [];
 
     return (
-        <SafeAreaView style={s.container}>
+        <View style={[s.container, { paddingTop: insets.top }]}>
             <ScrollView
                 contentContainerStyle={s.scroll}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.cyan} />}
@@ -246,7 +248,7 @@ export default function TrainingPlanScreen({ navigation }) {
                     />
                 ))}
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 

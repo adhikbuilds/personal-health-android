@@ -3,8 +3,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
     View, Text, ScrollView, StyleSheet, TouchableOpacity,
-    SafeAreaView, ActivityIndicator, Dimensions,
+    ActivityIndicator, Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Polyline, Circle, Rect, Line, Text as SvgText, Defs, LinearGradient as SvgGrad, Stop } from 'react-native-svg';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
@@ -369,6 +370,7 @@ function ReadinessArc({ data }) {
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProgressScreen() {
+    const insets = useSafeAreaInsets();
     const { userData } = useUser();
     const athleteId = userData?.avatarId || 'athlete_01';
 
@@ -410,26 +412,26 @@ export default function ProgressScreen() {
     // ─── Loading state ───────────────────────────────────────────────────
     if (loading) {
         return (
-            <SafeAreaView style={s.root}>
+            <View style={[s.root, { paddingTop: insets.top }]}>
                 <View style={s.center}>
                     <ActivityIndicator size="large" color={C.cyan} />
                     <Text style={[s.emptyText, { marginTop: 12 }]}>Loading progress...</Text>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
     // ─── Error state ─────────────────────────────────────────────────────
     if (error) {
         return (
-            <SafeAreaView style={s.root}>
+            <View style={[s.root, { paddingTop: insets.top }]}>
                 <View style={s.center}>
                     <Text style={s.errorText}>Could not load progress data</Text>
                     <TouchableOpacity style={s.retryBtn} onPress={load} activeOpacity={0.7}>
                         <Text style={s.retryText}>Retry</Text>
                     </TouchableOpacity>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
@@ -437,7 +439,7 @@ export default function ProgressScreen() {
     const hasData = progress?.session_count > 0;
     if (!hasData) {
         return (
-            <SafeAreaView style={s.root}>
+            <View style={[s.root, { paddingTop: insets.top }]}>
                 <View style={s.header}>
                     <Text style={s.title}>Progress</Text>
                 </View>
@@ -446,7 +448,7 @@ export default function ProgressScreen() {
                     <Text style={s.emptyTitle}>No Progress Yet</Text>
                     <Text style={s.emptyText}>Complete your first session to see progress</Text>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
@@ -457,7 +459,7 @@ export default function ProgressScreen() {
     const bpiDelta = progress?.bpi_delta ?? 0;
 
     return (
-        <SafeAreaView style={s.root}>
+        <View style={[s.root, { paddingTop: insets.top }]}>
             <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
                 {/* Header */}
                 <View style={s.header}>
@@ -500,7 +502,7 @@ export default function ProgressScreen() {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 
