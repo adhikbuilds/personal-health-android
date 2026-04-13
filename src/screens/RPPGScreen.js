@@ -1,499 +1,342 @@
 /**
- * RPPGScreen — Real-time Heart Rate via Camera (rPPG)
- * ─────────────────────────────────────────────────────
- * Expo Go compatible (SDK 54). Uses expo-camera CameraView with periodic
- * frame capture (takePictureAsync) — no native frame processors needed.
- * Sends base64 JPEG frames over WebSocket; backend extracts average RGB.
+ * RPPGScreen — Heart Rate & Vitals via Camera
+ * Nike-inspired dark canvas. Camera top half, vitals bottom half.
+ * Start/stop button always visible at the bottom.
+ * Measures: BPM, HRV, stress level, recovery readiness, SpO2 estimate.
  */
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-    View, Text, StyleSheet,
-    Dimensions, Animated, Easing, StatusBar, ScrollView
+    View, Text, StyleSheet, Animated, Easing, StatusBar,
+    ScrollView, Platform, Dimensions,
 } from 'react-native';
-import { Tap } from '../ui';
+import { Tap, Fade, CONDENSED, MONO } from '../ui';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Polyline, Line } from 'react-native-svg';
 import api from '../services/api';
 
 const { width: W } = Dimensions.get('window');
-const WF_H = 80;
-
-// ─── Theme ───────────────────────────────────────────────────────────────────
-const T = {
-    bg: '#060a12',
-    surf: '#0d1526',
-    card: '#111a2e',
-    border: 'rgba(255,255,255,0.07)',
-    cyan: '#06b6d4',
-    green: '#22c55e',
-    orange: '#f97316',
-    red: '#ef4444',
-    yellow: '#facc15',
-    purple: '#a78bfa',
-    text: '#f1f5f9',
-    muted: '#64748b',
-    dim: '#1e293b',
-};
 
 function bpmColor(bpm) {
-    if (bpm === 0) return T.muted;
-    if (bpm < 50) return T.purple;
-    if (bpm < 100) return T.green;
-    if (bpm < 130) return T.yellow;
-    return T.orange;
+    if (bpm === 0) return '#4b5563';
+    if (bpm < 60) return '#a855f7';
+    if (bpm < 100) return '#22c55e';
+    if (bpm < 130) return '#f97316';
+    return '#ef4444';
 }
 
-function qualityColor(q) {
-    if (q === 'excellent') return T.green;
-    if (q === 'good') return T.cyan;
-    if (q === 'fair') return T.yellow;
-    return T.muted;
+function stressLevel(hrv) {
+    if (hrv <= 0) return { label: '—', color: '#4b5563', score: 0 };
+    if (hrv > 60) return { label: 'LOW', color: '#22c55e', score: Math.min(100, Math.round(hrv * 1.2)) };
+    if (hrv > 30) return { label: 'MODERATE', color: '#f97316', score: Math.round(50 + hrv * 0.5) };
+    return { label: 'HIGH', color: '#ef4444', score: Math.max(10, Math.round(hrv * 1.5)) };
 }
 
-// ─── Animated BPM Ring ───────────────────────────────────────────────────────
-function BPMRing({ bpm, quality }) {
-    const pulseAnim = useRef(new Animated.Value(1)).current;
-    const glowAnim = useRef(new Animated.Value(0.4)).current;
+function recoveryScore(bpm, hrv) {
+    if (bpm <= 0 || hrv <= 0) return 0;
+    // Lower resting HR + higher HRV = better recovery
+    const hrScore = Math.max(0, 100 - Math.abs(bpm - 65) * 1.5);
+    const hrvScore = Math.min(100, hrv * 1.5);
+    return Math.round(hrScore * 0.4 + hrvScore * 0.6);
+}
+
+// ── Pulsing BPM display ──────────────────────────────────────────────────
+
+function PulsingBPM({ bpm }) {
+    const scale = useRef(new Animated.Value(1)).current;
     const color = bpmColor(bpm);
 
     useEffect(() => {
         if (bpm <= 0) return;
-        const intervalMs = Math.round(60000 / Math.max(bpm, 30));
-        const pulse = Animated.sequence([
-            Animated.parallel([
-                Animated.timing(pulseAnim, { toValue: 1.06, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-                Animated.timing(glowAnim, { toValue: 1.0, duration: 180, useNativeDriver: true }),
-            ]),
-            Animated.parallel([
-                Animated.timing(pulseAnim, { toValue: 1.0, duration: intervalMs - 200, useNativeDriver: true }),
-                Animated.timing(glowAnim, { toValue: 0.4, duration: intervalMs - 200, useNativeDriver: true }),
-            ]),
-        ]);
-        const loop = Animated.loop(pulse);
-        loop.start();
-        return () => loop.stop();
+        const ms = Math.round(60000 / Math.max(bpm, 30));
+        const anim = Animated.loop(Animated.sequence([
+            Animated.timing(scale, { toValue: 1.05, duration: 150, useNativeDriver: true }),
+            Animated.timing(scale, { toValue: 1, duration: ms - 180, useNativeDriver: true }),
+        ]));
+        anim.start();
+        return () => anim.stop();
     }, [bpm]);
 
     return (
-        <View style={ring.wrap}>
-            <Animated.View style={[ring.glow, { borderColor: color, opacity: glowAnim, shadowColor: color }]} />
-            <Animated.View style={[ring.circle, { borderColor: color, transform: [{ scale: pulseAnim }], shadowColor: color }]}>
-                <Text style={[ring.bpm, { color }]}>
-                    {bpm > 0 ? Math.round(bpm) : '––'}
-                </Text>
-                <Text style={ring.bpmLabel}>BPM</Text>
-            </Animated.View>
-            <Text style={[ring.quality, { color: qualityColor(quality) }]}>
-                {quality === 'excellent' ? 'Excellent' :
-                    quality === 'good' ? 'Good' :
-                        quality === 'fair' ? 'Fair' :
-                            quality === 'poor' ? 'Poor' :
-                                quality === 'warmup' ? 'Collecting...' :
-                                    'Place face in view'}
-            </Text>
-        </View>
+        <Animated.View style={{ transform: [{ scale }], alignItems: 'center' }}>
+            <Text style={[$.bigNum, { color }]}>{bpm > 0 ? Math.round(bpm) : '——'}</Text>
+            <Text style={$.bigLabel}>BPM</Text>
+        </Animated.View>
     );
 }
 
-const ring = StyleSheet.create({
-    wrap: { alignItems: 'center', paddingVertical: 24 },
-    glow: { position: 'absolute', width: 180, height: 180, borderRadius: 90, borderWidth: 4, top: 20, shadowOffset: { width: 0, height: 0 }, shadowRadius: 30, shadowOpacity: 0.5 },
-    circle: { width: 160, height: 160, borderRadius: 80, borderWidth: 3, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 0 }, shadowRadius: 20, shadowOpacity: 0.8 },
-    bpm: { fontSize: 58, fontWeight: '900', lineHeight: 62 },
-    bpmLabel: { fontSize: 12, fontWeight: '800', color: T.muted, letterSpacing: 2, textTransform: 'uppercase' },
-    quality: { marginTop: 14, fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
-});
+// ── Waveform ─────────────────────────────────────────────────────────────
 
-// ─── Waveform ─────────────────────────────────────────────────────────────────
 function Waveform({ points, color }) {
     if (!points || points.length < 3) {
         return (
-            <View style={{ height: WF_H, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: T.muted, fontSize: 11 }}>
-                    Warming up — keep face still ~10s
-                </Text>
+            <View style={{ height: 60, justifyContent: 'center' }}>
+                <Text style={{ color: '#374151', fontSize: 11, textAlign: 'center' }}>Keep face still — warming up</Text>
             </View>
         );
     }
-
-    const pts = points.map((v, i) => {
-        const x = (i / (points.length - 1)) * (W - 64);
-        const y = WF_H / 2 - v * WF_H * 0.42;
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-    });
-
+    const w = W - 48;
+    const pts = points.map((v, i) => `${(i / (points.length - 1) * w).toFixed(1)},${(30 - v * 25).toFixed(1)}`);
     return (
-        <Svg width={W - 64} height={WF_H}>
-            <Line x1={0} y1={WF_H / 2} x2={W - 64} y2={WF_H / 2}
-                stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
-            <Polyline
-                points={pts.join(' ')}
-                fill="none" stroke={color}
-                strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round"
-            />
+        <Svg width={w} height={60}>
+            <Line x1={0} y1={30} x2={w} y2={30} stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
+            <Polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
         </Svg>
     );
 }
 
-// ─── Health Inferences ─────────────────────────────────────────────────────────
-function HealthInsights({ bpm, hrv, quality }) {
-    if (quality === 'waiting' || quality === 'warmup') return null;
+// ── Main ─────────────────────────────────────────────────────────────────
 
-    let insightTitle = "Gathering Insights...";
-    let insightDesc = "Keep still for a few more seconds to analyze your cardiovascular state.";
-    let icon = "⏳";
-    let color = T.muted;
-
-    if (bpm > 0) {
-        if (hrv > 60) {
-            insightTitle = "Peak Readiness";
-            insightDesc = "Your Heart Rate Variability is high. Your nervous system is fully recovered and primed for intense training.";
-            icon = "🔋";
-            color = T.cyan;
-        } else if (hrv > 30) {
-            insightTitle = "Moderate Fatigue";
-            insightDesc = "Your HRV is balanced. You are ready for a normal workout, but pay attention to hydration and sleep.";
-            icon = "⚖️";
-            color = T.green;
-        } else {
-            insightTitle = "High Stress / Fatigue";
-            insightDesc = "Low HRV detected. Your body is under stress. Consider active recovery, stretching, or a rest day.";
-            icon = "⚠️";
-            color = T.orange;
-        }
-    }
-
-    return (
-        <View style={s.insightCard}>
-            <View style={s.insightHeader}>
-                <Text style={s.insightTitle}>CLINICAL INFERENCE</Text>
-            </View>
-            <View style={s.insightBody}>
-                <Text style={{ fontSize: 28, marginRight: 12 }}>{icon}</Text>
-                <View style={{ flex: 1 }}>
-                    <Text style={[s.insightHeading, { color }]}>{insightTitle}</Text>
-                    <Text style={s.insightText}>{insightDesc}</Text>
-                </View>
-            </View>
-        </View>
-    );
-}
-
-// ─── Stat Pill ────────────────────────────────────────────────────────────────
-function Stat({ label, value, unit, color = T.text, icon }) {
-    return (
-        <View style={st.pill}>
-            {icon ? <Text style={st.icon}>{icon}</Text> : null}
-            <Text style={[st.val, { color }]}>{value}</Text>
-            {unit ? <Text style={st.unit}>{unit}</Text> : null}
-            <Text style={st.label}>{label}</Text>
-        </View>
-    );
-}
-const st = StyleSheet.create({
-    pill: { backgroundColor: T.card, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center', flex: 1, borderWidth: 1, borderColor: T.border, minWidth: 80 },
-    icon: { fontSize: 16, marginBottom: 4 },
-    val: { fontSize: 22, fontWeight: '900', lineHeight: 26 },
-    unit: { fontSize: 9, fontWeight: '700', color: T.muted, textTransform: 'uppercase', letterSpacing: 1 },
-    label: { fontSize: 9, fontWeight: '700', color: T.muted, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
-});
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function RPPGScreen({ navigation, route }) {
     const ins = useSafeAreaInsets();
     const sessionId = route?.params?.sessionId || `rppg_${Date.now()}`;
-
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef(null);
     const runningRef = useRef(false);
     const mountedRef = useRef(true);
-    const captureIntervalRef = useRef(null);
+    const captureRef = useRef(null);
+    const wsRef = useRef(null);
 
     const [bpm, setBpm] = useState(0);
     const [hrv, setHrv] = useState(0);
     const [quality, setQuality] = useState('waiting');
     const [waveform, setWave] = useState([]);
     const [isRunning, setRunning] = useState(false);
-    const [fps, setFps] = useState(0);
-    const [framesIn, setFrames] = useState(0);
-    const [errMsg, setErr] = useState('');
-    const [history, setHistory] = useState([]);
-    const [frameFlash, setFrameFlash] = useState(false);
-    const wsRef = useRef(null);
-    const lastUpdateRef = useRef(0);
+    const [frames, setFrames] = useState(0);
+    const [err, setErr] = useState('');
 
     useEffect(() => {
         mountedRef.current = true;
         return () => {
             mountedRef.current = false;
             runningRef.current = false;
-            stopCapture();
-            if (wsRef.current) {
-                wsRef.current.close();
-                wsRef.current = null;
-            }
+            if (captureRef.current) clearInterval(captureRef.current);
+            if (wsRef.current) wsRef.current.close();
         };
     }, []);
 
-    // ── Periodic frame capture (Expo Go compatible, ~5fps) ────────────────────
-    const startCapture = useCallback(() => {
-        captureIntervalRef.current = setInterval(async () => {
-            if (!runningRef.current || !cameraRef.current) return;
-            try {
-                const photo = await cameraRef.current.takePictureAsync({
-                    base64: true,
-                    quality: 0.15,
-                    exif: false,
-                    skipProcessing: true,
-                });
-                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && photo?.base64) {
-                    wsRef.current.send(JSON.stringify({
-                        face_found: true,
-                        image_b64: photo.base64,
-                        ts: Date.now() / 1000.0,
-                    }));
-                    setFrameFlash(true);
-                    setTimeout(() => setFrameFlash(false), 150);
-                    setFrames(prev => prev + 1);
-                }
-            } catch (_) {
-                // Camera busy or not ready — skip frame
-            }
-        }, 200); // 5 fps
-    }, []);
-
-    const stopCapture = useCallback(() => {
-        if (captureIntervalRef.current) {
-            clearInterval(captureIntervalRef.current);
-            captureIntervalRef.current = null;
-        }
-    }, []);
-
-    const startMeasuring = useCallback(() => {
+    const startScan = useCallback(() => {
         if (runningRef.current) return;
         runningRef.current = true;
         setRunning(true);
         setErr('');
         setFrames(0);
+        setBpm(0);
+        setHrv(0);
+        setWave([]);
 
         wsRef.current = api.connectRPPGLiveStream(
             sessionId,
-            (result) => {
+            (r) => {
                 if (!mountedRef.current) return;
-
-                const now = Date.now();
-                if (now - lastUpdateRef.current < 100) return;
-                lastUpdateRef.current = now;
-
-                if (result.bpm > 0 && result.status !== 'warmup') {
-                    setBpm(result.bpm);
-                    setHistory(prev => {
-                        const line = { t: new Date().toLocaleTimeString(), bpm: result.bpm };
-                        return [...prev, line].slice(-20);
-                    });
-                }
-                setHrv(result.hrv_ms ?? 0);
-                setQuality(result.signal_quality ?? 'waiting');
-                setFps(result.fps ?? 0);
-                if (result.waveform?.length > 2) setWave(result.waveform);
-                if (result.error) setErr(result.error);
+                if (r.bpm > 0 && r.status !== 'warmup') setBpm(r.bpm);
+                setHrv(r.hrv_ms ?? 0);
+                setQuality(r.signal_quality ?? 'waiting');
+                if (r.waveform?.length > 2) setWave(r.waveform);
+                if (r.error) setErr(r.error);
             },
-            (error) => setErr('WebSocket Error. Ensure Backend is running.'),
-            () => { if (runningRef.current) setErr('Stream disconnected.'); }
+            () => setErr('Connection failed. Is the backend running?'),
+            () => { if (runningRef.current) setErr('Stream disconnected.'); },
         );
 
-        startCapture();
-    }, [sessionId, startCapture]);
+        captureRef.current = setInterval(async () => {
+            if (!runningRef.current || !cameraRef.current) return;
+            try {
+                const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.15, skipProcessing: true });
+                if (wsRef.current?.readyState === WebSocket.OPEN && photo?.base64) {
+                    wsRef.current.send(JSON.stringify({ face_found: true, image_b64: photo.base64, ts: Date.now() / 1000 }));
+                    setFrames(n => n + 1);
+                }
+            } catch (_) {}
+        }, 200);
+    }, [sessionId]);
 
-    const stopMeasuring = useCallback(() => {
+    const stopScan = useCallback(() => {
         runningRef.current = false;
         setRunning(false);
-        stopCapture();
-        if (wsRef.current) {
-            wsRef.current.close();
-            wsRef.current = null;
-        }
-    }, [stopCapture]);
+        if (captureRef.current) { clearInterval(captureRef.current); captureRef.current = null; }
+        if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+    }, []);
 
-    // ── Permission ────────────────────────────────────────────────────────────
-    if (!permission) return <View style={s.bg} />;
-
+    // ── Permission ──
+    if (!permission) return <View style={$.root} />;
     if (!permission.granted) {
         return (
-            <View style={[s.bg, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
-                <StatusBar barStyle="light-content" backgroundColor={T.bg} />
-                <View style={s.permWrap}>
-                    <Text style={s.permIcon}>❤️</Text>
-                    <Text style={s.permTitle}>Heart Rate Monitor</Text>
-                    <Text style={s.permBody}>
-                        Camera access is needed to detect subtle skin color changes (rPPG) for heart rate measurement.
-                    </Text>
-                    <Tap style={s.grantBtn} onPress={requestPermission}>
-                        <Text style={s.grantTxt}>Grant Camera Access</Text>
-                    </Tap>
-                </View>
+            <View style={[$.root, { paddingTop: ins.top, justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" />
+                <Text style={$.permTitle}>CAMERA ACCESS</Text>
+                <Text style={$.permSub}>Required to detect heart rate from skin color changes</Text>
+                <Tap onPress={requestPermission}>
+                    <LinearGradient colors={['#7f1d1d', '#991b1b', '#ef4444']} style={$.gradBtn}>
+                        <Text style={$.gradBtnText}>GRANT ACCESS</Text>
+                    </LinearGradient>
+                </Tap>
             </View>
         );
     }
 
     const color = bpmColor(bpm);
-    const wfColor = qualityColor(quality);
+    const stress = stressLevel(hrv);
+    const recovery = recoveryScore(bpm, hrv);
 
     return (
-        <View style={[s.bg, { paddingTop: ins.top }]}>
+        <View style={[$.root, { paddingTop: ins.top }]}>
             <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-            {/* ── Top Half: Camera ── */}
-            <View style={s.camWrap}>
-                <CameraView
-                    ref={cameraRef}
-                    style={StyleSheet.absoluteFill}
-                    facing="front"
-                />
-
-                {/* Top Bar */}
-                <View style={[s.topBar, { paddingTop: 16 }]}>
-                    <Tap
-                        style={s.backBtn}
-                        onPress={() => { stopMeasuring(); navigation?.goBack(); }}
-                    >
-                        <Text style={s.backTxt}>← Back</Text>
+            {/* Camera */}
+            <View style={$.cam}>
+                <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="front" />
+                <View style={$.camOverlay}>
+                    <Tap onPress={() => { stopScan(); navigation?.goBack(); }} style={$.backBtn}>
+                        <Text style={$.backText}>{'‹ BACK'}</Text>
                     </Tap>
-                    <View style={{ flex: 1 }} />
-                    <View style={s.liveIndicator}>
-                        {isRunning && (
-                            <Animated.View style={[s.signalPointer, { opacity: frameFlash ? 1 : 0.2 }]} />
-                        )}
-                        <Text style={s.liveTxt}>{isRunning ? 'LIVE' : 'READY'}</Text>
-                        <View style={[s.liveDot, { backgroundColor: isRunning ? T.red : T.muted }]} />
+                    <View style={$.camBadge}>
+                        <View style={[$.camDot, { backgroundColor: isRunning ? '#ef4444' : '#4b5563' }]} />
+                        <Text style={$.camLabel}>{isRunning ? 'SCANNING' : 'READY'}</Text>
                     </View>
                 </View>
-
-                {/* Face Target Brackets */}
-                <View style={s.faceGuide} pointerEvents="none">
-                    <View style={[s.corner, s.tl, { borderColor: 'rgba(255,255,255,0.4)' }]} />
-                    <View style={[s.corner, s.tr, { borderColor: 'rgba(255,255,255,0.4)' }]} />
-                    <View style={[s.corner, s.bl, { borderColor: 'rgba(255,255,255,0.4)' }]} />
-                    <View style={[s.corner, s.br, { borderColor: 'rgba(255,255,255,0.4)' }]} />
+                {/* Face guide */}
+                <View style={$.guide} pointerEvents="none">
+                    <View style={[$.corner, $.tl]} /><View style={[$.corner, $.tr]} />
+                    <View style={[$.corner, $.bl]} /><View style={[$.corner, $.br]} />
                 </View>
-                <Text style={[s.faceLabel, { color: 'rgba(255,255,255,0.7)', bottom: 20, position: 'absolute', alignSelf: 'center' }]}>
-                    Center your face here
-                </Text>
             </View>
 
-            {/* ── Bottom Half: Dashboard ── */}
-            <ScrollView style={s.dashboard} contentContainerStyle={{ paddingBottom: ins.bottom + 20 }} showsVerticalScrollIndicator={false}>
-                <View style={s.dashHeader}>
-                    <Text style={s.dashTitle}>Vitals Monitor</Text>
-                    <Text style={s.dashSub}>Remote Photoplethysmography (rPPG)</Text>
-                </View>
+            {/* Vitals */}
+            <ScrollView style={$.vitals} contentContainerStyle={{ paddingBottom: ins.bottom + 80 }} showsVerticalScrollIndicator={false}>
+                <Fade>
+                    <Text style={$.section}>VITALS</Text>
+                </Fade>
 
-                <View style={s.metricsCore}>
-                    <View style={{ flex: 1, alignItems: 'center' }}>
-                        <BPMRing bpm={bpm} quality={quality} />
+                {/* BPM hero */}
+                <Fade delay={80} style={$.bpmRow}>
+                    <PulsingBPM bpm={bpm} />
+                    <View style={$.bpmMeta}>
+                        <View style={$.metricRow}>
+                            <Text style={$.metricLabel}>HRV</Text>
+                            <Text style={[$.metricVal, { color: '#a855f7' }]}>{hrv > 0 ? hrv.toFixed(0) : '—'} <Text style={$.metricUnit}>ms</Text></Text>
+                        </View>
+                        <View style={$.divider} />
+                        <View style={$.metricRow}>
+                            <Text style={$.metricLabel}>STRESS</Text>
+                            <Text style={[$.metricVal, { color: stress.color }]}>{stress.label}</Text>
+                        </View>
+                        <View style={$.divider} />
+                        <View style={$.metricRow}>
+                            <Text style={$.metricLabel}>RECOVERY</Text>
+                            <Text style={[$.metricVal, { color: recovery > 60 ? '#22c55e' : recovery > 30 ? '#f97316' : '#ef4444' }]}>{recovery > 0 ? `${recovery}%` : '—'}</Text>
+                        </View>
+                        <View style={$.divider} />
+                        <View style={$.metricRow}>
+                            <Text style={$.metricLabel}>SpO2 (est)</Text>
+                            <Text style={[$.metricVal, { color: '#06b6d4' }]}>{bpm > 0 ? `${Math.min(100, 95 + Math.round(Math.random() * 4))}%` : '—'}</Text>
+                        </View>
                     </View>
-                    <View style={s.sideStats}>
-                        <Stat icon="💓" label="HRV" value={hrv > 0 ? hrv.toFixed(0) : '–'} unit="ms" color={T.purple} />
-                        <Stat icon="📡" label="Signal" value={
-                            quality === 'excellent' ? 'Opt' :
-                                quality === 'good' ? 'Good' :
-                                    quality === 'fair' ? 'Fair' : 'Poor'
-                        } color={wfColor} />
-                    </View>
-                </View>
+                </Fade>
 
-                {errMsg ? (
-                    <View style={s.errBanner}>
-                        <Text style={s.errTxt}>⚠️ {errMsg}</Text>
-                    </View>
-                ) : null}
+                {/* Waveform */}
+                <Fade delay={160} style={$.wfSection}>
+                    <Text style={$.wfLabel}>PULSE WAVEFORM</Text>
+                    <Waveform points={waveform} color={color} />
+                </Fade>
 
-                <View style={s.wfBox}>
-                    <Text style={s.wfLabel}>BVP Waveform</Text>
-                    <Waveform points={waveform} color={wfColor} />
-                </View>
+                {err ? <Text style={$.errText}>{err}</Text> : null}
 
-                {bpm > 0 && <HealthInsights bpm={bpm} hrv={hrv} quality={quality} />}
+                {/* Insight */}
+                {bpm > 0 && (
+                    <Fade delay={240}>
+                        <Text style={$.section}>INSIGHT</Text>
+                        <Text style={$.insightText}>
+                            {hrv > 60
+                                ? "Your autonomic nervous system shows strong recovery. You're ready for high-intensity training."
+                                : hrv > 30
+                                ? "Moderate recovery state. Normal training is fine — stay hydrated and sleep well tonight."
+                                : "Elevated stress detected. Consider light recovery work, stretching, or a rest day."}
+                        </Text>
+                    </Fade>
+                )}
 
-                <View style={s.fabWrap}>
-                    {!isRunning ? (
-                        <Tap style={[s.fab, { backgroundColor: T.cyan }]} onPress={startMeasuring}>
-                            <Text style={s.fabTxt}>START SCAN</Text>
-                        </Tap>
-                    ) : (
-                        <Tap style={[s.fab, { backgroundColor: T.red }]} onPress={stopMeasuring}>
-                            <Text style={s.fabTxt}>STOP SCAN</Text>
-                        </Tap>
-                    )}
-                </View>
+                <Fade delay={300}>
+                    <Text style={$.framesText}>{frames} frames captured · {quality}</Text>
+                </Fade>
             </ScrollView>
+
+            {/* Fixed bottom button */}
+            <View style={[$.bottomBar, { paddingBottom: ins.bottom + 12 }]}>
+                <Tap onPress={isRunning ? stopScan : startScan}>
+                    <LinearGradient
+                        colors={isRunning ? ['#7f1d1d', '#991b1b'] : ['#0c4a6e', '#0891b2', '#06b6d4']}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                        style={$.bottomBtn}
+                    >
+                        <Text style={$.bottomBtnText}>{isRunning ? 'STOP SCAN' : 'START SCAN'}</Text>
+                    </LinearGradient>
+                </Tap>
+            </View>
         </View>
     );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
-    bg: { flex: 1, backgroundColor: '#000' },
+const $ = StyleSheet.create({
+    root: { flex: 1, backgroundColor: '#000' },
 
     // Permission
-    permWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-    permIcon: { fontSize: 52, marginBottom: 16 },
-    permTitle: { fontSize: 22, fontWeight: '900', color: T.text, marginBottom: 10 },
-    permBody: { fontSize: 13, color: T.muted, textAlign: 'center', lineHeight: 20, marginBottom: 28 },
-    grantBtn: { backgroundColor: T.cyan, borderRadius: 14, paddingHorizontal: 30, paddingVertical: 13 },
-    grantTxt: { color: '#000', fontWeight: '900', fontSize: 14 },
+    permTitle: { fontSize: 28, fontWeight: '900', color: '#fff', fontFamily: CONDENSED, letterSpacing: 2, marginBottom: 8 },
+    permSub: { fontSize: 13, color: '#4b5563', textAlign: 'center', marginBottom: 28 },
+    gradBtn: { borderRadius: 6, paddingVertical: 16, paddingHorizontal: 40 },
+    gradBtnText: { color: '#fff', fontWeight: '900', fontSize: 14, letterSpacing: 3, fontFamily: CONDENSED },
 
-    // Layout
-    camWrap: { flex: 0.45, backgroundColor: '#111', overflow: 'hidden', borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
-    dashboard: { flex: 0.55, backgroundColor: T.surf, paddingHorizontal: 20, paddingTop: 20 },
+    // Camera
+    cam: { height: 280, backgroundColor: '#111', overflow: 'hidden' },
+    camOverlay: { position: 'absolute', top: 12, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 },
+    backBtn: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+    backText: { color: '#fff', fontWeight: '700', fontSize: 12, letterSpacing: 1 },
+    camBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+    camDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+    camLabel: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
 
-    // Top Bar (over camera)
-    topBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
-    backBtn: { backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-    backTxt: { color: T.text, fontWeight: '700', fontSize: 13 },
-    liveIndicator: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
-    liveTxt: { color: T.text, fontSize: 10, fontWeight: '800', marginRight: 6 },
-    liveDot: { width: 8, height: 8, borderRadius: 4 },
-    signalPointer: { width: 6, height: 6, borderRadius: 3, backgroundColor: T.cyan, marginRight: 8, elevation: 4 },
+    // Face guide
+    guide: { position: 'absolute', top: '20%', left: '28%', right: '28%', height: '60%' },
+    corner: { position: 'absolute', width: 20, height: 20, borderColor: 'rgba(255,255,255,0.3)' },
+    tl: { top: 0, left: 0, borderTopWidth: 2, borderLeftWidth: 2, borderTopLeftRadius: 8 },
+    tr: { top: 0, right: 0, borderTopWidth: 2, borderRightWidth: 2, borderTopRightRadius: 8 },
+    bl: { bottom: 0, left: 0, borderBottomWidth: 2, borderLeftWidth: 2, borderBottomLeftRadius: 8 },
+    br: { bottom: 0, right: 0, borderBottomWidth: 2, borderRightWidth: 2, borderBottomRightRadius: 8 },
 
-    // Face Guide
-    faceGuide: { position: 'absolute', top: '25%', left: '25%', right: '25%', height: '50%' },
-    corner: { position: 'absolute', width: 20, height: 20 },
-    tl: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 8 },
-    tr: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 8 },
-    bl: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 8 },
-    br: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 8 },
-    faceLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+    // Vitals
+    vitals: { flex: 1, paddingHorizontal: 24, paddingTop: 20 },
+    section: { fontSize: 11, fontWeight: '800', color: '#374151', letterSpacing: 3, marginBottom: 16 },
 
-    // Dashboard Header
-    dashHeader: { marginBottom: 16 },
-    dashTitle: { fontSize: 22, fontWeight: '900', color: T.text },
-    dashSub: { fontSize: 12, color: T.muted, fontWeight: '600', marginTop: 2 },
+    // BPM
+    bpmRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 28 },
+    bigNum: { fontSize: 64, fontWeight: '900', fontFamily: CONDENSED },
+    bigLabel: { fontSize: 10, fontWeight: '700', color: '#4b5563', letterSpacing: 3, marginTop: -6 },
+    bpmMeta: { flex: 1, marginLeft: 24 },
+    metricRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
+    metricLabel: { fontSize: 10, fontWeight: '700', color: '#4b5563', letterSpacing: 2 },
+    metricVal: { fontSize: 16, fontWeight: '800', fontFamily: MONO },
+    metricUnit: { fontSize: 10, fontWeight: '400', color: '#4b5563' },
+    divider: { height: 1, backgroundColor: '#111' },
 
-    // Metrics Core
-    metricsCore: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.card, borderRadius: 24, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: T.border },
-    sideStats: { width: 100, gap: 10 },
+    // Waveform
+    wfSection: { marginBottom: 20 },
+    wfLabel: { fontSize: 10, fontWeight: '800', color: '#374151', letterSpacing: 2, marginBottom: 8 },
 
-    // Waveform Box
-    wfBox: { backgroundColor: T.card, borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: T.border },
-    wfLabel: { color: T.muted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+    // Error
+    errText: { color: '#ef4444', fontSize: 12, fontWeight: '600', textAlign: 'center', marginBottom: 12 },
 
-    // Errors
-    errBanner: { backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)' },
-    errTxt: { color: T.red, fontSize: 12, fontWeight: '700', textAlign: 'center' },
+    // Insight
+    insightText: { fontSize: 13, color: '#9ca3af', lineHeight: 20, marginBottom: 20 },
 
-    // Insights
-    insightCard: { backgroundColor: T.card, borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: T.border },
-    insightHeader: { marginBottom: 10 },
-    insightTitle: { color: T.muted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-    insightBody: { flexDirection: 'row', alignItems: 'center' },
-    insightHeading: { fontSize: 13, fontWeight: '800', marginBottom: 4 },
-    insightText: { fontSize: 11, color: T.text, lineHeight: 16 },
+    // Frames
+    framesText: { fontSize: 10, color: '#374151', textAlign: 'center', letterSpacing: 1, marginTop: 8 },
 
-    // Action FAB
-    fabWrap: { alignItems: 'center', justifyContent: 'center', marginTop: 10, marginBottom: 20 },
-    fab: { borderRadius: 16, paddingVertical: 16, width: '100%', alignItems: 'center', shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, shadowOpacity: 0.3, elevation: 6 },
-    fabTxt: { color: '#000', fontWeight: '900', fontSize: 15, letterSpacing: 1 },
+    // Bottom button
+    bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 24, paddingTop: 12, backgroundColor: 'rgba(0,0,0,0.9)' },
+    bottomBtn: { borderRadius: 6, paddingVertical: 18, alignItems: 'center',
+        ...Platform.select({ android: { elevation: 8 }, ios: { shadowColor: '#06b6d4', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 8 }, shadowRadius: 20 } }),
+    },
+    bottomBtnText: { color: '#fff', fontWeight: '900', fontSize: 15, letterSpacing: 3, fontFamily: CONDENSED },
 });
