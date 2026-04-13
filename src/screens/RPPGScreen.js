@@ -8,10 +8,11 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
+    View, Text, StyleSheet, TouchableOpacity,
     Dimensions, Animated, Easing, StatusBar, ScrollView
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Polyline, Line } from 'react-native-svg';
 import api from '../services/api';
 
@@ -84,12 +85,12 @@ function BPMRing({ bpm, quality }) {
                 <Text style={ring.bpmLabel}>BPM</Text>
             </Animated.View>
             <Text style={[ring.quality, { color: qualityColor(quality) }]}>
-                {quality === 'excellent' ? '● Excellent' :
-                    quality === 'good' ? '● Good' :
-                        quality === 'fair' ? '● Fair' :
-                            quality === 'poor' ? '● Poor' :
-                                quality === 'warmup' ? '⏳ Collecting...' :
-                                    '⏳ Place face in view'}
+                {quality === 'excellent' ? 'Excellent' :
+                    quality === 'good' ? 'Good' :
+                        quality === 'fair' ? 'Fair' :
+                            quality === 'poor' ? 'Poor' :
+                                quality === 'warmup' ? 'Collecting...' :
+                                    'Place face in view'}
             </Text>
         </View>
     );
@@ -166,7 +167,7 @@ function HealthInsights({ bpm, hrv, quality }) {
     return (
         <View style={s.insightCard}>
             <View style={s.insightHeader}>
-                <Text style={s.insightTitle}>⚕️ CLINICAL INFERENCE</Text>
+                <Text style={s.insightTitle}>CLINICAL INFERENCE</Text>
             </View>
             <View style={s.insightBody}>
                 <Text style={{ fontSize: 28, marginRight: 12 }}>{icon}</Text>
@@ -200,6 +201,7 @@ const st = StyleSheet.create({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function RPPGScreen({ navigation, route }) {
+    const ins = useSafeAreaInsets();
     const sessionId = route?.params?.sessionId || `rppg_${Date.now()}`;
 
     const [permission, requestPermission] = useCameraPermissions();
@@ -319,7 +321,7 @@ export default function RPPGScreen({ navigation, route }) {
 
     if (!permission.granted) {
         return (
-            <SafeAreaView style={s.bg}>
+            <View style={[s.bg, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
                 <StatusBar barStyle="light-content" backgroundColor={T.bg} />
                 <View style={s.permWrap}>
                     <Text style={s.permIcon}>❤️</Text>
@@ -331,7 +333,7 @@ export default function RPPGScreen({ navigation, route }) {
                         <Text style={s.grantTxt}>Grant Camera Access</Text>
                     </TouchableOpacity>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
@@ -339,7 +341,7 @@ export default function RPPGScreen({ navigation, route }) {
     const wfColor = qualityColor(quality);
 
     return (
-        <View style={s.bg}>
+        <View style={[s.bg, { paddingTop: ins.top }]}>
             <StatusBar barStyle="light-content" backgroundColor="#000" />
 
             {/* ── Top Half: Camera ── */}
@@ -351,7 +353,7 @@ export default function RPPGScreen({ navigation, route }) {
                 />
 
                 {/* Top Bar */}
-                <SafeAreaView style={s.topBar}>
+                <View style={[s.topBar, { paddingTop: 16 }]}>
                     <TouchableOpacity
                         style={s.backBtn}
                         onPress={() => { stopMeasuring(); navigation?.goBack(); }}
@@ -366,7 +368,7 @@ export default function RPPGScreen({ navigation, route }) {
                         <Text style={s.liveTxt}>{isRunning ? 'LIVE' : 'READY'}</Text>
                         <View style={[s.liveDot, { backgroundColor: isRunning ? T.red : T.muted }]} />
                     </View>
-                </SafeAreaView>
+                </View>
 
                 {/* Face Target Brackets */}
                 <View style={s.faceGuide} pointerEvents="none">
@@ -381,7 +383,7 @@ export default function RPPGScreen({ navigation, route }) {
             </View>
 
             {/* ── Bottom Half: Dashboard ── */}
-            <ScrollView style={s.dashboard} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={s.dashboard} contentContainerStyle={{ paddingBottom: ins.bottom + 20 }} showsVerticalScrollIndicator={false}>
                 <View style={s.dashHeader}>
                     <Text style={s.dashTitle}>Vitals Monitor</Text>
                     <Text style={s.dashSub}>Remote Photoplethysmography (rPPG)</Text>
@@ -447,7 +449,7 @@ const s = StyleSheet.create({
     dashboard: { flex: 0.55, backgroundColor: T.surf, paddingHorizontal: 20, paddingTop: 20 },
 
     // Top Bar (over camera)
-    topBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16 },
+    topBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
     backBtn: { backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
     backTxt: { color: T.text, fontWeight: '700', fontSize: 13 },
     liveIndicator: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
