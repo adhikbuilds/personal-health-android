@@ -1,28 +1,67 @@
-// ScoreCardScreen — Post-session shareable score card
-// Displayed after a session ends. Shows form score, key stats, and share button.
-// VISION.md GTM Step 2: "Every session produces shareable output."
+// ScoreCardScreen — Nike-inspired. Pure black canvas. Bold typography IS the design.
+// No cards. No borders. No containers. Content floats on black.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView,
-    TouchableOpacity, ActivityIndicator, Share, Alert,
+    View, Text, StyleSheet, ScrollView, Pressable, Animated,
+    Platform, ActivityIndicator, Share, Alert, StatusBar,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C } from '../styles/colors';
+import Svg, { Circle } from 'react-native-svg';
 import api from '../services/api';
 
-const SCORE_COLORS = {
-    elite:   C.green,
-    great:   C.cyan,
-    okay:    C.orange,
-    poor:    C.red,
-};
+const FONT_CONDENSED = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
+
+// ── Shared: Tap with scale ──────────────────────────────────────────────────
+
+function Tap({ onPress, children, style }) {
+    const s = useRef(new Animated.Value(1)).current;
+    return (
+        <Pressable onPress={onPress}
+            onPressIn={() => Animated.spring(s, { toValue: 0.96, useNativeDriver: true, speed: 50 }).start()}
+            onPressOut={() => Animated.spring(s, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 6 }).start()}>
+            <Animated.View style={[style, { transform: [{ scale: s }] }]}>{children}</Animated.View>
+        </Pressable>
+    );
+}
+
+// ── Shared: Fade in on mount ────────────────────────────────────────────────
+
+function Fade({ delay = 0, children, style }) {
+    const o = useRef(new Animated.Value(0)).current;
+    const y = useRef(new Animated.Value(20)).current;
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(o, { toValue: 1, duration: 600, delay, useNativeDriver: true }),
+            Animated.spring(y, { toValue: 0, delay, useNativeDriver: true, speed: 12 }),
+        ]).start();
+    }, []);
+    return <Animated.View style={[style, { opacity: o, transform: [{ translateY: y }] }]}>{children}</Animated.View>;
+}
+
+// ── Progress ring ───────────────────────────────────────────────────────────
+
+function ProgressRing({ pct, color, size = 160, stroke = 6 }) {
+    const r = (size - stroke) / 2;
+    const c = 2 * Math.PI * r;
+    return (
+        <Svg width={size} height={size}>
+            <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.06)" fill="none" strokeWidth={stroke} />
+            <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+                strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(1, (pct || 0) / 100))}
+                strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+        </Svg>
+    );
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function scoreColor(score) {
-    if (score >= 80) return SCORE_COLORS.elite;
-    if (score >= 65) return SCORE_COLORS.great;
-    if (score >= 50) return SCORE_COLORS.okay;
-    return SCORE_COLORS.poor;
+    if (score >= 80) return '#22c55e';
+    if (score >= 65) return '#06b6d4';
+    if (score >= 50) return '#f97316';
+    return '#ef4444';
 }
 
 function formatDuration(sec) {
@@ -31,32 +70,10 @@ function formatDuration(sec) {
     return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-function StatBox({ label, value, unit, color }) {
-    return (
-        <View style={s.statBox}>
-            <Text style={s.statLabel}>{label}</Text>
-            <Text style={[s.statValue, color && { color }]}>{value}</Text>
-            {unit ? <Text style={s.statUnit}>{unit}</Text> : null}
-        </View>
-    );
-}
-
-function QualityBar({ dist }) {
-    const total = (dist.elite || 0) + (dist.good || 0) + (dist.average || 0) + (dist.poor || 0);
-    if (total === 0) return null;
-    const pct = (k) => Math.round(((dist[k] || 0) / total) * 100);
-    return (
-        <View style={s.qualBar}>
-            {pct('elite') > 0 && <View style={[s.qualSeg, { flex: pct('elite'), backgroundColor: C.green }]} />}
-            {pct('good') > 0 && <View style={[s.qualSeg, { flex: pct('good'), backgroundColor: C.cyan }]} />}
-            {pct('average') > 0 && <View style={[s.qualSeg, { flex: pct('average'), backgroundColor: C.orange }]} />}
-            {pct('poor') > 0 && <View style={[s.qualSeg, { flex: pct('poor'), backgroundColor: C.red }]} />}
-        </View>
-    );
-}
+// ── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ScoreCardScreen({ navigation, route }) {
-    const insets = useSafeAreaInsets();
+    const ins = useSafeAreaInsets();
     const sessionId = route?.params?.sessionId;
     const [card, setCard] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -75,7 +92,7 @@ export default function ScoreCardScreen({ navigation, route }) {
         const msg = [
             `ActiveBharat Session Score: ${sc.toFixed(1)}`,
             `Sport: ${(card.sport || '').replace('_', ' ')}`,
-            `Peak Jump: ${card.peak_jump_height_cm?.toFixed(1) || '—'} cm`,
+            `Peak Jump: ${card.peak_jump_height_cm?.toFixed(1) || '\u2014'} cm`,
             `XP Earned: +${card.xp_earned}`,
             `Symmetry: ${((card.avg_symmetry || 0) * 100).toFixed(0)}%`,
             '',
@@ -89,22 +106,30 @@ export default function ScoreCardScreen({ navigation, route }) {
         }
     };
 
+    // ── Loading ─────────────────────────────────────────────────────────
     if (loading) {
         return (
-            <View style={[s.container, { paddingTop: insets.top }]}>
-                <ActivityIndicator size="large" color={C.cyan} style={{ marginTop: 100 }} />
+            <View style={[$.root, { paddingTop: ins.top }]}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" />
+                <View style={$.center}>
+                    <ActivityIndicator size="large" color="#06b6d4" />
+                    <Text style={$.loadingText}>LOADING</Text>
+                </View>
             </View>
         );
     }
 
+    // ── Empty ───────────────────────────────────────────────────────────
     if (!card) {
         return (
-            <View style={[s.container, { paddingTop: insets.top }]}>
-                <View style={s.empty}>
-                    <Text style={s.emptyText}>Score card not available.</Text>
-                    <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
-                        <Text style={s.backBtnText}>Go Back</Text>
-                    </TouchableOpacity>
+            <View style={[$.root, { paddingTop: ins.top }]}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" />
+                <View style={$.center}>
+                    <Text style={$.errorText}>SCORE CARD NOT AVAILABLE</Text>
+                    <Tap onPress={() => navigation.goBack()} style={$.retryRow}>
+                        <Text style={$.retryText}>GO BACK</Text>
+                        <Text style={$.retryArrow}>›</Text>
+                    </Tap>
                 </View>
             </View>
         );
@@ -113,115 +138,158 @@ export default function ScoreCardScreen({ navigation, route }) {
     const sc = card.avg_form_score || 0;
     const color = scoreColor(sc);
     const dist = card.quality_distribution || {};
+    const total = (dist.elite || 0) + (dist.good || 0) + (dist.average || 0) + (dist.poor || 0);
+
+    const stats = [
+        { label: 'PEAK SCORE', value: card.peak_jump_height_cm?.toFixed(1) || '\u2014', unit: 'CM', color: '#06b6d4' },
+        { label: 'SYMMETRY', value: `${((card.avg_symmetry || 0) * 100).toFixed(0)}%`, color: (card.avg_symmetry || 0) >= 0.95 ? '#22c55e' : '#f97316' },
+        { label: 'XP EARNED', value: `+${card.xp_earned || 0}`, color: '#facc15' },
+        { label: 'DURATION', value: formatDuration(card.duration_seconds || 0), color: '#a855f7' },
+        { label: 'REPS', value: `${card.rep_count || '\u2014'}`, color: '#fff' },
+    ];
 
     return (
-        <View style={[s.container, { paddingTop: insets.top }]}>
-            <ScrollView contentContainerStyle={s.scroll}>
-                {/* Header */}
-                <View style={s.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={s.headerBack}>
-                        <Text style={s.headerBackText}>{'<'}</Text>
-                    </TouchableOpacity>
-                    <Text style={s.headerTitle}>Score Card</Text>
-                    <View style={{ width: 36 }} />
-                </View>
+        <View style={[$.root, { paddingTop: ins.top }]}>
+            <StatusBar barStyle="light-content" backgroundColor="#000" />
+            <ScrollView showsVerticalScrollIndicator={false}>
 
-                {/* Branding */}
-                <Text style={s.brand}>ActiveBharat</Text>
-                <Text style={s.sport}>{(card.sport || '').replace('_', ' ').toUpperCase()}</Text>
+                {/* ═══ Header ═══ */}
+                <Fade style={$.topBar}>
+                    <Text style={$.brand}>SESSION COMPLETE</Text>
+                    <Text style={$.sportLabel}>{(card.sport || '').replace('_', ' ').toUpperCase()}</Text>
+                </Fade>
 
-                {/* Big Score Circle */}
-                <View style={[s.scoreCircle, { borderColor: color }]}>
-                    <Text style={[s.scoreNum, { color }]}>{sc.toFixed(1)}</Text>
-                    <Text style={s.scoreLabel}>Form Score</Text>
-                </View>
+                {/* ═══ Score Ring ═══ */}
+                <Fade delay={100} style={$.heroSection}>
+                    <View style={$.ringContainer}>
+                        <ProgressRing pct={sc} color={color} />
+                        <View style={$.ringInner}>
+                            <Text style={[$.scoreNumber, { color }]}>{sc.toFixed(1)}</Text>
+                            <Text style={$.scoreLabel}>FORM SCORE</Text>
+                        </View>
+                    </View>
+                </Fade>
 
-                {/* Stats Grid */}
-                <View style={s.statsGrid}>
-                    <StatBox label="Peak Jump" value={card.peak_jump_height_cm?.toFixed(1) || '—'} unit="cm" color={C.cyan} />
-                    <StatBox label="Symmetry" value={`${((card.avg_symmetry || 0) * 100).toFixed(0)}%`} color={card.avg_symmetry >= 0.95 ? C.green : C.orange} />
-                    <StatBox label="XP Earned" value={`+${card.xp_earned || 0}`} color={C.yellow} />
-                    <StatBox label="Duration" value={formatDuration(card.duration_seconds || 0)} />
-                    <StatBox label="Reps" value={card.rep_count || '—'} />
-                    <StatBox label="Frames" value={card.total_frames || '—'} />
-                </View>
+                {/* ═══ Stats Rows ═══ */}
+                <Fade delay={200} style={$.statsSection}>
+                    <Text style={$.sectionLabel}>STATS</Text>
+                    {stats.map((st, i) => (
+                        <React.Fragment key={i}>
+                            <View style={$.statRow}>
+                                <Text style={$.statRowLabel}>{st.label}</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                                    <Text style={[$.statRowValue, { color: st.color || '#fff' }]}>{st.value}</Text>
+                                    {st.unit ? <Text style={$.statRowUnit}>{st.unit}</Text> : null}
+                                </View>
+                            </View>
+                            {i < stats.length - 1 && <View style={$.divider} />}
+                        </React.Fragment>
+                    ))}
+                </Fade>
 
-                {/* Quality Bar */}
-                <Text style={s.sectionTitle}>Quality Distribution</Text>
-                <QualityBar dist={dist} />
-                <View style={s.qualLegend}>
-                    <Text style={[s.qualLegendItem, { color: C.green }]}>Elite {dist.elite || 0}</Text>
-                    <Text style={[s.qualLegendItem, { color: C.cyan }]}>Good {dist.good || 0}</Text>
-                    <Text style={[s.qualLegendItem, { color: C.orange }]}>Avg {dist.average || 0}</Text>
-                    <Text style={[s.qualLegendItem, { color: C.red }]}>Poor {dist.poor || 0}</Text>
-                </View>
+                {/* ═══ Quality Bar ═══ */}
+                {total > 0 && (
+                    <Fade delay={300} style={$.qualSection}>
+                        <Text style={$.sectionLabel}>QUALITY DISTRIBUTION</Text>
+                        <View style={$.qualBar}>
+                            {dist.elite > 0 && <View style={[$.qualSeg, { flex: dist.elite, backgroundColor: '#22c55e' }]} />}
+                            {dist.good > 0 && <View style={[$.qualSeg, { flex: dist.good, backgroundColor: '#06b6d4' }]} />}
+                            {dist.average > 0 && <View style={[$.qualSeg, { flex: dist.average, backgroundColor: '#f97316' }]} />}
+                            {dist.poor > 0 && <View style={[$.qualSeg, { flex: dist.poor, backgroundColor: '#ef4444' }]} />}
+                        </View>
+                        <View style={$.qualLegend}>
+                            <Text style={[$.qualLegendItem, { color: '#22c55e' }]}>ELITE {dist.elite || 0}</Text>
+                            <Text style={[$.qualLegendItem, { color: '#06b6d4' }]}>GOOD {dist.good || 0}</Text>
+                            <Text style={[$.qualLegendItem, { color: '#f97316' }]}>AVG {dist.average || 0}</Text>
+                            <Text style={[$.qualLegendItem, { color: '#ef4444' }]}>POOR {dist.poor || 0}</Text>
+                        </View>
+                    </Fade>
+                )}
 
-                {/* Athlete Info */}
-                <View style={s.athleteInfo}>
-                    <Text style={s.athleteName}>{card.athlete_name || card.athlete_id}</Text>
-                    <Text style={s.athleteMeta}>{card.tier} · BPI {card.bpi?.toLocaleString()}</Text>
-                </View>
+                {/* ═══ Share CTA ═══ */}
+                <Fade delay={400} style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+                    <Tap onPress={handleShare}>
+                        <LinearGradient
+                            colors={color === '#22c55e' ? ['#15803d', '#22c55e', '#4ade80'] :
+                                    color === '#06b6d4' ? ['#0e7490', '#06b6d4', '#22d3ee'] :
+                                    color === '#f97316' ? ['#c2410c', '#f97316', '#fb923c'] :
+                                    ['#b91c1c', '#ef4444', '#f87171']}
+                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                            style={$.shareBlock}
+                        >
+                            <Text style={$.shareLabel}>SHARE YOUR RESULTS</Text>
+                            <Text style={$.shareTitle}>SHARE</Text>
+                        </LinearGradient>
+                    </Tap>
+                </Fade>
 
-                {/* Share Button */}
-                <TouchableOpacity style={[s.shareBtn, { backgroundColor: color }]} onPress={handleShare} activeOpacity={0.8}>
-                    <Text style={s.shareBtnText}>Share Score Card</Text>
-                </TouchableOpacity>
+                {/* ═══ Athlete ═══ */}
+                <Fade delay={500} style={$.athleteSection}>
+                    <Text style={$.athleteName}>{(card.athlete_name || card.athlete_id || '').toUpperCase()}</Text>
+                    <Text style={$.athleteMeta}>{card.tier}  ·  BPI {card.bpi?.toLocaleString()}</Text>
+                </Fade>
 
-                <Text style={s.watermark}>activebharat.in</Text>
+                <Text style={$.watermark}>ACTIVEBHARAT.IN</Text>
+
+                <View style={{ height: 40 }} />
             </ScrollView>
         </View>
     );
 }
 
-const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: C.bg },
-    scroll: { padding: 20, paddingBottom: 40, alignItems: 'center' },
+// ── Styles ───────────────────────────────────────────────────────────────────
+// Pure black. No cards. No borders. Bold uppercase type. Nike DNA.
 
-    header: { flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 20 },
-    headerBack: { width: 36, height: 36, borderRadius: 10, backgroundColor: C.surf, alignItems: 'center', justifyContent: 'center' },
-    headerBackText: { color: C.text, fontSize: 18, fontWeight: '600' },
-    headerTitle: { flex: 1, textAlign: 'center', color: C.text, fontSize: 16, fontWeight: '700' },
+const $ = StyleSheet.create({
+    root: { flex: 1, backgroundColor: '#000' },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
 
-    brand: { color: C.cyan, fontSize: 22, fontWeight: '900', letterSpacing: 1, marginBottom: 4 },
-    sport: { color: C.muted, fontSize: 11, letterSpacing: 2, fontWeight: '600', marginBottom: 24 },
+    // Top bar
+    topBar: { alignItems: 'center', paddingTop: 16, marginBottom: 8 },
+    brand: { fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 3 },
+    sportLabel: { fontSize: 11, fontWeight: '700', color: '#4b5563', letterSpacing: 3, marginTop: 4 },
 
-    scoreCircle: {
-        width: 160, height: 160, borderRadius: 80, borderWidth: 4,
-        alignItems: 'center', justifyContent: 'center', marginBottom: 28,
-        backgroundColor: 'rgba(255,255,255,0.02)',
-    },
-    scoreNum: { fontSize: 48, fontWeight: '900', fontFamily: 'monospace' },
-    scoreLabel: { color: C.muted, fontSize: 11, fontWeight: '600', marginTop: -2 },
+    // Hero
+    heroSection: { alignItems: 'center', paddingTop: 20, paddingBottom: 32 },
+    ringContainer: { marginBottom: 0 },
+    ringInner: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+    scoreNumber: { fontSize: 48, fontWeight: '900', fontFamily: FONT_CONDENSED },
+    scoreLabel: { fontSize: 9, fontWeight: '800', color: '#4b5563', letterSpacing: 2, marginTop: -2 },
 
-    statsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginBottom: 24, width: '100%' },
-    statBox: {
-        width: '30%', backgroundColor: C.surf, borderRadius: 12, padding: 14, alignItems: 'center',
-        borderWidth: 1, borderColor: C.border,
-    },
-    statLabel: { color: C.muted, fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
-    statValue: { color: C.text, fontSize: 20, fontWeight: '800', fontFamily: 'monospace' },
-    statUnit: { color: C.muted, fontSize: 10, marginTop: 2 },
+    // Section
+    sectionLabel: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginBottom: 16 },
 
-    sectionTitle: { color: C.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
-    qualBar: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', width: '100%', marginBottom: 8 },
+    // Stats
+    statsSection: { paddingHorizontal: 24, marginBottom: 32 },
+    statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14 },
+    statRowLabel: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
+    statRowValue: { fontSize: 22, fontWeight: '800', fontFamily: FONT_CONDENSED },
+    statRowUnit: { fontSize: 11, fontWeight: '600', color: '#4b5563', marginLeft: 4 },
+    divider: { height: 1, backgroundColor: '#1a1a1a' },
+
+    // Quality bar
+    qualSection: { paddingHorizontal: 24, marginBottom: 32 },
+    qualBar: { flexDirection: 'row', height: 4, borderRadius: 2, overflow: 'hidden', marginBottom: 12 },
     qualSeg: { height: '100%' },
-    qualLegend: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-    qualLegendItem: { fontSize: 10, fontWeight: '600' },
+    qualLegend: { flexDirection: 'row', justifyContent: 'space-between' },
+    qualLegendItem: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
 
-    athleteInfo: { alignItems: 'center', marginBottom: 24 },
-    athleteName: { color: C.text, fontSize: 16, fontWeight: '700' },
-    athleteMeta: { color: C.muted, fontSize: 12, marginTop: 4 },
+    // Share CTA
+    shareBlock: { borderRadius: 4, paddingVertical: 28, paddingHorizontal: 24, alignItems: 'center' },
+    shareLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.5)', letterSpacing: 3, marginBottom: 6 },
+    shareTitle: { fontSize: 32, fontWeight: '900', color: '#fff', fontFamily: FONT_CONDENSED, letterSpacing: 4 },
 
-    shareBtn: {
-        width: '100%', paddingVertical: 16, borderRadius: 14,
-        alignItems: 'center', marginBottom: 16,
-    },
-    shareBtnText: { color: '#000', fontWeight: '800', fontSize: 15 },
+    // Athlete
+    athleteSection: { alignItems: 'center', marginBottom: 20 },
+    athleteName: { fontSize: 14, fontWeight: '700', color: '#6b7280', letterSpacing: 4 },
+    athleteMeta: { fontSize: 11, fontWeight: '600', color: '#374151', marginTop: 4, letterSpacing: 2 },
 
-    watermark: { color: C.muted, fontSize: 10, opacity: 0.5 },
+    watermark: { textAlign: 'center', fontSize: 9, fontWeight: '600', color: '#1a1a1a', letterSpacing: 3, marginBottom: 8 },
 
-    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-    emptyText: { color: C.muted, fontSize: 14, marginBottom: 16 },
-    backBtn: { backgroundColor: C.cyan, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10 },
-    backBtnText: { color: '#000', fontWeight: '700', fontSize: 13 },
+    // States
+    loadingText: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginTop: 16 },
+    errorText: { fontSize: 15, fontWeight: '700', color: '#ef4444', letterSpacing: 2, marginBottom: 20 },
+    retryRow: { flexDirection: 'row', alignItems: 'center' },
+    retryText: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 2 },
+    retryArrow: { fontSize: 22, color: '#4b5563', fontWeight: '300', marginLeft: 8 },
 });

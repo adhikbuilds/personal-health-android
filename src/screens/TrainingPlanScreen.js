@@ -1,106 +1,64 @@
-// TrainingPlanScreen — Dynamic 7-Day Plan
-// Displays the athlete's personalized weekly plan from /plan/{id}/weekly.
-// Each day card shows type, drills, rationale, and a completion button.
-// The athlete can mark days done to track adherence.
+// TrainingPlanScreen — Nike-inspired. Pure black canvas. Bold typography IS the design.
+// No cards. No borders. No containers. Content floats on black.
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView,
-    TouchableOpacity, ActivityIndicator, Alert, RefreshControl,
+    View, Text, StyleSheet, ScrollView, Pressable, Animated,
+    Platform, ActivityIndicator, Alert, RefreshControl, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C } from '../styles/colors';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
 
+const FONT_CONDENSED = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
+
 const TYPE_COLORS = {
-    strength:  C.orange,
-    power:     C.red,
-    speed:     C.yellow,
-    technique: C.cyan,
-    recovery:  C.green,
-    rest:      C.muted,
+    strength:  '#f97316',
+    power:     '#ef4444',
+    speed:     '#facc15',
+    technique: '#06b6d4',
+    recovery:  '#22c55e',
+    rest:      '#4b5563',
 };
 
-const TYPE_EMOJI = {
-    strength:  '💪',
-    power:     '⚡',
-    speed:     '🏃',
-    technique: '🎯',
-    recovery:  '🧘',
-    rest:      '😴',
-};
+// ── Shared: Tap with scale ──────────────────────────────────────────────────
 
-// ─── Day Card ────────────────────────────────────────────────────────────────
-function DayCard({ day, isToday, onComplete }) {
-    const color = TYPE_COLORS[day.type] || C.muted;
-    const emoji = TYPE_EMOJI[day.type] || '•';
-
+function Tap({ onPress, children, style }) {
+    const s = useRef(new Animated.Value(1)).current;
     return (
-        <View style={[s.dayCard, isToday && { borderColor: C.cyan, borderWidth: 1.5 }, day.completed && s.dayDone]}>
-            {/* Header */}
-            <View style={s.dayHead}>
-                <View style={s.dayHeadLeft}>
-                    <Text style={s.dayEmoji}>{emoji}</Text>
-                    <View>
-                        <Text style={s.dayDayName}>{day.day_name}</Text>
-                        <Text style={s.dayDate}>{day.date}</Text>
-                    </View>
-                </View>
-                {isToday && <View style={s.todayBadge}><Text style={s.todayText}>TODAY</Text></View>}
-                {day.completed && <View style={s.doneBadge}><Text style={s.doneText}>Done</Text></View>}
-            </View>
-
-            {/* Type + meta */}
-            <Text style={[s.dayLabel, { color }]}>{day.label}</Text>
-            {day.type !== 'rest' && (
-                <Text style={s.dayMeta}>RPE {day.rpe} · {day.duration_min} min</Text>
-            )}
-
-            {/* Rationale */}
-            <View style={s.rationale}>
-                <Text style={s.rationaleText}>{day.rationale}</Text>
-            </View>
-
-            {/* Drills */}
-            {day.drills && day.drills.length > 0 && (
-                <View style={s.drillSection}>
-                    {day.drills.map((drill, i) => (
-                        <View key={i} style={s.drillRow}>
-                            <Text style={[s.drillSets, { color }]}>{drill.sets}</Text>
-                            <View style={s.drillInfo}>
-                                <Text style={s.drillName}>{drill.name}</Text>
-                                <Text style={s.drillCue}>{drill.cue}</Text>
-                            </View>
-                        </View>
-                    ))}
-                </View>
-            )}
-
-            {/* Complete button */}
-            {!day.completed && day.type !== 'rest' && (
-                <TouchableOpacity
-                    style={[s.completeBtn, { borderColor: color }]}
-                    activeOpacity={0.7}
-                    onPress={onComplete}
-                >
-                    <Text style={[s.completeBtnText, { color }]}>Mark Complete</Text>
-                </TouchableOpacity>
-            )}
-        </View>
+        <Pressable onPress={onPress}
+            onPressIn={() => Animated.spring(s, { toValue: 0.96, useNativeDriver: true, speed: 50 }).start()}
+            onPressOut={() => Animated.spring(s, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 6 }).start()}>
+            <Animated.View style={[style, { transform: [{ scale: s }] }]}>{children}</Animated.View>
+        </Pressable>
     );
 }
 
-// ─── Main Screen ─────────────────────────────────────────────────────────────
+// ── Shared: Fade in on mount ────────────────────────────────────────────────
+
+function Fade({ delay = 0, children, style }) {
+    const o = useRef(new Animated.Value(0)).current;
+    const y = useRef(new Animated.Value(20)).current;
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(o, { toValue: 1, duration: 600, delay, useNativeDriver: true }),
+            Animated.spring(y, { toValue: 0, delay, useNativeDriver: true, speed: 12 }),
+        ]).start();
+    }, []);
+    return <Animated.View style={[style, { opacity: o, transform: [{ translateY: y }] }]}>{children}</Animated.View>;
+}
+
+// ── Main Screen ─────────────────────────────────────────────────────────────
+
 export default function TrainingPlanScreen({ navigation }) {
-    const insets = useSafeAreaInsets();
+    const ins = useSafeAreaInsets();
     const { userData } = useUser();
     const athleteId = userData?.avatarId || 'athlete_01';
 
     const [plan, setPlan] = useState(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [completing, setCompleting] = useState(null); // date being marked
+    const [completing, setCompleting] = useState(null);
 
     const today = new Date().toISOString().slice(0, 10);
 
@@ -141,185 +99,193 @@ export default function TrainingPlanScreen({ navigation }) {
         setCompleting(dateStr);
         const result = await api.completePlanDay(athleteId, dateStr);
         if (result) {
-            await fetchPlan(); // reload to get updated adherence
+            await fetchPlan();
         }
         setCompleting(null);
     }, [athleteId, fetchPlan]);
 
-    // ─── Render ──────────────────────────────────────────────────────────
+    // ── Loading ─────────────────────────────────────────────────────────
     if (loading && !plan) {
         return (
-            <View style={[s.container, { paddingTop: insets.top }]}>
-                <ActivityIndicator size="large" color={C.cyan} style={{ marginTop: 100 }} />
-            </View>
-        );
-    }
-
-    if (!plan) {
-        return (
-            <View style={[s.container, { paddingTop: insets.top }]}>
-                <View style={s.emptyState}>
-                    <Text style={s.emptyText}>Could not load training plan.</Text>
-                    <TouchableOpacity style={s.retryBtn} onPress={fetchPlan}>
-                        <Text style={s.retryText}>Retry</Text>
-                    </TouchableOpacity>
+            <View style={[$.root, { paddingTop: ins.top }]}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" />
+                <View style={$.center}>
+                    <ActivityIndicator size="large" color="#06b6d4" />
+                    <Text style={$.loadingText}>LOADING</Text>
                 </View>
             </View>
         );
     }
 
-    const ctx = plan.context || {};
+    // ── Error / empty ───────────────────────────────────────────────────
+    if (!plan) {
+        return (
+            <View style={[$.root, { paddingTop: ins.top }]}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" />
+                <View style={$.center}>
+                    <Text style={$.errorText}>COULD NOT LOAD PLAN</Text>
+                    <Tap onPress={fetchPlan} style={$.retryRow}>
+                        <Text style={$.retryText}>RETRY</Text>
+                        <Text style={$.retryArrow}>›</Text>
+                    </Tap>
+                </View>
+            </View>
+        );
+    }
+
     const days = plan.days || [];
 
     return (
-        <View style={[s.container, { paddingTop: insets.top }]}>
+        <View style={[$.root, { paddingTop: ins.top }]}>
+            <StatusBar barStyle="light-content" backgroundColor="#000" />
             <ScrollView
-                contentContainerStyle={s.scroll}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.cyan} />}
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#06b6d4" colors={['#06b6d4']} />}
             >
-                {/* Header */}
-                <View style={s.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-                        <Text style={s.backText}>{'<'}</Text>
-                    </TouchableOpacity>
-                    <View style={{ flex: 1 }}>
-                        <Text style={s.title}>Training Plan</Text>
-                        <Text style={s.subtitle}>
-                            {plan.week_start} — {plan.week_end}
-                        </Text>
+
+                {/* ═══ Header ═══ */}
+                <Fade style={$.topBar}>
+                    <View>
+                        <Text style={$.brand}>TRAINING PLAN</Text>
+                        <Text style={$.weekRange}>{plan.week_start} — {plan.week_end}</Text>
                     </View>
-                    <TouchableOpacity style={s.regenBtn} onPress={handleRegenerate}>
-                        <Text style={s.regenText}>Regen</Text>
-                    </TouchableOpacity>
-                </View>
+                    <Tap onPress={handleRegenerate}>
+                        <Text style={$.regenText}>REGEN ›</Text>
+                    </Tap>
+                </Fade>
 
-                {/* Summary card */}
-                <View style={s.summaryCard}>
-                    <Text style={s.summaryText}>{plan.summary}</Text>
-                    <View style={s.summaryStats}>
-                        <View style={s.statBlock}>
-                            <Text style={s.statLabel}>Adherence</Text>
-                            <Text style={s.statValue}>{plan.adherence_pct}%</Text>
-                        </View>
-                        <View style={s.statBlock}>
-                            <Text style={s.statLabel}>Volume</Text>
-                            <Text style={[s.statValue, ctx.volume_state === 'over' && { color: C.red }]}>
-                                {ctx.volume_state || '—'}
-                            </Text>
-                        </View>
-                        <View style={s.statBlock}>
-                            <Text style={s.statLabel}>Risk</Text>
-                            <Text style={[s.statValue,
-                                ctx.injury_risk === 'high' && { color: C.red },
-                                ctx.injury_risk === 'watch' && { color: C.yellow },
-                            ]}>
-                                {ctx.injury_risk || '—'}
-                            </Text>
-                        </View>
-                        <View style={s.statBlock}>
-                            <Text style={s.statLabel}>Source</Text>
-                            <Text style={s.statValue}>{plan.source}</Text>
-                        </View>
+                {/* ═══ Summary + Adherence ═══ */}
+                <Fade delay={100} style={$.summarySection}>
+                    {plan.summary ? <Text style={$.summaryText}>{plan.summary}</Text> : null}
+                    <View style={$.adherenceRow}>
+                        <Text style={$.adherenceLabel}>ADHERENCE</Text>
+                        <Text style={[$.adherenceValue, {
+                            color: (plan.adherence_pct || 0) >= 80 ? '#22c55e' : (plan.adherence_pct || 0) >= 50 ? '#f97316' : '#ef4444'
+                        }]}>{plan.adherence_pct || 0}%</Text>
                     </View>
-                </View>
+                </Fade>
 
-                {/* Context chips */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll}>
-                    {[
-                        ['Form', ctx.form_bucket],
-                        ['Weak', (ctx.weak_joint || '').replace('_', ' ') || 'none'],
-                        ['Sessions (14d)', ctx.session_count],
-                        ['Avg Score', ctx.avg_form_score && ctx.avg_form_score.toFixed(1)],
-                    ].map(([k, v], i) => (
-                        <View key={i} style={s.chip}>
-                            <Text style={s.chipKey}>{k}</Text>
-                            <Text style={s.chipVal}>{v ?? '—'}</Text>
-                        </View>
-                    ))}
-                </ScrollView>
+                {/* ═══ Day Sections ═══ */}
+                {days.map((day, idx) => {
+                    const color = TYPE_COLORS[day.type] || '#4b5563';
+                    const isToday = day.date === today;
 
-                {/* Day cards */}
-                {days.map((day) => (
-                    <DayCard
-                        key={day.date}
-                        day={day}
-                        isToday={day.date === today}
-                        onComplete={() => handleComplete(day.date)}
-                    />
-                ))}
+                    return (
+                        <Fade key={day.date} delay={200 + idx * 80} style={$.daySection}>
+                            {/* Day header */}
+                            <View style={$.dayHeader}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <View style={[$.typeDot, { backgroundColor: color }]} />
+                                    <Text style={$.dayName}>{day.day_name?.toUpperCase()}</Text>
+                                    {isToday && <Text style={$.todayBadge}>TODAY</Text>}
+                                    {day.completed && <Text style={$.doneBadge}>DONE</Text>}
+                                </View>
+                                <Text style={$.dayDate}>{day.date}</Text>
+                            </View>
+
+                            {/* Type label */}
+                            <Text style={[$.typeLabel, { color }]}>{day.label}</Text>
+
+                            {/* Meta */}
+                            {day.type !== 'rest' && (
+                                <Text style={$.dayMeta}>RPE {day.rpe}  ·  {day.duration_min} MIN</Text>
+                            )}
+
+                            {/* Rationale */}
+                            {day.rationale ? (
+                                <Text style={$.rationaleText}>{day.rationale}</Text>
+                            ) : null}
+
+                            {/* Drills */}
+                            {day.drills?.length > 0 && (
+                                <View style={$.drillsBlock}>
+                                    {day.drills.map((drill, i) => (
+                                        <View key={i} style={$.drillRow}>
+                                            <Text style={[$.drillSets, { color }]}>{drill.sets}</Text>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={$.drillName}>{drill.name}</Text>
+                                                {drill.cue ? <Text style={$.drillCue}>{drill.cue}</Text> : null}
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Complete action */}
+                            {!day.completed && day.type !== 'rest' && (
+                                <>
+                                    <View style={$.divider} />
+                                    <Tap onPress={() => handleComplete(day.date)} style={$.actionRow}>
+                                        <Text style={[$.actionTitle, { color }]}>MARK COMPLETE</Text>
+                                        <Text style={$.actionArrow}>›</Text>
+                                    </Tap>
+                                </>
+                            )}
+
+                            {/* Bottom divider between days */}
+                            <View style={$.thickDivider} />
+                        </Fade>
+                    );
+                })}
+
+                <View style={{ height: 40 }} />
             </ScrollView>
         </View>
     );
 }
 
-// ─── Styles ────────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: C.bg },
-    scroll: { padding: 16, paddingBottom: 40 },
+// ── Styles ───────────────────────────────────────────────────────────────────
+// Pure black. No cards. No borders. Bold uppercase type. Nike DNA.
 
-    header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 12 },
-    backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: C.surf, alignItems: 'center', justifyContent: 'center' },
-    backText: { color: C.text, fontSize: 18, fontWeight: '600' },
-    title: { color: C.text, fontSize: 20, fontWeight: '800' },
-    subtitle: { color: C.muted, fontSize: 12, fontFamily: 'monospace', marginTop: 2 },
-    regenBtn: { backgroundColor: C.surf, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: C.border },
-    regenText: { color: C.cyan, fontSize: 12, fontWeight: '700' },
+const $ = StyleSheet.create({
+    root: { flex: 1, backgroundColor: '#000' },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
 
-    summaryCard: { backgroundColor: C.surf, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: C.border },
-    summaryText: { color: C.text, fontSize: 14, lineHeight: 20, marginBottom: 14 },
-    summaryStats: { flexDirection: 'row', justifyContent: 'space-between' },
-    statBlock: { alignItems: 'center' },
-    statLabel: { color: C.muted, fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-    statValue: { color: C.text, fontSize: 14, fontWeight: '700', fontFamily: 'monospace', textTransform: 'capitalize' },
+    // Top bar
+    topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 24, paddingTop: 12, marginBottom: 24 },
+    brand: { fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 3 },
+    weekRange: { fontSize: 12, fontWeight: '600', color: '#4b5563', marginTop: 4, fontFamily: FONT_CONDENSED, letterSpacing: 1 },
+    regenText: { fontSize: 12, fontWeight: '700', color: '#06b6d4', letterSpacing: 1 },
 
-    chipScroll: { marginBottom: 16 },
-    chip: {
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: C.surf, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
-        marginRight: 8, borderWidth: 1, borderColor: C.border,
-    },
-    chipKey: { color: C.muted, fontSize: 10, fontWeight: '500' },
-    chipVal: { color: C.text, fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+    // Summary
+    summarySection: { paddingHorizontal: 24, marginBottom: 32 },
+    summaryText: { fontSize: 14, fontWeight: '500', color: '#6b7280', lineHeight: 21, marginBottom: 16 },
+    adherenceRow: { flexDirection: 'row', alignItems: 'center' },
+    adherenceLabel: { fontSize: 9, fontWeight: '800', color: '#4b5563', letterSpacing: 2, marginRight: 10 },
+    adherenceValue: { fontSize: 22, fontWeight: '900', fontFamily: FONT_CONDENSED },
 
-    dayCard: {
-        backgroundColor: C.surf, borderRadius: 14, padding: 16,
-        marginBottom: 14, borderWidth: 1, borderColor: C.border,
-    },
-    dayDone: { opacity: 0.5 },
-    dayHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-    dayHeadLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    dayEmoji: { fontSize: 24 },
-    dayDayName: { color: C.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '600' },
-    dayDate: { color: C.muted, fontSize: 11, fontFamily: 'monospace' },
-    todayBadge: { backgroundColor: 'rgba(6,182,212,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(6,182,212,0.3)' },
-    todayText: { color: C.cyan, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
-    doneBadge: { backgroundColor: 'rgba(34,197,94,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(34,197,94,0.3)' },
-    doneText: { color: C.green, fontSize: 9, fontWeight: '800' },
+    // Day section
+    daySection: { paddingHorizontal: 24, marginBottom: 0 },
+    dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    typeDot: { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
+    dayName: { fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: 3, fontFamily: FONT_CONDENSED },
+    dayDate: { fontSize: 11, fontWeight: '600', color: '#374151', fontFamily: FONT_CONDENSED },
+    todayBadge: { fontSize: 9, fontWeight: '800', color: '#06b6d4', letterSpacing: 2, marginLeft: 10 },
+    doneBadge: { fontSize: 9, fontWeight: '800', color: '#22c55e', letterSpacing: 2, marginLeft: 10 },
 
-    dayLabel: { fontSize: 18, fontWeight: '800', marginBottom: 2 },
-    dayMeta: { color: C.muted, fontSize: 11, marginBottom: 10, fontFamily: 'monospace' },
+    typeLabel: { fontSize: 18, fontWeight: '800', fontFamily: FONT_CONDENSED, marginBottom: 4 },
+    dayMeta: { fontSize: 11, fontWeight: '700', color: '#4b5563', letterSpacing: 2, marginBottom: 10 },
 
-    rationale: {
-        backgroundColor: 'rgba(255,255,255,0.02)', borderLeftWidth: 2,
-        borderLeftColor: C.cyan, borderRadius: 4, padding: 10, marginBottom: 12,
-    },
-    rationaleText: { color: C.text, fontSize: 12, lineHeight: 18 },
+    rationaleText: { fontSize: 13, fontWeight: '400', color: '#6b7280', fontStyle: 'italic', lineHeight: 20, marginBottom: 12 },
 
-    drillSection: { marginBottom: 12 },
-    drillRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: C.border },
-    drillSets: { fontFamily: 'monospace', fontSize: 11, fontWeight: '700', minWidth: 65 },
-    drillInfo: { flex: 1 },
-    drillName: { color: C.text, fontSize: 12, fontWeight: '600', marginBottom: 2 },
-    drillCue: { color: C.muted, fontSize: 10 },
+    // Drills
+    drillsBlock: { marginBottom: 8 },
+    drillRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#1a1a1a' },
+    drillSets: { fontFamily: FONT_CONDENSED, fontSize: 12, fontWeight: '700', minWidth: 65, letterSpacing: 1 },
+    drillName: { fontSize: 13, fontWeight: '600', color: '#d1d5db', marginBottom: 2 },
+    drillCue: { fontSize: 11, fontWeight: '400', color: '#4b5563' },
 
-    completeBtn: {
-        borderWidth: 1.5, borderRadius: 10, paddingVertical: 10,
-        alignItems: 'center', marginTop: 4,
-    },
-    completeBtnText: { fontWeight: '700', fontSize: 13 },
+    // Action row
+    divider: { height: 1, backgroundColor: '#1a1a1a' },
+    thickDivider: { height: 1, backgroundColor: '#1a1a1a', marginTop: 20, marginBottom: 24 },
+    actionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16 },
+    actionTitle: { fontSize: 14, fontWeight: '700', letterSpacing: 2 },
+    actionArrow: { fontSize: 22, color: '#4b5563', fontWeight: '300' },
 
-    emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-    emptyText: { color: C.muted, fontSize: 14, marginBottom: 16 },
-    retryBtn: { backgroundColor: C.cyan, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10 },
-    retryText: { color: '#000', fontWeight: '700', fontSize: 13 },
+    // States
+    loadingText: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginTop: 16 },
+    errorText: { fontSize: 15, fontWeight: '700', color: '#ef4444', letterSpacing: 2, marginBottom: 20 },
+    retryRow: { flexDirection: 'row', alignItems: 'center' },
+    retryText: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 2 },
+    retryArrow: { fontSize: 22, color: '#4b5563', fontWeight: '300', marginLeft: 8 },
 });
