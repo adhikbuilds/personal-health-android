@@ -3,7 +3,7 @@
 // CameraView from expo-camera/next does NOT have takePictureAsync — that's why
 // real AI analysis was always falling back to simulation mode.
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, ScrollView, Pressable, Animated } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, ScrollView, Pressable, Animated , Platform } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
