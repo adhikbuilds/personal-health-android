@@ -22,6 +22,7 @@ export const PROXY_PORT = 8083;
 export const FASTAPI_PORT = 8082;
 
 // Computed URLs
-export const API_BASE = `http://${BACKEND_HOST}:${PROXY_PORT}`;
+// Direct to FastAPI — the Node proxy intercepts /athlete/:id and /session/:id as HTML pages
+export const API_BASE = `http://${BACKEND_HOST}:${FASTAPI_PORT}`;
 export const WS_BASE = `ws://${BACKEND_HOST}:${FASTAPI_PORT}`;
 export const API_TIMEOUT = 20000; // ms

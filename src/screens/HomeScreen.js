@@ -1,85 +1,61 @@
-// HomeScreen — Inspired by Nike Training Club & Strava
-// Design principles: content IS the design, numbers are heroes,
-// minimal chrome, generous space, subtle animation.
+// HomeScreen — Nike-inspired. Pure black canvas. Bold typography IS the design.
+// No cards. No borders. No containers. Content floats on black.
+// Futura Condensed → system condensed bold. Helvetica → system default.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
-    View, Text, ScrollView, StyleSheet, Pressable,
-    Dimensions, Platform,
+    View, Text, ScrollView, StyleSheet, Pressable, Animated,
+    Dimensions, Platform, StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Animated, {
-    useSharedValue, useAnimatedStyle, useAnimatedProps,
-    withTiming, withSpring, withDelay, interpolate,
-    Easing, FadeIn, FadeInDown,
-} from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
-import { C } from '../styles/colors';
 import { DAILY_TRACKER_DEFAULTS } from '../data/constants';
 
-const { width: SW } = Dimensions.get('window');
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const MONO = Platform.OS === 'android' ? 'monospace' : 'Courier';
+const { width: W, height: H } = Dimensions.get('window');
 
-function greet() {
-    const h = new Date().getHours();
-    return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-}
-
-// ── Animated Ring ────────────────────────────────────────────────────────────
-
-function Ring({ pct, color, size = 120, sw = 5 }) {
-    const r = (size - sw) / 2;
-    const circ = 2 * Math.PI * r;
-    const val = useSharedValue(0);
-    useEffect(() => { val.value = withTiming(Math.min(1, pct / 100), { duration: 1400, easing: Easing.out(Easing.cubic) }); }, [pct]);
-    const ap = useAnimatedProps(() => ({ strokeDashoffset: circ * (1 - val.value) }));
-    return (
-        <Svg width={size} height={size}>
-            <Circle cx={size/2} cy={size/2} r={r} stroke="rgba(255,255,255,0.04)" fill="none" strokeWidth={sw} />
-            <AnimatedCircle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={sw}
-                strokeDasharray={circ} animatedProps={ap} strokeLinecap="round"
-                transform={`rotate(-90 ${size/2} ${size/2})`} />
-        </Svg>
-    );
-}
-
-// ── Scale button ─────────────────────────────────────────────────────────────
+// ── Tap with scale feedback ──────────────────────────────────────────────────
 
 function Tap({ onPress, children, style }) {
-    const sc = useSharedValue(1);
-    const as = useAnimatedStyle(() => ({ transform: [{ scale: sc.value }] }));
+    const s = useRef(new Animated.Value(1)).current;
     return (
         <Pressable onPress={onPress}
-            onPressIn={() => { sc.value = withTiming(0.97, { duration: 120 }); }}
-            onPressOut={() => { sc.value = withSpring(1, { damping: 15 }); }}>
-            <Animated.View style={[style, as]}>{children}</Animated.View>
+            onPressIn={() => Animated.spring(s, { toValue: 0.96, useNativeDriver: true, speed: 50 }).start()}
+            onPressOut={() => Animated.spring(s, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 6 }).start()}>
+            <Animated.View style={[style, { transform: [{ scale: s }] }]}>{children}</Animated.View>
         </Pressable>
     );
 }
 
-// ── Metric bar ───────────────────────────────────────────────────────────────
+// ── Fade in on mount ─────────────────────────────────────────────────────────
 
-function MetricBar({ label, value, goal, color, delay }) {
-    const pct = goal > 0 ? Math.min(1, value / goal) : 0;
-    const w = useSharedValue(0);
-    useEffect(() => { w.value = withDelay(delay, withTiming(pct, { duration: 900, easing: Easing.out(Easing.quad) })); }, [pct]);
-    const bs = useAnimatedStyle(() => ({ width: `${w.value * 100}%` }));
-    const display = typeof value === 'number' && value % 1 ? value.toFixed(1) : value;
+function Fade({ delay = 0, children, style }) {
+    const o = useRef(new Animated.Value(0)).current;
+    const y = useRef(new Animated.Value(20)).current;
+    useEffect(() => {
+        Animated.stagger(0, [
+            Animated.timing(o, { toValue: 1, duration: 600, delay, useNativeDriver: true }),
+            Animated.spring(y, { toValue: 0, delay, useNativeDriver: true, speed: 12 }),
+        ]).start();
+    }, []);
+    return <Animated.View style={[style, { opacity: o, transform: [{ translateY: y }] }]}>{children}</Animated.View>;
+}
+
+// ── Progress ring ────────────────────────────────────────────────────────────
+
+function ProgressRing({ pct, color, size = 140, stroke = 6 }) {
+    const r = (size - stroke) / 2;
+    const c = 2 * Math.PI * r;
     return (
-        <Animated.View entering={FadeInDown.delay(delay).duration(400)} style={st.metricRow}>
-            <View style={st.metricHead}>
-                <Text style={st.metricLabel}>{label}</Text>
-                <Text style={st.metricVal}>{display}<Text style={st.metricGoal}> / {goal}</Text></Text>
-            </View>
-            <View style={st.barTrack}>
-                <Animated.View style={[st.barFill, { backgroundColor: color }, bs]} />
-            </View>
-        </Animated.View>
+        <Svg width={size} height={size}>
+            <Circle cx={size/2} cy={size/2} r={r} stroke="rgba(255,255,255,0.06)" fill="none" strokeWidth={stroke} />
+            <Circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+                strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(1, (pct||0)/100))}
+                strokeLinecap="round" transform={`rotate(-90 ${size/2} ${size/2})`} />
+        </Svg>
     );
 }
 
@@ -93,140 +69,154 @@ export default function HomeScreen({ navigation }) {
     const TK = `@dt_${new Date().toISOString().slice(0,10)}`;
 
     useEffect(() => {
-        AsyncStorage.getItem(TK).then(r => { if (r) try { setTracker(JSON.parse(r)); } catch(_){} });
+        AsyncStorage.getItem(TK).then(r => { if(r) try{setTracker(JSON.parse(r))}catch(_){} });
         api.ping().then(ok => setOnline(!!ok));
     }, []);
     useEffect(() => { AsyncStorage.setItem(TK, JSON.stringify(tracker)).catch(()=>{}); }, [tracker]);
 
-    const sc = fitnessScore?.score || 0;
-    const scColor = fitnessScore?.color || '#06b6d4';
+    const score = fitnessScore?.score || 0;
+    const color = fitnessScore?.color || '#06b6d4';
     const first = userData.name?.split(' ')[0] || 'Athlete';
     const daily = Object.values(tracker);
 
     return (
-        <View style={[st.root, { paddingTop: ins.top + 8 }]}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <View style={[$.root, { paddingTop: ins.top }]}>
+            <StatusBar barStyle="light-content" backgroundColor="#000" />
+            <ScrollView showsVerticalScrollIndicator={false}>
 
-                {/* ── Greeting ── */}
-                <Animated.View entering={FadeIn.duration(500)} style={st.top}>
-                    <View>
-                        <Text style={st.hi}>{greet()}</Text>
-                        <Text style={st.name}>{first}</Text>
-                    </View>
-                    <View style={[st.dot, { backgroundColor: online ? '#22c55e' : online === false ? '#ef4444' : '#facc15' }]} />
-                </Animated.View>
+                {/* ═══ Top Bar ═══ */}
+                <Fade style={$.topBar}>
+                    <Text style={$.brand}>ACTIVEBHARAT</Text>
+                    <View style={[$.liveIndicator, { backgroundColor: online ? '#22c55e' : '#ef4444' }]} />
+                </Fade>
 
-                {/* ── Hero Metric ── */}
-                <Animated.View entering={FadeInDown.delay(80).springify()} style={st.hero}>
-                    <View style={st.ringWrap}>
-                        <Ring pct={sc} color={scColor} />
-                        <View style={st.ringCenter}>
-                            <Text style={[st.heroNum, { color: scColor }]}>{sc || '—'}</Text>
-                            <Text style={st.heroUnit}>score</Text>
+                {/* ═══ Hero: Score + Identity ═══ */}
+                <Fade delay={100} style={$.heroSection}>
+                    <View style={$.ringContainer}>
+                        <ProgressRing pct={score} color={color} />
+                        <View style={$.ringInner}>
+                            <Text style={[$.scoreNumber, { color }]}>{score || '—'}</Text>
                         </View>
                     </View>
-                    <View style={st.heroMeta}>
-                        <View style={st.heroRow}>
-                            <Text style={st.metaNum}>{(userData.bpi||0).toLocaleString()}</Text>
-                            <Text style={st.metaKey}>BPI</Text>
+                    <Text style={$.heroName}>{first.toUpperCase()}</Text>
+                    <View style={$.statsRow}>
+                        <View style={$.statItem}>
+                            <Text style={$.statNumber}>{(userData.bpi||0).toLocaleString()}</Text>
+                            <Text style={$.statLabel}>BPI</Text>
                         </View>
-                        <View style={st.heroRow}>
-                            <Text style={st.metaNum}>{userData.sessions||0}</Text>
-                            <Text style={st.metaKey}>sessions</Text>
+                        <View style={$.statDivider} />
+                        <View style={$.statItem}>
+                            <Text style={$.statNumber}>{userData.sessions||0}</Text>
+                            <Text style={$.statLabel}>SESSIONS</Text>
                         </View>
-                        <View style={st.heroRow}>
-                            <Text style={st.metaNum}>{userData.streak||0}<Text style={st.metaKey}>d</Text></Text>
-                            <Text style={st.metaKey}>streak</Text>
+                        <View style={$.statDivider} />
+                        <View style={$.statItem}>
+                            <Text style={$.statNumber}>{userData.streak||0}</Text>
+                            <Text style={$.statLabel}>DAY STREAK</Text>
                         </View>
                     </View>
-                </Animated.View>
+                </Fade>
 
-                {/* ── Start Training ── */}
-                <Animated.View entering={FadeInDown.delay(180).springify()}>
+                {/* ═══ Main CTA — full width, bold ═══ */}
+                <Fade delay={200}>
                     <Tap onPress={() => navigation.navigate('GhostSkeleton', { sport: userData.sport || 'vertical_jump' })}>
-                        <LinearGradient colors={['#0c4a6e','#0891b2']} start={{x:0,y:0}} end={{x:1,y:1}} style={st.cta}>
-                            <Text style={st.ctaText}>Start Training</Text>
-                            <Text style={st.ctaSub}>AI form coaching</Text>
+                        <LinearGradient colors={['#0e7490','#06b6d4','#22d3ee']} start={{x:0,y:0}} end={{x:1,y:1}} style={$.ctaBlock}>
+                            <Text style={$.ctaLabel}>YOUR NEXT SESSION</Text>
+                            <Text style={$.ctaTitle}>START{'\n'}TRAINING</Text>
+                            <Text style={$.ctaSubtitle}>AI-powered form analysis</Text>
                         </LinearGradient>
                     </Tap>
-                </Animated.View>
+                </Fade>
 
-                {/* ── Quick Actions ── */}
-                <Animated.View entering={FadeInDown.delay(260).springify()} style={st.qRow}>
-                    <Tap onPress={() => navigation.navigate('HeartRate', { sessionId: 'rppg_'+Date.now() })} style={st.qCard}>
-                        <Text style={[st.qEmoji, { color: '#ef4444' }]}>{'♥'}</Text>
-                        <Text style={st.qTitle}>Heart Rate</Text>
+                {/* ═══ Quick Actions — simple text links, Nike style ═══ */}
+                <Fade delay={300} style={$.actionsSection}>
+                    <Tap onPress={() => navigation.navigate('HeartRate', { sessionId: 'rppg_'+Date.now() })} style={$.actionRow}>
+                        <Text style={$.actionTitle}>HEART RATE</Text>
+                        <Text style={$.actionArrow}>›</Text>
                     </Tap>
-                    <Tap onPress={() => navigation.navigate('TrainingPlan')} style={st.qCard}>
-                        <Text style={[st.qEmoji, { color: '#22c55e' }]}>{'☰'}</Text>
-                        <Text style={st.qTitle}>Plan</Text>
+                    <View style={$.actionDivider} />
+                    <Tap onPress={() => navigation.navigate('TrainingPlan')} style={$.actionRow}>
+                        <Text style={$.actionTitle}>WEEKLY PLAN</Text>
+                        <Text style={$.actionArrow}>›</Text>
                     </Tap>
-                    <Tap onPress={() => navigation.navigate('FitnessTest')} style={st.qCard}>
-                        <Text style={[st.qEmoji, { color: '#06b6d4' }]}>{'◎'}</Text>
-                        <Text style={st.qTitle}>Fitness Test</Text>
+                    <View style={$.actionDivider} />
+                    <Tap onPress={() => navigation.navigate('FitnessTest')} style={$.actionRow}>
+                        <Text style={$.actionTitle}>FITNESS TEST</Text>
+                        <Text style={$.actionArrow}>›</Text>
                     </Tap>
-                </Animated.View>
+                </Fade>
 
-                {/* ── Today ── */}
-                <Animated.View entering={FadeInDown.delay(340).duration(400)}>
-                    <Text style={st.section}>Today</Text>
-                </Animated.View>
-                {daily.slice(0, 5).map((t, i) => (
-                    <MetricBar key={i} label={t.label} value={t.current} goal={t.goal}
-                        color={[C.cyan, C.orange, C.green, C.purple, C.yellow][i % 5]}
-                        delay={400 + i * 60} />
-                ))}
+                {/* ═══ Today — minimal progress bars ═══ */}
+                <Fade delay={400} style={$.todaySection}>
+                    <Text style={$.todayTitle}>TODAY</Text>
+                    {daily.slice(0, 4).map((t, i) => {
+                        const pct = t.goal > 0 ? Math.min(1, t.current / t.goal) : 0;
+                        const colors = ['#06b6d4','#f97316','#22c55e','#a855f7'];
+                        const val = typeof t.current === 'number' && t.current % 1 ? t.current.toFixed(1) : t.current;
+                        return (
+                            <View key={i} style={$.todayRow}>
+                                <View style={$.todayMeta}>
+                                    <Text style={$.todayLabel}>{t.label}</Text>
+                                    <Text style={$.todayValue}>{val} <Text style={$.todayGoal}>/ {t.goal}</Text></Text>
+                                </View>
+                                <View style={$.todayBar}>
+                                    <View style={[$.todayFill, { width: `${pct*100}%`, backgroundColor: colors[i] }]} />
+                                </View>
+                            </View>
+                        );
+                    })}
+                </Fade>
 
+                <View style={{ height: 40 }} />
             </ScrollView>
         </View>
     );
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────────
-// NTC-inspired: black canvas, big numbers, minimal chrome, no card borders.
+// Pure black. No cards. No borders. Bold uppercase type. Nike DNA.
 
-const st = StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#050a12' },
+const $ = StyleSheet.create({
+    root: { flex: 1, backgroundColor: '#000' },
 
-    // Top
-    top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 24, marginBottom: 32 },
-    hi: { fontSize: 13, color: '#6b7280', fontWeight: '400' },
-    name: { fontSize: 30, fontWeight: '800', color: '#f9fafb', letterSpacing: -1 },
-    dot: { width: 10, height: 10, borderRadius: 5, marginTop: 8 },
+    // Top bar
+    topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 12, marginBottom: 8 },
+    brand: { fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 3 },
+    liveIndicator: { width: 8, height: 8, borderRadius: 4 },
 
     // Hero
-    hero: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, marginBottom: 32 },
-    ringWrap: { position: 'relative' },
-    ringCenter: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-    heroNum: { fontSize: 36, fontWeight: '900', fontFamily: MONO },
-    heroUnit: { fontSize: 10, color: '#6b7280', fontWeight: '500', marginTop: -4 },
-    heroMeta: { flex: 1, marginLeft: 28 },
-    heroRow: { marginBottom: 14 },
-    metaNum: { fontSize: 22, fontWeight: '800', color: '#f9fafb', fontFamily: MONO },
-    metaKey: { fontSize: 11, color: '#4b5563', fontWeight: '400' },
+    heroSection: { alignItems: 'center', paddingTop: 20, paddingBottom: 40 },
+    ringContainer: { marginBottom: 20 },
+    ringInner: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+    scoreNumber: { fontSize: 44, fontWeight: '900', fontFamily: Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold' },
+    heroName: { fontSize: 16, fontWeight: '700', color: '#6b7280', letterSpacing: 6, marginBottom: 28 },
+    statsRow: { flexDirection: 'row', alignItems: 'center' },
+    statItem: { alignItems: 'center', paddingHorizontal: 20 },
+    statNumber: { fontSize: 24, fontWeight: '800', color: '#fff', fontFamily: Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold' },
+    statLabel: { fontSize: 9, fontWeight: '600', color: '#4b5563', letterSpacing: 2, marginTop: 4 },
+    statDivider: { width: 1, height: 28, backgroundColor: '#1f2937' },
 
     // CTA
-    cta: { marginHorizontal: 24, borderRadius: 16, paddingVertical: 24, paddingHorizontal: 24, marginBottom: 20,
-        ...Platform.select({ android: { elevation: 10 }, ios: { shadowColor: '#0891b2', shadowOpacity: 0.35, shadowOffset: { width: 0, height: 10 }, shadowRadius: 24 } }),
-    },
-    ctaText: { fontSize: 22, fontWeight: '800', color: '#fff' },
-    ctaSub: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: '400', marginTop: 4 },
+    ctaBlock: { marginHorizontal: 20, borderRadius: 4, paddingVertical: 36, paddingHorizontal: 28, marginBottom: 32 },
+    ctaLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.5)', letterSpacing: 3, marginBottom: 8 },
+    ctaTitle: { fontSize: 42, fontWeight: '900', color: '#fff', lineHeight: 44, letterSpacing: -1, fontFamily: Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold' },
+    ctaSubtitle: { fontSize: 13, fontWeight: '400', color: 'rgba(255,255,255,0.45)', marginTop: 12 },
 
-    // Quick
-    qRow: { flexDirection: 'row', paddingHorizontal: 24, gap: 10, marginBottom: 36 },
-    qCard: { flex: 1, backgroundColor: '#111827', borderRadius: 14, paddingVertical: 18, alignItems: 'center' },
-    qEmoji: { fontSize: 22, marginBottom: 6 },
-    qTitle: { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
+    // Actions
+    actionsSection: { paddingHorizontal: 24, marginBottom: 40 },
+    actionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18 },
+    actionTitle: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 2 },
+    actionArrow: { fontSize: 22, color: '#4b5563', fontWeight: '300' },
+    actionDivider: { height: 1, backgroundColor: '#1a1a1a' },
 
-    // Section
-    section: { fontSize: 18, fontWeight: '700', color: '#f9fafb', paddingHorizontal: 24, marginBottom: 16 },
-
-    // Metric
-    metricRow: { paddingHorizontal: 24, marginBottom: 18 },
-    metricHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-    metricLabel: { fontSize: 13, color: '#6b7280', fontWeight: '400' },
-    metricVal: { fontSize: 13, color: '#f9fafb', fontWeight: '700', fontFamily: MONO },
-    metricGoal: { color: '#374151', fontWeight: '400' },
-    barTrack: { height: 4, backgroundColor: '#1f2937', borderRadius: 2, overflow: 'hidden' },
-    barFill: { height: '100%', borderRadius: 2 },
+    // Today
+    todaySection: { paddingHorizontal: 24 },
+    todayTitle: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginBottom: 20 },
+    todayRow: { marginBottom: 20 },
+    todayMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    todayLabel: { fontSize: 13, fontWeight: '500', color: '#9ca3af' },
+    todayValue: { fontSize: 13, fontWeight: '700', color: '#fff', fontFamily: Platform.OS === 'android' ? 'sans-serif-condensed' : 'Courier' },
+    todayGoal: { fontWeight: '400', color: '#374151' },
+    todayBar: { height: 3, backgroundColor: '#111', borderRadius: 2, overflow: 'hidden' },
+    todayFill: { height: '100%', borderRadius: 2 },
 });
