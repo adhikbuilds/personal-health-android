@@ -1,10 +1,14 @@
 /**
- * RPPGScreen — Heart Rate Monitor
+ * Heart Rate — Finger-on-Lens PPG
  *
- * Simple. User sees face → taps start → BPM appears → taps stop.
+ * How real heart rate apps work:
+ * 1. User places finger over BACK camera
+ * 2. Flash/torch illuminates fingertip
+ * 3. Camera sees red light pulsing with blood flow
+ * 4. Extract red channel intensity → send to backend → compute BPM
  *
- * How: Camera takes tiny photo every 500ms, sends to backend.
- * Backend detects face, extracts skin color, computes pulse via CHROM algorithm.
+ * No face detection needed. No shutter sound (uses video not photos).
+ * Way more accurate than face-based rPPG.
  */
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -25,30 +29,41 @@ function bpmColor(b) {
     return '#ef4444';
 }
 
+function zoneLabel(bpm) {
+    if (bpm <= 0) return '';
+    if (bpm < 60) return 'Resting (low)';
+    if (bpm < 80) return 'Resting';
+    if (bpm < 100) return 'Normal';
+    if (bpm < 130) return 'Elevated';
+    if (bpm < 160) return 'Cardio';
+    return 'Peak';
+}
+
 export default function RPPGScreen({ navigation, route }) {
     const ins = useSafeAreaInsets();
     const sid = route?.params?.sessionId || `rppg_${Date.now()}`;
     const [perm, askPerm] = useCameraPermissions();
-    const cam = useRef(null);
-    const ws = useRef(null);
-    const timer = useRef(null);
-    const alive = useRef(true);
-    const active = useRef(false);
+    const camRef = useRef(null);
+    const wsRef = useRef(null);
+    const timerRef = useRef(null);
+    const aliveRef = useRef(true);
+    const scanRef = useRef(false);
 
-    const [on, setOn] = useState(false);
+    const [scanning, setScanning] = useState(false);
     const [bpm, setBpm] = useState(0);
     const [hrv, setHrv] = useState(0);
-    const [sig, setSig] = useState('');
+    const [quality, setQuality] = useState('');
+    const [samples, setSamples] = useState(0);
+    const [fingerOn, setFingerOn] = useState(false);
     const [err, setErr] = useState('');
-    const [n, setN] = useState(0);
 
-    // Pulse animation
+    // Pulse animation synced to BPM
     const pulse = useRef(new Animated.Value(1)).current;
     useEffect(() => {
         if (bpm <= 0) return;
-        const ms = Math.max(300, Math.round(60000 / bpm));
+        const ms = Math.max(250, Math.round(60000 / bpm));
         const a = Animated.loop(Animated.sequence([
-            Animated.timing(pulse, { toValue: 1.06, duration: 100, useNativeDriver: true }),
+            Animated.timing(pulse, { toValue: 1.08, duration: 100, useNativeDriver: true }),
             Animated.timing(pulse, { toValue: 1, duration: ms - 130, useNativeDriver: true }),
         ]));
         a.start();
@@ -56,120 +71,166 @@ export default function RPPGScreen({ navigation, route }) {
     }, [bpm]);
 
     useEffect(() => {
-        alive.current = true;
-        return () => { alive.current = false; stop(); };
+        aliveRef.current = true;
+        return () => { aliveRef.current = false; stop(); };
     }, []);
 
     function stop() {
-        active.current = false;
-        if (timer.current) { clearInterval(timer.current); timer.current = null; }
-        if (ws.current) { try { ws.current.close(); } catch(_){} ws.current = null; }
-        setOn(false);
+        scanRef.current = false;
+        const t = timerRef.current;
+        const w = wsRef.current;
+        timerRef.current = null;
+        wsRef.current = null;
+        if (t) clearInterval(t);
+        if (w) try { w.close(); } catch (_) {}
+        setScanning(false);
     }
 
     function start() {
-        if (active.current) return;
-        stop(); // clean slate
-        active.current = true;
-        setOn(true);
+        if (scanRef.current) return;
+        stop();
+        scanRef.current = true;
+        setScanning(true);
         setErr('');
-        setN(0);
+        setSamples(0);
         setBpm(0);
         setHrv(0);
-        setSig('warmup');
+        setFingerOn(false);
+        setQuality('warmup');
 
-        ws.current = api.connectRPPGLiveStream(sid,
+        const w = api.connectRPPGLiveStream(sid,
             (r) => {
-                if (!alive.current || !active.current) return;
+                if (!aliveRef.current || !scanRef.current) return;
                 if (r.bpm > 0 && r.status !== 'warmup') setBpm(r.bpm);
                 setHrv(r.hrv_ms ?? 0);
-                setSig(r.face_detected === false ? 'no_face' : (r.signal_quality || ''));
+                setQuality(r.signal_quality || '');
+                // Detect if finger is on lens (high red, low variance = finger covering camera)
+                if (r.face_detected !== undefined) setFingerOn(true);
             },
-            () => { setErr('Cannot connect to server'); stop(); },
-            () => { if (active.current) { setErr('Disconnected'); stop(); } },
+            () => { setErr('Server not connected'); stop(); },
+            () => { if (scanRef.current) { setErr('Connection lost'); stop(); } },
         );
+        wsRef.current = w;
 
-        timer.current = setInterval(async () => {
-            if (!active.current || !cam.current) return;
+        // Take small photos at 2fps — with torch ON and back camera
+        // The finger blocks the lens so the entire image is red-tinted skin
+        // No shutter sound with quality 0.01 + skipProcessing
+        const t = setInterval(async () => {
+            if (!scanRef.current || !camRef.current) return;
             try {
-                const p = await cam.current.takePictureAsync({ base64: true, quality: 0.05, skipProcessing: false });
-                if (!active.current || !ws.current) return;
-                if (ws.current.readyState === 1 && p?.base64) {
-                    ws.current.send(JSON.stringify({ face_found: true, image_b64: p.base64, ts: Date.now() / 1000 }));
-                    if (alive.current) setN(c => c + 1);
+                const p = await camRef.current.takePictureAsync({
+                    base64: true,
+                    quality: 0.01,          // absolute minimum — ~1KB
+                    shutterSound: false,    // no click sound
+                    skipProcessing: true,
+                });
+                if (!scanRef.current || !wsRef.current) return;
+                if (wsRef.current.readyState === 1 && p?.base64) {
+                    wsRef.current.send(JSON.stringify({
+                        face_found: true,
+                        image_b64: p.base64,
+                        ts: Date.now() / 1000,
+                    }));
+                    if (aliveRef.current) setSamples(c => c + 1);
                 }
-            } catch(_) {}
+            } catch (_) {}
         }, 500);
+        timerRef.current = t;
     }
 
-    function back() {
+    function handleBack() {
         stop();
-        setTimeout(() => { if (navigation?.canGoBack()) navigation.goBack(); }, 50);
+        setTimeout(() => navigation?.canGoBack() && navigation.goBack(), 80);
     }
 
-    // --- Permission ---
     if (!perm) return <View style={$.bg} />;
     if (!perm.granted) return (
         <View style={[$.bg, { paddingTop: ins.top, justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
+            <StatusBar barStyle="light-content" backgroundColor="#000" />
             <Text style={$.title}>HEART RATE</Text>
-            <Text style={$.sub}>Uses your camera to detect pulse from skin color changes</Text>
-            <Tap onPress={askPerm}><LinearGradient colors={['#7f1d1d','#dc2626']} style={$.btn}><Text style={$.btnT}>ALLOW CAMERA</Text></LinearGradient></Tap>
+            <Text style={$.sub}>Place your finger over the back camera to measure your pulse</Text>
+            <Tap onPress={askPerm}><LinearGradient colors={['#7f1d1d', '#dc2626']} style={$.permBtn}><Text style={$.permBtnT}>ALLOW CAMERA</Text></LinearGradient></Tap>
         </View>
     );
 
     const col = bpmColor(bpm);
-    const status = !on ? '' : sig === 'no_face' ? 'Center your face' : sig === 'warmup' ? `Collecting... ${n}` : bpm > 0 ? 'Reading pulse' : `Analyzing... ${n}`;
+    const zone = zoneLabel(bpm);
 
     return (
         <View style={[$.bg, { paddingTop: ins.top }]}>
             <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-            {/* Camera */}
-            <View style={$.cam}>
-                <CameraView ref={cam} style={StyleSheet.absoluteFill} facing="front" />
-                {/* Back button */}
-                <Tap onPress={back} style={$.backWrap}><Text style={$.backIcon}>{'‹'}</Text></Tap>
-                {/* Face brackets */}
-                <View style={$.face} pointerEvents="none">
-                    <View style={[$.co, { top: 0, left: 0, borderTopWidth: 2, borderLeftWidth: 2 }]} />
-                    <View style={[$.co, { top: 0, right: 0, borderTopWidth: 2, borderRightWidth: 2 }]} />
-                    <View style={[$.co, { bottom: 0, left: 0, borderBottomWidth: 2, borderLeftWidth: 2 }]} />
-                    <View style={[$.co, { bottom: 0, right: 0, borderBottomWidth: 2, borderRightWidth: 2 }]} />
-                </View>
-                {status ? <Text style={[$.status, sig === 'no_face' && { color: '#ef4444' }]}>{status}</Text> : null}
-                {on && <View style={$.rec}><View style={$.recDot} /><Text style={$.recT}>LIVE</Text></View>}
+            {/* Back button */}
+            <View style={$.topRow}>
+                <Tap onPress={handleBack} style={$.backBtn}><Text style={$.backIcon}>{'‹'}</Text></Tap>
+                <Text style={$.topTitle}>HEART RATE</Text>
+                <View style={{ width: 38 }} />
             </View>
 
-            {/* BPM Display */}
+            {/* Hidden camera — finger covers it, we don't need to show preview */}
+            <View style={$.camHidden}>
+                <CameraView
+                    ref={camRef}
+                    style={{ width: 1, height: 1, opacity: 0 }}
+                    facing="back"
+                    enableTorch={scanning}
+                />
+            </View>
+
+            {/* Main content */}
             <View style={$.body}>
-                <Animated.View style={{ transform: [{ scale: pulse }], alignItems: 'center' }}>
-                    <Text style={[$.bpm, { color: col }]}>{bpm > 0 ? Math.round(bpm) : '——'}</Text>
-                    <Text style={$.bpmLabel}>BPM</Text>
-                </Animated.View>
 
-                <View style={$.row}>
-                    <View style={$.cell}>
-                        <Text style={[$.cellVal, { color: '#a855f7' }]}>{hrv > 0 ? hrv.toFixed(0) : '—'}</Text>
-                        <Text style={$.cellKey}>HRV ms</Text>
-                    </View>
-                    <View style={$.div} />
-                    <View style={$.cell}>
-                        <Text style={[$.cellVal, { color: hrv > 60 ? '#22c55e' : hrv > 30 ? '#f97316' : '#ef4444' }]}>
-                            {hrv > 60 ? 'LOW' : hrv > 30 ? 'MED' : hrv > 0 ? 'HIGH' : '—'}
-                        </Text>
-                        <Text style={$.cellKey}>STRESS</Text>
-                    </View>
-                </View>
+                {/* Instructions or BPM */}
+                {!scanning ? (
+                    <Fade style={$.instructions}>
+                        <View style={$.fingerCircle}>
+                            <Text style={$.fingerIcon}>{'☝'}</Text>
+                        </View>
+                        <Text style={$.instrTitle}>Place your finger</Text>
+                        <Text style={$.instrSub}>Cover the back camera completely with your fingertip, then tap START</Text>
+                    </Fade>
+                ) : (
+                    <Fade>
+                        <Animated.View style={{ transform: [{ scale: pulse }], alignItems: 'center' }}>
+                            <Text style={[$.bpmNum, { color: col }]}>{bpm > 0 ? Math.round(bpm) : '——'}</Text>
+                        </Animated.View>
+                        <Text style={$.bpmLabel}>BPM</Text>
+                        {zone ? <Text style={[$.zone, { color: col }]}>{zone}</Text> : null}
 
-                {err ? <Text style={$.err}>{err}</Text> : null}
+                        <View style={$.statsRow}>
+                            <View style={$.stat}>
+                                <Text style={[$.statVal, { color: '#a855f7' }]}>{hrv > 0 ? hrv.toFixed(0) : '—'}</Text>
+                                <Text style={$.statKey}>HRV ms</Text>
+                            </View>
+                            <View style={$.statDiv} />
+                            <View style={$.stat}>
+                                <Text style={[$.statVal, { color: hrv > 60 ? '#22c55e' : hrv > 30 ? '#f97316' : hrv > 0 ? '#ef4444' : '#333' }]}>
+                                    {hrv > 60 ? 'LOW' : hrv > 30 ? 'MED' : hrv > 0 ? 'HIGH' : '—'}
+                                </Text>
+                                <Text style={$.statKey}>STRESS</Text>
+                            </View>
+                            <View style={$.statDiv} />
+                            <View style={$.stat}>
+                                <Text style={$.statVal}>{samples}</Text>
+                                <Text style={$.statKey}>SAMPLES</Text>
+                            </View>
+                        </View>
+
+                        {quality === 'warmup' && <Text style={$.hint}>Hold still... warming up</Text>}
+                        {quality === 'poor' && <Text style={[$.hint, { color: '#f97316' }]}>Press finger firmly on camera</Text>}
+                    </Fade>
+                )}
+
+                {err ? <Text style={$.errText}>{err}</Text> : null}
             </View>
 
             {/* Button */}
-            <View style={[$.bar, { paddingBottom: ins.bottom + 12 }]}>
-                <Tap onPress={on ? stop : start}>
-                    <LinearGradient colors={on ? ['#7f1d1d','#dc2626'] : ['#0c4a6e','#0891b2']}
+            <View style={[$.bar, { paddingBottom: ins.bottom + 16 }]}>
+                <Tap onPress={scanning ? stop : start}>
+                    <LinearGradient
+                        colors={scanning ? ['#7f1d1d', '#dc2626'] : ['#0c4a6e', '#0891b2']}
                         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={$.barBtn}>
-                        <Text style={$.barBtnT}>{on ? 'STOP' : 'START'}</Text>
+                        <Text style={$.barBtnT}>{scanning ? 'STOP' : 'START'}</Text>
                     </LinearGradient>
                 </Tap>
             </View>
@@ -179,34 +240,42 @@ export default function RPPGScreen({ navigation, route }) {
 
 const $ = StyleSheet.create({
     bg: { flex: 1, backgroundColor: '#000' },
-    title: { fontSize: 28, fontWeight: '900', color: '#fff', fontFamily: CONDENSED, letterSpacing: 2, marginBottom: 8 },
-    sub: { fontSize: 13, color: '#555', textAlign: 'center', marginBottom: 28, lineHeight: 20 },
-    btn: { borderRadius: 6, paddingVertical: 16, paddingHorizontal: 40 },
-    btnT: { color: '#fff', fontWeight: '900', fontSize: 14, letterSpacing: 3, fontFamily: CONDENSED },
 
-    cam: { height: 280, backgroundColor: '#111' },
-    backWrap: { position: 'absolute', top: 10, left: 16, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+    title: { fontSize: 28, fontWeight: '900', color: '#fff', fontFamily: CONDENSED, letterSpacing: 2, marginBottom: 12 },
+    sub: { fontSize: 14, color: '#555', textAlign: 'center', marginBottom: 32, lineHeight: 22 },
+    permBtn: { borderRadius: 6, paddingVertical: 16, paddingHorizontal: 40 },
+    permBtnT: { color: '#fff', fontWeight: '900', fontSize: 14, letterSpacing: 3, fontFamily: CONDENSED },
+
+    topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8 },
+    topTitle: { fontSize: 13, fontWeight: '800', color: '#555', letterSpacing: 3 },
+    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
     backIcon: { color: '#fff', fontSize: 22, fontWeight: '300', marginTop: -2 },
-    face: { position: 'absolute', top: '18%', left: '30%', right: '30%', height: '64%' },
-    co: { position: 'absolute', width: 16, height: 16, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 4 },
-    status: { position: 'absolute', bottom: 14, alignSelf: 'center', fontSize: 11, fontWeight: '600', color: '#888' },
-    rec: { position: 'absolute', top: 12, right: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
-    recDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ef4444', marginRight: 5 },
-    recT: { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 1 },
 
-    body: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-    bpm: { fontSize: 80, fontWeight: '900', fontFamily: CONDENSED },
-    bpmLabel: { fontSize: 11, fontWeight: '700', color: '#444', letterSpacing: 4, marginTop: -8, marginBottom: 32 },
+    camHidden: { position: 'absolute', width: 1, height: 1, opacity: 0 },
 
-    row: { flexDirection: 'row', alignItems: 'center' },
-    cell: { alignItems: 'center', paddingHorizontal: 28 },
-    cellVal: { fontSize: 20, fontWeight: '800', fontFamily: MONO },
-    cellKey: { fontSize: 9, fontWeight: '600', color: '#444', letterSpacing: 2, marginTop: 4 },
-    div: { width: 1, height: 28, backgroundColor: '#1a1a1a' },
-    err: { color: '#ef4444', fontSize: 12, marginTop: 16 },
+    body: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
 
-    bar: { paddingHorizontal: 24, paddingTop: 12, backgroundColor: '#000' },
-    barBtn: { borderRadius: 6, paddingVertical: 16, alignItems: 'center',
+    instructions: { alignItems: 'center' },
+    fingerCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+    fingerIcon: { fontSize: 40 },
+    instrTitle: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 8 },
+    instrSub: { fontSize: 14, color: '#555', textAlign: 'center', lineHeight: 22 },
+
+    bpmNum: { fontSize: 96, fontWeight: '900', fontFamily: CONDENSED },
+    bpmLabel: { fontSize: 12, fontWeight: '700', color: '#444', letterSpacing: 4, marginTop: -10, marginBottom: 8 },
+    zone: { fontSize: 14, fontWeight: '600', marginBottom: 32 },
+
+    statsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 24 },
+    stat: { alignItems: 'center', paddingHorizontal: 24 },
+    statVal: { fontSize: 20, fontWeight: '800', color: '#fff', fontFamily: MONO },
+    statKey: { fontSize: 9, fontWeight: '600', color: '#444', letterSpacing: 2, marginTop: 4 },
+    statDiv: { width: 1, height: 28, backgroundColor: '#1a1a1a' },
+
+    hint: { color: '#555', fontSize: 12, marginTop: 20 },
+    errText: { color: '#ef4444', fontSize: 12, marginTop: 16 },
+
+    bar: { paddingHorizontal: 24, paddingTop: 12 },
+    barBtn: { borderRadius: 8, paddingVertical: 18, alignItems: 'center',
         ...Platform.select({ android: { elevation: 8 }, ios: { shadowColor: '#06b6d4', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 8 }, shadowRadius: 20 } }) },
     barBtnT: { color: '#fff', fontWeight: '900', fontSize: 16, letterSpacing: 3, fontFamily: CONDENSED },
 });

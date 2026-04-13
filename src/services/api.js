@@ -5,18 +5,14 @@
 import { Platform } from 'react-native';
 import {
     BACKEND_HOST,
-    PROXY_PORT,
     FASTAPI_PORT,
-    API_BASE as BASE_FROM_CONSTANTS,
-    WS_BASE as WS_FROM_CONSTANTS,
+    API_BASE as BASE_URL,
+    WS_BASE as WS_URL,
     API_TIMEOUT,
 } from '../constants';
 
-// On Android phone: use proxy (avoids Windows Firewall & AP isolation).
-// On iOS simulator / browser: hit FastAPI directly.
-export const API_BASE = Platform.OS === 'android'
-    ? BASE_FROM_CONSTANTS                        // http://BACKEND_HOST:8083
-    : `http://localhost:${FASTAPI_PORT}`;        // Direct (emulator/browser)
+// Direct to FastAPI backend
+export const API_BASE = BASE_URL;
 
 // WebSocket direct to FastAPI (no proxy — proxy causes issues with WS paths)
 const WS_BASE_RESOLVED = `ws://${BACKEND_HOST}:${FASTAPI_PORT}`;
