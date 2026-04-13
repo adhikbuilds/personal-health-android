@@ -4,10 +4,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View, Text, StyleSheet, ScrollView,
-    TouchableOpacity, TextInput, Animated, Dimensions, Alert,
+    TextInput, Animated, Dimensions, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Tap } from '../ui';
 import { C, LEVEL_COLORS, LEVEL_LABELS } from '../styles/colors';
 import { computeFitnessScore, FITNESS_TEST_BANDS } from '../data/constants';
 import { useUser } from '../context/UserContext';
@@ -75,9 +76,9 @@ function ScoreComponent({ icon, label, subLabel, points, barColor, recommendatio
             </View>
             <Text style={sc.compRec}>{recommendation}</Text>
             {onRetake && (
-                <TouchableOpacity onPress={onRetake}>
+                <Tap onPress={onRetake}>
                     <Text style={sc.retakeBtn}>Retake Test ↺</Text>
-                </TouchableOpacity>
+                </Tap>
             )}
         </View>
     );
@@ -126,19 +127,19 @@ function RunTimer({ onTimeSet }) {
             <Text style={rt.time}>{mins}:{secs}</Text>
             <View style={rt.btnRow}>
                 {!running && !done && (
-                    <TouchableOpacity style={[rt.btn, { backgroundColor: C.green }]} onPress={start}>
+                    <Tap style={[rt.btn, { backgroundColor: C.green }]} onPress={start}>
                         <Text style={rt.btnText}>START TIMER</Text>
-                    </TouchableOpacity>
+                    </Tap>
                 )}
                 {running && (
-                    <TouchableOpacity style={[rt.btn, { backgroundColor: C.red }]} onPress={stop}>
+                    <Tap style={[rt.btn, { backgroundColor: C.red }]} onPress={stop}>
                         <Text style={rt.btnText}>STOP</Text>
-                    </TouchableOpacity>
+                    </Tap>
                 )}
                 {done && (
-                    <TouchableOpacity style={[rt.btn, { backgroundColor: C.muted }]} onPress={reset}>
+                    <Tap style={[rt.btn, { backgroundColor: C.muted }]} onPress={reset}>
                         <Text style={rt.btnText}>RESET</Text>
-                    </TouchableOpacity>
+                    </Tap>
                 )}
             </View>
         </View>
@@ -232,9 +233,9 @@ export default function FitnessTestScreen({ navigation }) {
         return (
             <View style={[s.safe, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
                 <View style={s.topbar}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
+                    <Tap onPress={() => navigation.goBack()}>
                         <Text style={s.back}>‹ Back</Text>
-                    </TouchableOpacity>
+                    </Tap>
                     <Text style={s.title}>Fitness Test</Text>
                     <View style={{ width: 60 }} />
                 </View>
@@ -262,9 +263,9 @@ export default function FitnessTestScreen({ navigation }) {
                             </View>
                         ))}
                     </View>
-                    <TouchableOpacity style={s.startBtn} onPress={() => setStep('bmi')}>
+                    <Tap style={s.startBtn} onPress={() => setStep('bmi')}>
                         <Text style={s.startBtnText}>Start Test →</Text>
-                    </TouchableOpacity>
+                    </Tap>
                 </ScrollView>
             </View>
         );
@@ -275,9 +276,9 @@ export default function FitnessTestScreen({ navigation }) {
         return (
             <View style={[s.safe, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
                 <View style={s.topbar}>
-                    <TouchableOpacity onPress={() => setStep('intro')}>
+                    <Tap onPress={() => setStep('intro')}>
                         <Text style={s.back}>‹ Back</Text>
-                    </TouchableOpacity>
+                    </Tap>
                     <Text style={s.title}>Take your Fitness Test</Text>
                     <View style={{ width: 60 }} />
                 </View>
@@ -363,18 +364,18 @@ export default function FitnessTestScreen({ navigation }) {
                             <Text style={{ fontSize: 32 }}>🏃</Text>
                         </View>
                         <View style={s.timerToggle}>
-                            <TouchableOpacity
+                            <Tap
                                 style={[s.toggleBtn, useTimer && s.toggleBtnActive]}
                                 onPress={() => setUseTimer(true)}
                             >
                                 <Text style={[s.toggleText, useTimer && { color: C.bg }]}>Use Timer</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
+                            </Tap>
+                            <Tap
                                 style={[s.toggleBtn, !useTimer && s.toggleBtnActive]}
                                 onPress={() => setUseTimer(false)}
                             >
                                 <Text style={[s.toggleText, !useTimer && { color: C.bg }]}>Enter Time</Text>
-                            </TouchableOpacity>
+                            </Tap>
                         </View>
                         {useTimer ? (
                             <RunTimer onTimeSet={setRunSeconds} />
@@ -394,13 +395,12 @@ export default function FitnessTestScreen({ navigation }) {
                         )}
                     </View>
 
-                    <TouchableOpacity
+                    <Tap
                         style={[s.startBtn, { opacity: (heightCm && weightKg && reachCm && (runSeconds > 0 || runInput)) ? 1 : 0.4 }]}
                         onPress={calculate}
-                        disabled={!(heightCm && weightKg && reachCm && (runSeconds > 0 || runInput))}
                     >
                         <Text style={s.startBtnText}>Calculate Score →</Text>
-                    </TouchableOpacity>
+                    </Tap>
                 </ScrollView>
             </View>
         );
@@ -410,9 +410,9 @@ export default function FitnessTestScreen({ navigation }) {
     return (
         <View style={[s.safe, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
             <View style={s.topbar}>
-                <TouchableOpacity onPress={() => setStep('bmi')}>
+                <Tap onPress={() => setStep('bmi')}>
                     <Text style={s.back}>‹ Retake</Text>
-                </TouchableOpacity>
+                </Tap>
                 <Text style={s.title}>Your Results</Text>
                 <View style={{ width: 60 }} />
             </View>
@@ -439,19 +439,18 @@ export default function FitnessTestScreen({ navigation }) {
                     recommendation={recs.bmi}
                 />
 
-                <TouchableOpacity
+                <Tap
                     style={[s.startBtn, { backgroundColor: saving ? C.muted : results.color }]}
                     onPress={saveResults}
-                    disabled={saving}
                 >
                     <Text style={[s.startBtnText, { color: '#fff' }]}>
                         {saving ? 'Saving…' : 'Save to Profile ✓'}
                     </Text>
-                </TouchableOpacity>
+                </Tap>
 
-                <TouchableOpacity style={s.ghostBtn} onPress={() => setStep('bmi')}>
+                <Tap style={s.ghostBtn} onPress={() => setStep('bmi')}>
                     <Text style={s.ghostBtnText}>Retake Test ↺</Text>
-                </TouchableOpacity>
+                </Tap>
             </ScrollView>
         </View>
     );

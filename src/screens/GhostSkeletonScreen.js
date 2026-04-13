@@ -17,9 +17,10 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity,
+    View, Text, StyleSheet,
     Dimensions, Animated, Easing,
 } from 'react-native';
+import { Tap } from '../ui';
 import { Camera, CameraView } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Line, Circle, Text as SvgText } from 'react-native-svg';
@@ -350,9 +351,9 @@ export default function GhostSkeletonScreen({ navigation, route }) {
                 <View style={s.center}>
                     <Text style={s.permTitle}>Camera Permission</Text>
                     <Text style={s.permText}>Camera access is needed to show the skeleton overlay and compare your form with the AI model.</Text>
-                    <TouchableOpacity style={s.grantBtn} onPress={() => Camera.requestCameraPermissionsAsync().then(({ status }) => setPermission({ granted: status === 'granted' }))}>
+                    <Tap style={s.grantBtn} onPress={() => Camera.requestCameraPermissionsAsync().then(({ status }) => setPermission({ granted: status === 'granted' }))}>
                         <Text style={s.btnText}>Grant Camera Access</Text>
-                    </TouchableOpacity>
+                    </Tap>
                 </View>
             </View>
         );
@@ -385,9 +386,9 @@ export default function GhostSkeletonScreen({ navigation, route }) {
             {/* ── Top HUD ── */}
             <View style={[s.hud, { paddingTop: ins.top + 8 }]}>
                 <View style={s.hudRow}>
-                    <TouchableOpacity style={s.backBtn} onPress={() => navigation?.goBack()}>
+                    <Tap style={s.backBtn} onPress={() => navigation?.goBack()}>
                         <Text style={s.backTxt}>← Back</Text>
-                    </TouchableOpacity>
+                    </Tap>
 
                     <View style={s.sportChip}>
                         <Text style={s.sportTxt}>{sport.replace(/_/g, ' ').toUpperCase()}</Text>
@@ -415,9 +416,9 @@ export default function GhostSkeletonScreen({ navigation, route }) {
                         <View style={[s.legendDot, { backgroundColor: C.orange }]} />
                         <Text style={s.legendTxt}>Off-target</Text>
                     </View>
-                    <TouchableOpacity style={s.labelToggle} onPress={() => setShowLabels(l => !l)}>
+                    <Tap style={s.labelToggle} onPress={() => setShowLabels(l => !l)}>
                         <Text style={s.labelToggleTxt}>{showLabels ? 'Hide Labels' : 'Labels'}</Text>
-                    </TouchableOpacity>
+                    </Tap>
                 </View>
             </View>
 
@@ -448,16 +449,14 @@ export default function GhostSkeletonScreen({ navigation, route }) {
                 <Text style={s.feedbackTxt}>{feedback}</Text>
 
                 {/* Start button */}
-                <TouchableOpacity
+                <Tap
                     style={[s.startBtn, !calibReady && s.startBtnOff]}
-                    onPress={handleStart}
-                    activeOpacity={0.85}
-                    disabled={!calibReady}
+                    onPress={calibReady ? handleStart : undefined}
                 >
                     <Text style={[s.btnText, !calibReady && { color: 'rgba(0,0,0,0.5)' }]}>
                         {calibReady ? 'Start Session' : phase === 'countdown' ? 'Positioning...' : 'Calibrating...'}
                     </Text>
-                </TouchableOpacity>
+                </Tap>
             </View>
         </View>
     );

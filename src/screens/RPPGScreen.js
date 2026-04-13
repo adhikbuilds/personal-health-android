@@ -8,9 +8,10 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity,
+    View, Text, StyleSheet,
     Dimensions, Animated, Easing, StatusBar, ScrollView
 } from 'react-native';
+import { Tap } from '../ui';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Polyline, Line } from 'react-native-svg';
@@ -329,9 +330,9 @@ export default function RPPGScreen({ navigation, route }) {
                     <Text style={s.permBody}>
                         Camera access is needed to detect subtle skin color changes (rPPG) for heart rate measurement.
                     </Text>
-                    <TouchableOpacity style={s.grantBtn} onPress={requestPermission}>
+                    <Tap style={s.grantBtn} onPress={requestPermission}>
                         <Text style={s.grantTxt}>Grant Camera Access</Text>
-                    </TouchableOpacity>
+                    </Tap>
                 </View>
             </View>
         );
@@ -354,12 +355,12 @@ export default function RPPGScreen({ navigation, route }) {
 
                 {/* Top Bar */}
                 <View style={[s.topBar, { paddingTop: 16 }]}>
-                    <TouchableOpacity
+                    <Tap
                         style={s.backBtn}
                         onPress={() => { stopMeasuring(); navigation?.goBack(); }}
                     >
                         <Text style={s.backTxt}>← Back</Text>
-                    </TouchableOpacity>
+                    </Tap>
                     <View style={{ flex: 1 }} />
                     <View style={s.liveIndicator}>
                         {isRunning && (
@@ -418,13 +419,13 @@ export default function RPPGScreen({ navigation, route }) {
 
                 <View style={s.fabWrap}>
                     {!isRunning ? (
-                        <TouchableOpacity style={[s.fab, { backgroundColor: T.cyan }]} onPress={startMeasuring} activeOpacity={0.85}>
+                        <Tap style={[s.fab, { backgroundColor: T.cyan }]} onPress={startMeasuring}>
                             <Text style={s.fabTxt}>START SCAN</Text>
-                        </TouchableOpacity>
+                        </Tap>
                     ) : (
-                        <TouchableOpacity style={[s.fab, { backgroundColor: T.red }]} onPress={stopMeasuring} activeOpacity={0.85}>
+                        <Tap style={[s.fab, { backgroundColor: T.red }]} onPress={stopMeasuring}>
                             <Text style={s.fabTxt}>STOP SCAN</Text>
-                        </TouchableOpacity>
+                        </Tap>
                     )}
                 </View>
             </ScrollView>
