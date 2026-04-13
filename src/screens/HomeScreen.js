@@ -135,7 +135,7 @@ export default function HomeScreen({ navigation }) {
                 {/* ═══ CTA ═══ */}
                 <Fade delay={240}>
                     <Animated.View style={{ transform: [{ scale: ctaBounce }] }}>
-                        <Tap onPress={() => navigation.navigate('GhostSkeleton', { sport: userData.sport || 'vertical_jump' })}>
+                        <Tap onPress={() => navigation.navigate('GhostSkeleton', { sport: userData.sport || 'general' })}>
                             <LinearGradient colors={['#0c4a6e','#0891b2','#06b6d4']} start={{x:0,y:0}} end={{x:1,y:1}} style={$.cta}>
                                 <Text style={$.ctaEyebrow}>YOUR NEXT SESSION</Text>
                                 <Text style={$.ctaTitle}>START{'\n'}TRAINING</Text>

@@ -14,14 +14,15 @@ import { Tap, Fade, ProgressRing, CONDENSED, MONO } from '../ui';
 const { width: W } = Dimensions.get('window');
 
 const SPORTS = [
+    { key: 'general',       label: 'GENERAL' },
     { key: 'vertical_jump', label: 'VJ' },
-    { key: 'snatch',        label: 'SNATCH' },
-    { key: 'sprint',        label: 'SPRINT' },
-    { key: 'javelin',       label: 'JAVELIN' },
-    { key: 'cricket_bat',   label: 'CRICKET' },
     { key: 'squat',         label: 'SQUAT' },
     { key: 'push_up',       label: 'PUSH UP' },
     { key: 'pull_up',       label: 'PULL UP' },
+    { key: 'sprint',        label: 'SPRINT' },
+    { key: 'snatch',        label: 'SNATCH' },
+    { key: 'javelin',       label: 'JAVELIN' },
+    { key: 'cricket_bat',   label: 'CRICKET' },
 ];
 
 const SPORT_RANGES = {
@@ -76,7 +77,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
     const ins = useSafeAreaInsets();
     const { addXp, userData } = useUser();
     const [permission, setPermission] = useState(null);
-    const initialSport = route?.params?.sport || 'vertical_jump';
+    const initialSport = route?.params?.sport || 'general';
     const [sport, setSport] = useState(initialSport);
     const [isActive, setIsActive] = useState(false);
     const [metrics, setMetrics] = useState(null);
