@@ -117,8 +117,15 @@ export default function RPPGScreen({ navigation, route }) {
         };
     }, []);
 
+    const killCapture = useCallback(() => {
+        runningRef.current = false;
+        if (captureRef.current) { clearInterval(captureRef.current); captureRef.current = null; }
+        if (wsRef.current) { try { wsRef.current.close(); } catch(_){} wsRef.current = null; }
+    }, []);
+
     const startScan = useCallback(() => {
         if (runningRef.current) return;
+        killCapture(); // clean up any previous state
         runningRef.current = true;
         setRunning(true);
         setErr('');
@@ -126,40 +133,50 @@ export default function RPPGScreen({ navigation, route }) {
         setBpm(0);
         setHrv(0);
         setWave([]);
+        setQuality('warmup');
 
         wsRef.current = api.connectRPPGLiveStream(
             sessionId,
             (r) => {
-                if (!mountedRef.current) return;
+                if (!mountedRef.current || !runningRef.current) return;
                 if (r.bpm > 0 && r.status !== 'warmup') setBpm(r.bpm);
                 setHrv(r.hrv_ms ?? 0);
                 setQuality(r.signal_quality ?? 'waiting');
                 if (r.waveform?.length > 2) setWave(r.waveform);
                 if (r.error) setErr(r.error);
             },
-            () => setErr('Connection failed. Is the backend running?'),
-            () => { if (runningRef.current) setErr('Stream disconnected.'); },
+            () => { if (runningRef.current) setErr('Connection failed. Check backend.'); },
+            () => { if (runningRef.current) setErr('Disconnected.'); },
         );
 
+        // Capture at ~4fps (250ms) — slower but more reliable than 5fps
+        // Use skipProcessing: false for correct orientation
         captureRef.current = setInterval(async () => {
-            if (!runningRef.current || !cameraRef.current || !wsRef.current) return;
+            if (!runningRef.current || !cameraRef.current) return;
             try {
-                const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.1, skipProcessing: true });
-                if (!runningRef.current) return; // re-check after async
-                if (wsRef.current?.readyState === WebSocket.OPEN && photo?.base64) {
-                    wsRef.current.send(JSON.stringify({ face_found: true, image_b64: photo.base64, ts: Date.now() / 1000 }));
-                    setFrames(n => n + 1);
+                const photo = await cameraRef.current.takePictureAsync({
+                    base64: true,
+                    quality: 0.08,        // tiny file — we only need face color
+                    skipProcessing: false, // correct orientation
+                });
+                if (!runningRef.current || !wsRef.current) return;
+                if (wsRef.current.readyState === WebSocket.OPEN && photo?.base64) {
+                    wsRef.current.send(JSON.stringify({
+                        face_found: true,
+                        image_b64: photo.base64,
+                        ts: Date.now() / 1000,
+                    }));
+                    if (mountedRef.current) setFrames(n => n + 1);
                 }
             } catch (_) {}
-        }, 200);
-    }, [sessionId]);
+        }, 250);
+    }, [sessionId, killCapture]);
 
     const stopScan = useCallback(() => {
-        runningRef.current = false;
+        killCapture();
         setRunning(false);
-        if (captureRef.current) { clearInterval(captureRef.current); captureRef.current = null; }
-        if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
-    }, []);
+        setQuality('waiting');
+    }, [killCapture]);
 
     // ── Permission ──
     if (!permission) return <View style={$.root} />;
@@ -190,7 +207,7 @@ export default function RPPGScreen({ navigation, route }) {
             <View style={$.cam}>
                 <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="front" />
                 <View style={$.camOverlay}>
-                    <Tap onPress={() => { stopScan(); navigation?.goBack(); }} style={$.backBtn}>
+                    <Tap onPress={() => { killCapture(); setRunning(false); setTimeout(() => navigation?.goBack(), 100); }} style={$.backBtn}>
                         <Text style={$.backText}>{'‹ BACK'}</Text>
                     </Tap>
                     <View style={$.camBadge}>
