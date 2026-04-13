@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, Platform, StyleSheet, Text, View, Vibration } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 let Haptics;
 try { Haptics = require('expo-haptics'); } catch (_) {}
@@ -50,17 +51,24 @@ export function Fade({ delay = 0, distance = 24, duration = 650, children, style
     );
 }
 
-// ── Animated number counter ─────────────────────────────────────────────────
+// ── Animated number counter (with flash on finish) ─────────────────────────
 
 export function CountUp({ to, duration = 800, delay = 0, style }) {
     const val = useRef(new Animated.Value(0)).current;
+    const flashOpacity = useRef(new Animated.Value(1)).current;
     const [display, setDisplay] = React.useState(0);
     useEffect(() => {
         const listener = val.addListener(({ value }) => setDisplay(Math.round(value)));
-        Animated.timing(val, { toValue: to, duration, delay, useNativeDriver: false }).start();
+        Animated.timing(val, { toValue: to, duration, delay, useNativeDriver: false }).start(() => {
+            // #5 Number color flash — brief brightness pulse when counting finishes
+            Animated.sequence([
+                Animated.timing(flashOpacity, { toValue: 0.5, duration: 120, useNativeDriver: true }),
+                Animated.timing(flashOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+            ]).start();
+        });
         return () => val.removeListener(listener);
     }, [to]);
-    return <Text style={style}>{display || '—'}</Text>;
+    return <Animated.Text style={[style, { opacity: flashOpacity }]}>{display || '—'}</Animated.Text>;
 }
 
 // ── Section label ───────────────────────────────────────────────────────────
@@ -69,17 +77,57 @@ export function SectionLabel({ children }) {
     return <Text style={ui.sectionLabel}>{children}</Text>;
 }
 
-// ── Action row (Nike-style text + arrow) ────────────────────────────────────
+// ── Pulsing live dot (#1) ───────────────────────────────────────────────────
+
+export function PulsingDot({ color, size = 8 }) {
+    const scale = useRef(new Animated.Value(1)).current;
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(scale, { toValue: 1.4, duration: 1000, useNativeDriver: true }),
+                Animated.timing(scale, { toValue: 1, duration: 1000, useNativeDriver: true }),
+            ])
+        ).start();
+    }, []);
+    return <Animated.View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, transform: [{ scale }] }} />;
+}
+
+// ── Gradient divider (#9) ───────────────────────────────────────────────────
+
+export function GradientDivider({ color = '#06b6d4' }) {
+    return (
+        <LinearGradient
+            colors={['transparent', color, 'transparent']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ height: 1, opacity: 0.25 }}
+        />
+    );
+}
+
+// ── Action row with slide effect (#6) ───────────────────────────────────────
 
 export function ActionRow({ label, color, onPress }) {
+    const scale = useRef(new Animated.Value(1)).current;
+    const slideX = useRef(new Animated.Value(0)).current;
+    const onIn = () => {
+        Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 50 }).start();
+        Animated.spring(slideX, { toValue: 4, useNativeDriver: true, speed: 50 }).start();
+    };
+    const onOut = () => {
+        Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 6 }).start();
+        Animated.spring(slideX, { toValue: 0, useNativeDriver: true, speed: 16, bounciness: 6 }).start();
+    };
     return (
-        <Tap onPress={onPress} style={ui.actionRow}>
-            <View style={ui.actionLeft}>
-                {color && <View style={[ui.actionDot, { backgroundColor: color }]} />}
-                <Text style={ui.actionTitle}>{label}</Text>
-            </View>
-            <Text style={ui.actionArrow}>›</Text>
-        </Tap>
+        <Pressable onPress={onPress} onPressIn={onIn} onPressOut={onOut}>
+            <Animated.View style={[ui.actionRow, { transform: [{ scale }] }]}>
+                <View style={ui.actionLeft}>
+                    {color && <View style={[ui.actionDot, { backgroundColor: color }]} />}
+                    <Animated.Text style={[ui.actionTitle, { transform: [{ translateX: slideX }] }]}>{label}</Animated.Text>
+                </View>
+                <Text style={ui.actionArrow}>›</Text>
+            </Animated.View>
+        </Pressable>
     );
 }
 

@@ -4,8 +4,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
     View, Text, ScrollView, StyleSheet, Pressable, Animated,
-    Dimensions, Platform, ActivityIndicator, StatusBar,
+    Dimensions, Platform, ActivityIndicator, StatusBar, RefreshControl,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Polyline, Circle, Line, Text as SvgText, Defs, LinearGradient as SvgGrad, Stop } from 'react-native-svg';
 import { useUser } from '../context/UserContext';
@@ -152,6 +153,7 @@ export default function ProgressScreen() {
     const [days, setDays] = useState(30);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
     const [progress, setProgress] = useState(null);
     const [weakJoints, setWeakJoints] = useState(null);
@@ -183,6 +185,11 @@ export default function ProgressScreen() {
     }, [athleteId, days]);
 
     useEffect(() => { load(); }, [load]);
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        load().finally(() => setRefreshing(false));
+    }, [load]);
 
     // ── Loading ─────────────────────────────────────────────────────────
     if (loading) {
@@ -247,7 +254,9 @@ export default function ProgressScreen() {
     return (
         <View style={[$.root, { paddingTop: ins.top }]}>
             <StatusBar barStyle="light-content" backgroundColor="#000" />
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333" progressBackgroundColor="#000" colors={['#06b6d4']} />}
+            >
 
                 {/* ═══ Header + Period Tabs ═══ */}
                 <Fade style={$.topBar}>
@@ -321,7 +330,9 @@ export default function ProgressScreen() {
                                         <Text style={$.jointName}>{titleCase(j.joint)}</Text>
                                         <Text style={[$.jointDev, { color: dotColor }]}>{j.deviation_deg.toFixed(1)}deg</Text>
                                     </View>
-                                    {i < weakJoints.weak_joints.length - 1 && <View style={$.divider} />}
+                                    {i < weakJoints.weak_joints.length - 1 && (
+                                        <LinearGradient colors={['transparent', '#06b6d4', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1, opacity: 0.2 }} />
+                                    )}
                                 </React.Fragment>
                             );
                         })}
@@ -432,7 +443,7 @@ const $ = StyleSheet.create({
     statItem: { flex: 1, alignItems: 'center' },
     statNumber: { fontSize: 22, fontWeight: '800', fontFamily: FONT_CONDENSED },
     statLabel: { fontSize: 9, fontWeight: '600', color: '#4b5563', letterSpacing: 2, marginTop: 4 },
-    statDivider: { width: 1, height: 32, backgroundColor: '#1a1a1a' },
+    statDivider: { width: 1, height: 32, backgroundColor: '#1a1a1a', opacity: 0.6 },
 
     // Weak joints
     jointRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14 },

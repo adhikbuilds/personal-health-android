@@ -11,7 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
 import { DAILY_TRACKER_DEFAULTS } from '../data/constants';
-import { Tap, Fade, CountUp, ActionRow, Divider, ProgressRing, CONDENSED, MONO } from '../ui';
+import { Tap, Fade, CountUp, ActionRow, Divider, GradientDivider, PulsingDot, ProgressRing, CONDENSED, MONO } from '../ui';
 
 const { width: W } = Dimensions.get('window');
 
@@ -61,6 +61,23 @@ export default function HomeScreen({ navigation }) {
 
     const onRefresh = () => { setRefreshing(true); load(); setTimeout(() => setRefreshing(false), 800); };
 
+    // #2 Breathing score ring glow
+    const ringGlow = useRef(new Animated.Value(0.8)).current;
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(ringGlow, { toValue: 1, duration: 2000, useNativeDriver: true }),
+                Animated.timing(ringGlow, { toValue: 0.8, duration: 2000, useNativeDriver: true }),
+            ])
+        ).start();
+    }, []);
+
+    // #3 Bouncy CTA
+    const ctaBounce = useRef(new Animated.Value(0.85)).current;
+    useEffect(() => {
+        Animated.spring(ctaBounce, { toValue: 1, useNativeDriver: true, speed: 4, bounciness: 14 }).start();
+    }, []);
+
     const sc = fitnessScore?.score || 0;
     const scColor = fitnessScore?.color || '#06b6d4';
     const first = userData.name?.split(' ')[0] || 'Athlete';
@@ -77,7 +94,7 @@ export default function HomeScreen({ navigation }) {
                 {/* ═══ Top ═══ */}
                 <Fade style={$.top}>
                     <Text style={$.brand}>ACTIVEBHARAT</Text>
-                    <View style={[$.liveDot, { backgroundColor: online ? '#22c55e' : online === false ? '#ef4444' : '#facc15' }]} />
+                    <PulsingDot color={online ? '#22c55e' : online === false ? '#ef4444' : '#facc15'} size={8} />
                 </Fade>
 
                 {/* ═══ Greeting ═══ */}
@@ -88,13 +105,13 @@ export default function HomeScreen({ navigation }) {
 
                 {/* ═══ Hero ═══ */}
                 <Fade delay={100} style={$.hero}>
-                    <View style={$.ringWrap}>
+                    <Animated.View style={[$.ringWrap, { opacity: ringGlow }]}>
                         <ProgressRing pct={sc} color={scColor} size={150} stroke={6} />
                         <View style={$.ringInner}>
                             <CountUp to={sc} duration={1200} delay={400} style={[$.scoreNum, { color: scColor, fontFamily: CONDENSED }]} />
                             <Text style={$.scoreUnit}>SCORE</Text>
                         </View>
-                    </View>
+                    </Animated.View>
                 </Fade>
 
                 {/* ═══ Stats ═══ */}
@@ -117,21 +134,23 @@ export default function HomeScreen({ navigation }) {
 
                 {/* ═══ CTA ═══ */}
                 <Fade delay={240}>
-                    <Tap onPress={() => navigation.navigate('GhostSkeleton', { sport: userData.sport || 'vertical_jump' })}>
-                        <LinearGradient colors={['#0c4a6e','#0891b2','#06b6d4']} start={{x:0,y:0}} end={{x:1,y:1}} style={$.cta}>
-                            <Text style={$.ctaEyebrow}>YOUR NEXT SESSION</Text>
-                            <Text style={$.ctaTitle}>START{'\n'}TRAINING</Text>
-                            <View style={$.ctaBtn}><Text style={$.ctaBtnText}>GO</Text></View>
-                        </LinearGradient>
-                    </Tap>
+                    <Animated.View style={{ transform: [{ scale: ctaBounce }] }}>
+                        <Tap onPress={() => navigation.navigate('GhostSkeleton', { sport: userData.sport || 'vertical_jump' })}>
+                            <LinearGradient colors={['#0c4a6e','#0891b2','#06b6d4']} start={{x:0,y:0}} end={{x:1,y:1}} style={$.cta}>
+                                <Text style={$.ctaEyebrow}>YOUR NEXT SESSION</Text>
+                                <Text style={$.ctaTitle}>START{'\n'}TRAINING</Text>
+                                <View style={$.ctaBtn}><Text style={$.ctaBtnText}>GO</Text></View>
+                            </LinearGradient>
+                        </Tap>
+                    </Animated.View>
                 </Fade>
 
                 {/* ═══ Actions ═══ */}
                 <Fade delay={320} style={$.actions}>
                     <ActionRow label="HEART RATE" color="#ef4444" onPress={() => navigation.navigate('HeartRate', { sessionId: 'rppg_'+Date.now() })} />
-                    <Divider />
+                    <GradientDivider color="#ef4444" />
                     <ActionRow label="WEEKLY PLAN" color="#22c55e" onPress={() => navigation.navigate('TrainingPlan')} />
-                    <Divider />
+                    <GradientDivider color="#22c55e" />
                     <ActionRow label="FITNESS TEST" color="#06b6d4" onPress={() => navigation.navigate('FitnessTest')} />
                 </Fade>
 
