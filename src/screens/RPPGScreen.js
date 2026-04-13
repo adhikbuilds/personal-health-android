@@ -117,15 +117,23 @@ export default function RPPGScreen({ navigation, route }) {
         };
     }, []);
 
-    const killCapture = useCallback(() => {
+    // Global cleanup — works regardless of closure state
+    function cleanup() {
         runningRef.current = false;
-        if (captureRef.current) { clearInterval(captureRef.current); captureRef.current = null; }
-        if (wsRef.current) { try { wsRef.current.close(); } catch(_){} wsRef.current = null; }
-    }, []);
+        const interval = captureRef.current;
+        const ws = wsRef.current;
+        captureRef.current = null;
+        wsRef.current = null;
+        if (interval) clearInterval(interval);
+        if (ws) try { ws.close(); } catch(_) {}
+    }
 
-    const startScan = useCallback(() => {
+    // Cleanup on unmount
+    useEffect(() => () => cleanup(), []);
+
+    const startScan = () => {
         if (runningRef.current) return;
-        killCapture(); // clean up any previous state
+        cleanup();
         runningRef.current = true;
         setRunning(true);
         setErr('');
@@ -135,7 +143,7 @@ export default function RPPGScreen({ navigation, route }) {
         setWave([]);
         setQuality('warmup');
 
-        wsRef.current = api.connectRPPGLiveStream(
+        const ws = api.connectRPPGLiveStream(
             sessionId,
             (r) => {
                 if (!mountedRef.current || !runningRef.current) return;
@@ -145,23 +153,23 @@ export default function RPPGScreen({ navigation, route }) {
                 if (r.waveform?.length > 2) setWave(r.waveform);
                 if (r.error) setErr(r.error);
             },
-            () => { if (runningRef.current) setErr('Connection failed. Check backend.'); },
-            () => { if (runningRef.current) setErr('Disconnected.'); },
+            () => { if (runningRef.current) setErr('Connection failed.'); },
+            () => { if (runningRef.current) { setErr('Disconnected.'); cleanup(); setRunning(false); } },
         );
+        wsRef.current = ws;
 
-        // Capture at ~4fps (250ms) — slower but more reliable than 5fps
-        // Use skipProcessing: false for correct orientation
-        captureRef.current = setInterval(async () => {
+        const interval = setInterval(async () => {
             if (!runningRef.current || !cameraRef.current) return;
             try {
                 const photo = await cameraRef.current.takePictureAsync({
                     base64: true,
-                    quality: 0.08,        // tiny file — we only need face color
-                    skipProcessing: false, // correct orientation
+                    quality: 0.08,
+                    skipProcessing: false,
                 });
-                if (!runningRef.current || !wsRef.current) return;
-                if (wsRef.current.readyState === WebSocket.OPEN && photo?.base64) {
-                    wsRef.current.send(JSON.stringify({
+                if (!runningRef.current) return;
+                const currentWs = wsRef.current;
+                if (currentWs && currentWs.readyState === WebSocket.OPEN && photo?.base64) {
+                    currentWs.send(JSON.stringify({
                         face_found: true,
                         image_b64: photo.base64,
                         ts: Date.now() / 1000,
@@ -169,14 +177,24 @@ export default function RPPGScreen({ navigation, route }) {
                     if (mountedRef.current) setFrames(n => n + 1);
                 }
             } catch (_) {}
-        }, 250);
-    }, [sessionId, killCapture]);
+        }, 300); // 3.3fps — reliable with face detection overhead
+        captureRef.current = interval;
+    };
 
-    const stopScan = useCallback(() => {
-        killCapture();
+    const stopScan = () => {
+        cleanup();
         setRunning(false);
         setQuality('waiting');
-    }, [killCapture]);
+    };
+
+    const goBack = () => {
+        cleanup();
+        setRunning(false);
+        // Delay navigation to let camera unmount
+        requestAnimationFrame(() => {
+            if (navigation?.canGoBack()) navigation.goBack();
+        });
+    };
 
     // ── Permission ──
     if (!permission) return <View style={$.root} />;
@@ -207,7 +225,7 @@ export default function RPPGScreen({ navigation, route }) {
             <View style={$.cam}>
                 <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="front" />
                 <View style={$.camOverlay}>
-                    <Tap onPress={() => { killCapture(); setRunning(false); setTimeout(() => navigation?.goBack(), 100); }} style={$.backBtn}>
+                    <Tap onPress={goBack} style={$.backBtn}>
                         <Text style={$.backText}>{'‹ BACK'}</Text>
                     </Tap>
                     <View style={$.camBadge}>
