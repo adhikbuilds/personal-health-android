@@ -18,11 +18,8 @@ export const API_BASE = Platform.OS === 'android'
     ? BASE_FROM_CONSTANTS                        // http://BACKEND_HOST:8083
     : `http://localhost:${FASTAPI_PORT}`;        // Direct (emulator/browser)
 
-// WebSocket through the Node.js proxy to avoid AP isolation on university networks.
-// Proxy rewrites ws://HOST:8083/ws/rppg/... → ws://localhost:8082/rppg/...
-const WS_BASE_RESOLVED = Platform.OS === 'android'
-    ? `ws://${BACKEND_HOST}:${PROXY_PORT}/ws`    // ws://BACKEND_HOST:8083/ws (proxied)
-    : `ws://localhost:${FASTAPI_PORT}`;
+// WebSocket direct to FastAPI (no proxy — proxy causes issues with WS paths)
+const WS_BASE_RESOLVED = `ws://${BACKEND_HOST}:${FASTAPI_PORT}`;
 
 // ─── Core fetch helper ───────────────────────────────────────────────────────
 async function fetchJSON(path, options = {}) {
