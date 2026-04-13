@@ -120,8 +120,9 @@ export default function RPPGScreen({ navigation, route }) {
             try {
                 const p = await camRef.current.takePictureAsync({
                     base64: true,
-                    quality: 0.01,          // absolute minimum — ~1KB
-                    shutterSound: false,    // no click sound
+                    quality: 0.01,
+                    shutterSound: false,
+                    animateShutter: false,
                     skipProcessing: true,
                 });
                 if (!scanRef.current || !wsRef.current) return;
@@ -148,7 +149,7 @@ export default function RPPGScreen({ navigation, route }) {
         <View style={[$.bg, { paddingTop: ins.top, justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
             <StatusBar barStyle="light-content" backgroundColor="#000" />
             <Text style={$.title}>HEART RATE</Text>
-            <Text style={$.sub}>Place your finger over the back camera to measure your pulse</Text>
+            <Text style={$.sub}>The camera detects blood flow through your fingertip to measure your heart rate</Text>
             <Tap onPress={askPerm}><LinearGradient colors={['#7f1d1d', '#dc2626']} style={$.permBtn}><Text style={$.permBtnT}>ALLOW CAMERA</Text></LinearGradient></Tap>
         </View>
     );
@@ -167,13 +168,14 @@ export default function RPPGScreen({ navigation, route }) {
                 <View style={{ width: 38 }} />
             </View>
 
-            {/* Hidden camera — finger covers it, we don't need to show preview */}
-            <View style={$.camHidden}>
+            {/* Camera hidden offscreen — no visible flash */}
+            <View style={{ position: 'absolute', top: -9999, left: -9999, width: 1, height: 1 }}>
                 <CameraView
                     ref={camRef}
-                    style={{ width: 1, height: 1, opacity: 0 }}
+                    style={{ width: 1, height: 1 }}
                     facing="back"
                     enableTorch={scanning}
+                    animateShutter={false}
                 />
             </View>
 
@@ -189,13 +191,13 @@ export default function RPPGScreen({ navigation, route }) {
                             </View>
                         </View>
                         <Text style={$.instrTitle}>Measure your pulse</Text>
-                        <Text style={$.instrSub}>Place your fingertip gently over the{'\n'}back camera lens, then tap START</Text>
+                        <Text style={$.instrSub}>Cover both the camera and flash{'\n'}with your fingertip, then tap START</Text>
                         <View style={$.stepsRow}>
-                            <View style={$.step}><Text style={$.stepNum}>1</Text><Text style={$.stepText}>Cover{'\n'}camera</Text></View>
+                            <View style={$.step}><Text style={$.stepNum}>1</Text><Text style={$.stepText}>Cover lens{'\n'}+ flash</Text></View>
                             <View style={$.stepLine} />
-                            <View style={$.step}><Text style={$.stepNum}>2</Text><Text style={$.stepText}>Hold{'\n'}still</Text></View>
+                            <View style={$.step}><Text style={$.stepNum}>2</Text><Text style={$.stepText}>Press{'\n'}lightly</Text></View>
                             <View style={$.stepLine} />
-                            <View style={$.step}><Text style={$.stepNum}>3</Text><Text style={$.stepText}>Get{'\n'}results</Text></View>
+                            <View style={$.step}><Text style={$.stepNum}>3</Text><Text style={$.stepText}>Hold{'\n'}10 sec</Text></View>
                         </View>
                     </Fade>
                 ) : (

@@ -30,7 +30,8 @@
         "android.permission.INTERNET",
         "android.permission.VIBRATE"
       ],
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "pan",
+      "usesCleartextTraffic": true
     },
     "plugins": [
       [
