@@ -149,7 +149,7 @@ export default function RPPGScreen({ navigation, route }) {
         <View style={[$.bg, { paddingTop: ins.top, justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
             <StatusBar barStyle="light-content" backgroundColor="#000" />
             <Text style={$.title}>HEART RATE</Text>
-            <Text style={$.sub}>The camera detects blood flow through your fingertip to measure your heart rate</Text>
+            <Text style={$.sub}>Place your finger over the back camera. The flash lights up your fingertip and the camera detects your pulse.</Text>
             <Tap onPress={askPerm}><LinearGradient colors={['#7f1d1d', '#dc2626']} style={$.permBtn}><Text style={$.permBtnT}>ALLOW CAMERA</Text></LinearGradient></Tap>
         </View>
     );
@@ -191,14 +191,15 @@ export default function RPPGScreen({ navigation, route }) {
                             </View>
                         </View>
                         <Text style={$.instrTitle}>Measure your pulse</Text>
-                        <Text style={$.instrSub}>Cover both the camera and flash{'\n'}with your fingertip, then tap START</Text>
+                        <Text style={$.instrSub}>Place one fingertip flat on the back of{'\n'}your phone, covering the camera and flash{'\n'}at the same time. Tap START, then hold{'\n'}still for 10 seconds.</Text>
                         <View style={$.stepsRow}>
-                            <View style={$.step}><Text style={$.stepNum}>1</Text><Text style={$.stepText}>Cover lens{'\n'}+ flash</Text></View>
+                            <View style={$.step}><Text style={$.stepNum}>1</Text><Text style={$.stepText}>Tap{'\n'}START</Text></View>
                             <View style={$.stepLine} />
-                            <View style={$.step}><Text style={$.stepNum}>2</Text><Text style={$.stepText}>Press{'\n'}lightly</Text></View>
+                            <View style={$.step}><Text style={$.stepNum}>2</Text><Text style={$.stepText}>Place finger{'\n'}on camera</Text></View>
                             <View style={$.stepLine} />
-                            <View style={$.step}><Text style={$.stepNum}>3</Text><Text style={$.stepText}>Hold{'\n'}10 sec</Text></View>
+                            <View style={$.step}><Text style={$.stepNum}>3</Text><Text style={$.stepText}>Hold still{'\n'}10 sec</Text></View>
                         </View>
+                        <Text style={$.tip}>Your finger should glow red from the flash</Text>
                     </Fade>
                 ) : (
                     <Fade>
@@ -227,8 +228,9 @@ export default function RPPGScreen({ navigation, route }) {
                             </View>
                         </View>
 
-                        {quality === 'warmup' && <Text style={$.hint}>Hold still... warming up</Text>}
-                        {quality === 'poor' && <Text style={[$.hint, { color: '#f97316' }]}>Press finger firmly on camera</Text>}
+                        {quality === 'warmup' && <Text style={$.hint}>Keep your finger on the camera... warming up</Text>}
+                        {quality === 'poor' && <Text style={[$.hint, { color: '#f97316' }]}>Press your finger a bit more firmly — cover the whole lens</Text>}
+                        {quality === '' && scanning && samples < 5 && <Text style={$.hint}>Place your finger over the camera + flash now</Text>}
                     </Fade>
                 )}
 
@@ -272,7 +274,8 @@ const $ = StyleSheet.create({
     heartIcon: { fontSize: 36, color: '#ef4444' },
     instrTitle: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 10, fontFamily: CONDENSED, letterSpacing: 1 },
     instrSub: { fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 22, marginBottom: 32 },
-    stepsRow: { flexDirection: 'row', alignItems: 'center' },
+    tip: { fontSize: 12, color: '#ef4444', marginTop: 20, fontStyle: 'italic' },
+    stepsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
     step: { alignItems: 'center', width: 64 },
     stepNum: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#111', color: '#06b6d4', fontSize: 13, fontWeight: '800', textAlign: 'center', lineHeight: 28, overflow: 'hidden', marginBottom: 6 },
     stepText: { fontSize: 10, color: '#555', textAlign: 'center', lineHeight: 14 },
