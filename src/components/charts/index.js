@@ -73,15 +73,26 @@ export function Ring({ pct = 0, color = '#06b6d4', size = 120, stroke = 8, label
 }
 
 // ─── Sparkline ─────────────────────────────────────────────────────────────
+// Has a subtle gradient area fill by default so it reads as a data trail
+// rather than a flat stroke. Set `area={false}` for pure line mode.
 
-export function Sparkline({ data = [], color = '#06b6d4', width = 120, height = 32, stroke = 2 }) {
+export function Sparkline({ data = [], color = '#06b6d4', width = 120, height = 32, stroke = 2, area = true }) {
     if (!data.length) return <View style={{ width, height }} />;
     const [lo, hi] = niceRange(data);
     const step = data.length > 1 ? width / (data.length - 1) : 0;
     const points = data.map((v, i) => ({ x: i * step, y: height - ((v - lo) / (hi - lo || 1)) * height }));
     const d = smoothCubic(points);
+    const areaD = `${d} L ${width} ${height} L 0 ${height} Z`;
+    const gradId = `sl-${color.replace('#', '')}-${Math.round(width)}`;
     return (
         <Svg width={width} height={height}>
+            <Defs>
+                <LinearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                    <Stop offset="0" stopColor={color} stopOpacity="0.32" />
+                    <Stop offset="1" stopColor={color} stopOpacity="0.02" />
+                </LinearGradient>
+            </Defs>
+            {area && <Path d={areaD} fill={`url(#${gradId})`} />}
             <Path d={d} stroke={color} strokeWidth={stroke} fill="none" strokeLinecap="round" />
         </Svg>
     );
