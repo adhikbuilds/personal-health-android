@@ -5,12 +5,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Dimensions, ScrollView, Pressable, Animated , Platform } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
-import { Tap, Fade, ProgressRing, CONDENSED, MONO } from '../ui';
+import { Tap, Fade } from '../ui';
 import { SPORTS as SPORTS_MAP, SPORT_RANGES, repTransition } from '../config/sports';
+import { C, T } from '../styles/colors';
+import { SysBar, Panel, Header, HdrMeta, FieldRow, Triad, TerminalScreen, Footer, useLiveClock, fmt, fmtInt } from '../components/terminal';
+
+const CONDENSED = T.MONO;
+const MONO = T.MONO;
 
 const { width: W } = Dimensions.get('window');
 
@@ -260,65 +264,63 @@ export default function TrainScreen({ showToast, navigation, route }) {
     }
     if (!permission.granted) {
         return (
-            <View style={[s.root, { paddingTop: ins.top, paddingBottom: ins.bottom, alignItems: 'center', justifyContent: 'center', padding: 24 }]}>
-                <Text style={{ fontSize: 13, color: '#4b5563', letterSpacing: 3, fontWeight: '800', marginBottom: 16 }}>CAMERA ACCESS</Text>
-                <Text style={s.title}>PERMISSION REQUIRED</Text>
-                <Text style={[s.subtitle, { textAlign: 'center', marginBottom: 24, marginTop: 8 }]}>
-                    Camera access is needed to perform real-time biomechanics analysis.
-                </Text>
-                <Tap onPress={requestPermission}>
-                    <LinearGradient colors={['#0c4a6e','#0891b2','#06b6d4']} start={{x:0,y:0}} end={{x:1,y:1}} style={s.gradientBtn}>
-                        <Text style={s.gradientBtnText}>GRANT CAMERA ACCESS</Text>
-                    </LinearGradient>
-                </Tap>
-            </View>
+            <TerminalScreen style={{ paddingTop: ins.top }}>
+                <SysBar online={null} identity="TRAIN.CAM" />
+                <View style={{ padding: 16 }}>
+                    <Text style={s.setupPrompt}>{'> train --init'}</Text>
+                    <Text style={s.setupTitle}>CAMERA PERMISSION REQUIRED</Text>
+                    <Text style={s.setupSub}>POSE ANALYSIS REQUIRES REAR CAMERA ACCESS</Text>
+                </View>
+                <Pressable onPress={requestPermission} style={({ pressed }) => [s.setupCta, pressed && { backgroundColor: '#111' }]}>
+                    <Text style={s.setupCtaText}>[A] ALLOW CAMERA  ▸</Text>
+                </Pressable>
+            </TerminalScreen>
         );
     }
 
     // ── Session Summary Screen ───────────────────────────────────────────────────
 
     if (showSummary && summary) {
-        const qColor = Q_COLORS[summary.avgScore >= 90 ? 'elite' : summary.avgScore >= 75 ? 'good' : summary.avgScore >= 55 ? 'average' : 'poor'];
+        const qBand = summary.avgScore >= 90 ? 'elite' : summary.avgScore >= 75 ? 'good' : summary.avgScore >= 55 ? 'average' : 'poor';
+        const qCol = { elite: C.good, good: C.info, average: C.warn, poor: C.bad }[qBand];
         return (
-            <View style={[s.root, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
-                <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, paddingBottom: ins.bottom + 20 }} showsVerticalScrollIndicator={false}>
-                    <Fade>
-                        <Text style={s.summaryHeadline}>SESSION{'\n'}COMPLETE</Text>
-                    </Fade>
+            <TerminalScreen style={{ paddingTop: ins.top }}>
+                <SysBar online={true} identity="TRAIN.COMPLETE" />
+                <ScrollView contentContainerStyle={{ paddingBottom: ins.bottom + 20 }} showsVerticalScrollIndicator={false}>
+                    <View style={s.setupHero}>
+                        <Text style={s.setupPrompt}>{'> session --end'}</Text>
+                        <Text style={s.setupTitle}>SESSION COMPLETE</Text>
+                    </View>
 
-                    <Fade delay={100} style={{ alignItems: 'center', marginVertical: 32 }}>
-                        <View style={{ position: 'relative' }}>
-                            <ProgressRing pct={summary.avgScore} color={qColor} size={160} stroke={6} />
-                            <View style={s.ringInner}>
-                                <Text style={[s.ringScore, { color: qColor, fontFamily: CONDENSED }]}>{summary.avgScore}</Text>
-                                <Text style={s.ringLabel}>SCORE</Text>
+                    <Panel>
+                        <Header title="FORM SCORE" right={<HdrMeta color={qCol}>[{qBand.toUpperCase()}]</HdrMeta>} />
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 14 }}>
+                            <Text style={{ fontSize: 80, fontWeight: '700', fontFamily: MONO, color: qCol, letterSpacing: -4, lineHeight: 74 }}>
+                                {String(summary.avgScore).padStart(3, '0')}
+                            </Text>
+                            <View style={{ marginLeft: 12, marginBottom: 4 }}>
+                                <Text style={{ fontSize: 13, color: C.muted, fontFamily: MONO }}>/ 100</Text>
+                                <Text style={{ fontSize: 10, color: qCol, fontFamily: MONO, letterSpacing: 1, marginTop: 4, fontWeight: '700' }}>
+                                    PEAK {summary.peakScore}
+                                </Text>
                             </View>
                         </View>
-                    </Fade>
+                    </Panel>
 
-                    <Fade delay={200}>
-                        <View style={s.summaryStats}>
-                            <SummaryRow label="Peak Score" value={`${summary.peakScore}%`} color="#22c55e" />
-                            <View style={s.thinDivider} />
-                            <SummaryRow label="Peak Jump Height" value={summary.peakVj > 0 ? `${summary.peakVj.toFixed(1)} cm` : '--'} color="#f97316" />
-                            <View style={s.thinDivider} />
-                            <SummaryRow label="Reps Counted" value={String(summary.reps ?? 0)} color="#f97316" />
-                            <View style={s.thinDivider} />
-                            <SummaryRow label="Frames Analyzed" value={String(summary.frames)} color="#a78bfa" />
-                        </View>
+                    <Panel>
+                        <Header title="TELEMETRY" />
+                        <FieldRow label="PEAK.......... MAX FORM SCORE"       value={fmt(summary.peakScore, 0)} color={C.good} />
+                        <FieldRow label="JMP........... PEAK JUMP HEIGHT (CM)" value={summary.peakVj > 0 ? fmt(summary.peakVj, 1) : '--'} color={C.info} />
+                        <FieldRow label="REP........... REPS COUNTED"         value={fmtInt(summary.reps || 0)} color={C.warn} />
+                        <FieldRow label="FRM........... FRAMES ANALYSED"      value={fmtInt(summary.frames || 0)} color={C.text} />
+                        <FieldRow label="XP............ BPI REWARD"           value={'+' + fmtInt(summary.xpEarned || 0)} color={C.good} />
+                    </Panel>
 
-                        <Text style={s.xpText}>+{summary.xpEarned} XP EARNED</Text>
-                    </Fade>
-
-                    <Fade delay={300}>
-                        <Tap onPress={completeSummary}>
-                            <LinearGradient colors={['#0c4a6e','#0891b2','#06b6d4']} start={{x:0,y:0}} end={{x:1,y:1}} style={s.gradientBtn}>
-                                <Text style={s.gradientBtnText}>SAVE</Text>
-                            </LinearGradient>
-                        </Tap>
-                    </Fade>
+                    <Pressable onPress={completeSummary} style={({ pressed }) => [s.setupCta, pressed && { backgroundColor: '#111' }]}>
+                        <Text style={s.setupCtaText}>[SAVE] COMMIT TO BIO-PASSPORT  ▸</Text>
+                    </Pressable>
                 </ScrollView>
-            </View>
+            </TerminalScreen>
         );
     }
 
@@ -327,58 +329,50 @@ export default function TrainScreen({ showToast, navigation, route }) {
     if (!isActive) {
         const sportLabel = SPORTS.find(sp => sp.key === sport)?.label || 'VERTICAL JUMP';
         return (
-            <View style={[s.root, { paddingTop: ins.top }]}>
+            <TerminalScreen style={{ paddingTop: ins.top }}>
+                <SysBar online={null} identity={`TRAIN.${String(sport).toUpperCase().replace('_', '-')}`} />
                 <ScrollView contentContainerStyle={{ paddingBottom: ins.bottom + 40 }} showsVerticalScrollIndicator={false}>
 
-                    {/* Hero section — the sport is the visual focus */}
-                    <Fade style={s.setupHero}>
-                        <Text style={s.setupEyebrow}>ACTIVEBHARAT</Text>
+                    <View style={s.setupHero}>
+                        <Text style={s.setupPrompt}>{'> train --sport='}{sport}</Text>
                         <Text style={s.setupTitle}>{sportLabel}</Text>
-                        <Text style={s.setupSub}>AI-powered biomechanics session</Text>
-                    </Fade>
+                        <Text style={s.setupSub}>AI BIOMECHANICS SESSION · POSE→FORM SCORE</Text>
+                    </View>
 
-                    {/* Sport selector — horizontal tabs */}
-                    <Fade delay={80}>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sportScroll}>
+                    <Panel>
+                        <Header title="SPORT SELECT" />
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 8 }}>
                             {SPORTS.map((sp) => (
-                                <Tap key={sp.key} onPress={() => setSport(sp.key)} style={[s.sportItem, sport === sp.key && s.sportPill]} haptic={true}>
-                                    <Text style={[s.sportTab, sport === sp.key && s.sportTabActive]}>{sp.label}</Text>
-                                    {sport === sp.key && <View style={s.sportUnderline} />}
-                                </Tap>
+                                <Pressable
+                                    key={sp.key}
+                                    onPress={() => setSport(sp.key)}
+                                    style={({ pressed }) => [
+                                        s.sportChip,
+                                        sport === sp.key && { borderColor: C.text, backgroundColor: '#0a0a0a' },
+                                        pressed && { backgroundColor: '#111' },
+                                    ]}
+                                >
+                                    <Text style={[s.sportChipText, sport === sp.key && { color: C.text }]}>
+                                        [{sp.label}]
+                                    </Text>
+                                </Pressable>
                             ))}
                         </ScrollView>
-                    </Fade>
+                    </Panel>
 
-                    {/* CTA — dominant, full bleed gradient */}
-                    <Fade delay={160}>
-                        <Animated.View style={{ transform: [{ scale: ctaBounce }] }}>
-                            <Tap onPress={startSession}>
-                                <LinearGradient colors={['#0c4a6e','#0891b2','#06b6d4']} start={{x:0,y:0}} end={{x:1,y:1}} style={s.setupCta}>
-                                    <Text style={s.setupCtaLabel}>TAP TO BEGIN</Text>
-                                    <Text style={s.setupCtaTitle}>START{'\n'}SESSION</Text>
-                                    <View style={s.setupCtaCircle}><Text style={s.setupCtaGo}>GO</Text></View>
-                                </LinearGradient>
-                            </Tap>
-                        </Animated.View>
-                    </Fade>
+                    <Panel>
+                        <Header title="PRE-FLIGHT CHECK" />
+                        <FieldRow label="L1............ LIGHTING"      value="▸ WINDOW FACING"    color={C.textSub} size="sm" />
+                        <FieldRow label="L2............ FRAMING"       value="▸ FULL BODY"        color={C.textSub} size="sm" />
+                        <FieldRow label="L3............ CAMERA HEIGHT" value="▸ WAIST · 2M AWAY"  color={C.textSub} size="sm" />
+                        <FieldRow label="L4............ CLOTHING"      value="▸ FITTED"           color={C.textSub} size="sm" />
+                    </Panel>
 
-                    {/* Tips — minimal, tucked at bottom */}
-                    <Fade delay={240} style={s.tipsSection}>
-                        <Text style={s.sectionLabel}>SETUP TIPS</Text>
-                        {[
-                            'Good lighting — face a window',
-                            'Full body in frame — head to feet',
-                            'Phone at waist height, 2m away',
-                            'Fitted clothes for best tracking',
-                        ].map((item) => (
-                            <View key={item} style={s.tipRow}>
-                                <View style={s.tipDot} />
-                                <Text style={s.tipText}>{item}</Text>
-                            </View>
-                        ))}
-                    </Fade>
+                    <Pressable onPress={startSession} style={({ pressed }) => [s.setupCta, pressed && { backgroundColor: '#111' }]}>
+                        <Text style={s.setupCtaText}>[SPACE] START SESSION  ▸</Text>
+                    </Pressable>
                 </ScrollView>
-            </View>
+            </TerminalScreen>
         );
     }
 
@@ -391,17 +385,18 @@ export default function TrainScreen({ showToast, navigation, route }) {
         : metrics;
     const staleMetrics = analysisMode === 'error' && !metrics && lastGoodMetricsRef.current;
 
-    const qColor = displayMetrics ? (Q_COLORS[displayMetrics.form_quality] || '#06b6d4') : '#06b6d4';
-    const modeLabel = analysisMode === 'real' ? 'REAL AI'
-        : analysisMode === 'no_pose' ? 'NO POSE'
-        : analysisMode === 'waiting' ? 'ANALYZING...'
-        : analysisMode === 'error' ? (staleMetrics ? 'OFFLINE · LAST SEEN' : 'CONNECTION LOST')
-        : 'WAITING';
-    const modeColor = analysisMode === 'real' ? '#22c55e'
-        : analysisMode === 'no_pose' ? '#f97316'
-        : analysisMode === 'waiting' ? '#06b6d4'
-        : analysisMode === 'error' ? '#ef4444'
-        : '#64748b';
+    const Q_TERM = { elite: C.good, good: C.info, average: C.warn, poor: C.bad };
+    const qColor = displayMetrics ? (Q_TERM[displayMetrics.form_quality] || C.text) : C.text;
+    const modeLabel = analysisMode === 'real' ? 'LIVE.AI'
+        : analysisMode === 'no_pose' ? 'NO.POSE'
+        : analysisMode === 'waiting' ? 'ANALYSING'
+        : analysisMode === 'error' ? (staleMetrics ? 'OFFLINE·STALE' : 'CONN.LOST')
+        : 'WAIT';
+    const modeColor = analysisMode === 'real' ? C.good
+        : analysisMode === 'no_pose' ? C.warn
+        : analysisMode === 'waiting' ? C.text
+        : analysisMode === 'error' ? C.bad
+        : C.textMid;
 
     return (
         <View style={s.cameraWrap}>
@@ -485,70 +480,61 @@ const s = StyleSheet.create({
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' },
     mutedText: { color: '#64748b', fontSize: 14 },
 
-    // Setup hero
-    setupHero: { alignItems: 'center', paddingTop: 40, paddingBottom: 32 },
-    setupEyebrow: { fontSize: 10, fontWeight: '800', color: '#4b5563', letterSpacing: 4, marginBottom: 16 },
-    setupTitle: { fontSize: 52, fontWeight: '900', color: '#fff', letterSpacing: -1, fontFamily: CONDENSED, textAlign: 'center' },
-    setupSub: { fontSize: 13, color: '#4b5563', fontWeight: '400', marginTop: 8 },
+    // Setup — terminal layout
+    setupHero: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+    setupPrompt: { fontSize: 11, color: C.textMid, fontFamily: MONO, fontWeight: '600' },
+    setupTitle: { fontSize: 26, fontWeight: '700', color: '#E8E8E8', fontFamily: MONO, letterSpacing: 1, marginTop: 8 },
+    setupSub: { fontSize: 10, color: C.textMid, fontFamily: MONO, marginTop: 6, letterSpacing: 1 },
 
-    // Sport tabs
-    sportScroll: { paddingHorizontal: 24, paddingBottom: 4, marginBottom: 24 },
-    sportItem: { marginRight: 24 },
-    sportPill: { backgroundColor: 'rgba(6,182,212,0.12)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, marginRight: 16 },
-    sportTab: { fontSize: 13, fontWeight: '700', color: '#4b5563', letterSpacing: 2, paddingBottom: 8 },
-    sportTabActive: { color: '#fff' },
-    sportUnderline: { height: 2, backgroundColor: '#06b6d4', borderRadius: 1 },
-
-    // Setup CTA
-    setupCta: { marginHorizontal: 20, borderRadius: 8, paddingVertical: 40, paddingHorizontal: 28, marginBottom: 36, position: 'relative',
-        ...Platform.select({ android: { elevation: 16 }, ios: { shadowColor: '#06b6d4', shadowOpacity: 0.35, shadowOffset: { width: 0, height: 14 }, shadowRadius: 28 } }),
+    sportChip: {
+        paddingHorizontal: 10, paddingVertical: 6, marginRight: 8,
+        borderWidth: 1, borderColor: C.border,
     },
-    setupCtaLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.35)', letterSpacing: 4, marginBottom: 8 },
-    setupCtaTitle: { fontSize: 48, fontWeight: '900', color: '#fff', lineHeight: 50, letterSpacing: -1, fontFamily: CONDENSED },
-    setupCtaCircle: { position: 'absolute', bottom: 28, right: 28, width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-    setupCtaGo: { fontSize: 16, fontWeight: '900', color: '#fff', letterSpacing: 1 },
+    sportChipText: { fontSize: 11, color: C.textMid, fontFamily: MONO, fontWeight: '700', letterSpacing: 1 },
 
-    // Tips
-    tipsSection: { paddingHorizontal: 24 },
-    sectionLabel: { fontSize: 11, fontWeight: '800', color: '#374151', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 14 },
-    tipRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-    tipDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#374151', marginRight: 12 },
-    tipText: { fontSize: 13, color: '#6b7280', fontWeight: '400', lineHeight: 18 },
+    setupCta: {
+        margin: 16, paddingVertical: 14, alignItems: 'center',
+        borderWidth: 1, borderColor: C.text,
+    },
+    setupCtaText: { color: C.text, fontFamily: MONO, fontSize: 13, fontWeight: '700', letterSpacing: 1.5 },
 
     // Gradient CTA (used in permission + summary)
     gradientBtn: { borderRadius: 6, paddingVertical: 18, alignItems: 'center', marginHorizontal: 20 },
     gradientBtnText: { color: '#fff', fontWeight: '900', fontSize: 14, letterSpacing: 3, fontFamily: CONDENSED },
 
-    // Camera view
+    // Camera view — terminal HUD overlays on live feed
     cameraWrap: { flex: 1, backgroundColor: '#000' },
-    camTopBar: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, zIndex: 10 },
-    recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#ef4444', marginRight: 8 },
-    recText: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
-    finishText: { color: '#ef4444', fontWeight: '900', fontSize: 13, letterSpacing: 2 },
+    camTopBar: {
+        position: 'absolute', left: 0, right: 0, flexDirection: 'row',
+        justifyContent: 'space-between', alignItems: 'center',
+        paddingHorizontal: 16, paddingVertical: 8, zIndex: 10,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        borderBottomWidth: 1, borderBottomColor: C.border,
+    },
+    recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.bad, marginRight: 8 },
+    recText: { color: C.bad, fontSize: 10, fontWeight: '700', letterSpacing: 1.5, fontFamily: MONO },
+    finishText: { color: C.bad, fontWeight: '700', fontSize: 11, letterSpacing: 1.5, fontFamily: MONO },
 
-    overlayMetrics: { position: 'absolute', left: 16, zIndex: 10 },
-    overlayMode: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-    overlayAngle: { color: '#06b6d4', fontSize: 11, fontWeight: '700', marginBottom: 4, fontFamily: MONO, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
+    overlayMetrics: { position: 'absolute', left: 12, zIndex: 10, padding: 8, backgroundColor: 'rgba(0,0,0,0.75)', borderWidth: 1, borderColor: C.border },
+    overlayMode: { fontSize: 10, fontWeight: '700', letterSpacing: 1, fontFamily: MONO },
+    overlayAngle: { color: C.text, fontSize: 10, fontWeight: '700', marginTop: 3, fontFamily: MONO, letterSpacing: 0.5 },
 
-    // Bottom HUD
-    camBottomHUD: { position: 'absolute', left: 16, right: 16, backgroundColor: 'rgba(0,0,0,0.85)', borderRadius: 16, overflow: 'hidden', zIndex: 10 },
+    // Bottom HUD — terminal panel over camera
+    camBottomHUD: {
+        position: 'absolute', left: 12, right: 12, zIndex: 10,
+        backgroundColor: 'rgba(0,0,0,0.88)', borderWidth: 1, borderColor: C.border,
+    },
     hudTopLine: { height: 2, width: '100%' },
-    hudContent: { flexDirection: 'row', alignItems: 'center', padding: 16 },
-    hudLabel: { fontSize: 9, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 },
-    hudFeedback: { color: '#f1f5f9', fontWeight: '700', fontSize: 15 },
-    hudStatLabel: { fontSize: 8, color: '#64748b', fontWeight: '700', letterSpacing: 2 },
-    hudStatNum: { fontSize: 22, fontWeight: '900' },
-    hudFormScore: { fontSize: 36, fontWeight: '900', fontFamily: CONDENSED },
+    hudContent: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
+    hudLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, marginBottom: 4, fontFamily: MONO },
+    hudFeedback: { color: '#E8E8E8', fontWeight: '600', fontSize: 11, fontFamily: MONO, letterSpacing: 0.3 },
+    hudStatLabel: { fontSize: 8, color: C.textMid, fontWeight: '700', letterSpacing: 1, fontFamily: MONO },
+    hudStatNum: { fontSize: 18, fontWeight: '700', fontFamily: MONO },
+    hudFormScore: { fontSize: 32, fontWeight: '700', fontFamily: MONO, letterSpacing: -1 },
 
-    // Summary
-    summaryHeadline: { fontSize: 40, fontWeight: '900', color: '#fff', letterSpacing: 2, fontFamily: CONDENSED, textAlign: 'center', lineHeight: 44 },
+    // Summary (remaining legacy)
+    summaryHeadline: { fontSize: 28, fontWeight: '700', color: '#E8E8E8', letterSpacing: 1, fontFamily: MONO, textAlign: 'center' },
     ringInner: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-    ringScore: { fontSize: 48, fontWeight: '900' },
-    ringLabel: { fontSize: 9, fontWeight: '700', color: '#4b5563', letterSpacing: 3, marginTop: -4 },
-    summaryStats: { marginBottom: 20 },
-    summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14 },
-    sumLabel: { fontSize: 13, color: '#6b7280', fontWeight: '400' },
-    sumVal: { fontSize: 20, fontWeight: '900', fontFamily: CONDENSED },
-    thinDivider: { height: 1, backgroundColor: '#1a1a1a' },
-    xpText: { fontSize: 18, fontWeight: '900', color: '#06b6d4', textAlign: 'center', letterSpacing: 2, marginBottom: 32, fontFamily: CONDENSED },
+    ringScore: { fontSize: 44, fontWeight: '700', fontFamily: MONO },
+    ringLabel: { fontSize: 9, fontWeight: '700', color: C.textMid, letterSpacing: 2, marginTop: -2 },
 });

@@ -1,146 +1,132 @@
-// ActiveBharat — Design Tokens
+// ActiveBharat — Design Tokens (Bloomberg Terminal direction)
 // -----------------------------------------------------------------------------
-// Guiding references: Linear (structure), Whoop (restraint), Strava (stat triad),
-// Apple Fitness (ring hierarchy), Arc Browser (depth without shadows).
-//
-// Rules:
-//   1. No gradient card backgrounds. Elevation comes from color steps.
-//   2. One accent (VOLT) per screen. Signal colors ONLY for state.
-//   3. Numbers use the MONO token (tabular nums, no jitter on update).
-//   4. 16pt corner radius, 1pt BORDER hairlines — no drop shadows on dark UI.
-//   5. No emoji next to labels. Typography + one accent colour carry meaning.
+// References: Bloomberg Terminal, IEX/trader terminals, Unix system monitors.
+// Full mono typography, amber + phosphor green on pure black, bracket syntax,
+// aligned numeric columns, ALL CAPS headers, time-stamped data. Utilitarian.
 
 export const C = {
-    // Surfaces — three discrete elevation steps, flat colour not shadows.
-    bg:        '#0B0D0F',   // base canvas (near-black, slightly cool)
-    bg2:       '#0F1217',
-    surf:      '#15181C',   // cards, elevated
-    surfHi:    '#1E2227',   // nested / inputs
-    surf2:     '#15181C',   // back-compat alias
-    card:      '#15181C',
-    cardHi:    '#1E2227',
+    // Canvas — dead black, phosphor screen.
+    bg:        '#000000',
+    page:      '#000000',
+    bg2:       '#060606',
+    surf:      '#0A0A0A',
+    surfHi:    '#111111',
+    card:      '#0A0A0A',
+    cardHi:    '#111111',
 
-    // Hairlines
-    border:    '#262B31',
-    border2:   '#353A42',
+    // Hairline grid lines
+    border:    '#1C1C1C',
+    border2:   '#2A2A2A',
 
-    // Text
-    text:      '#F5F7FA',   // hi
-    textSub:   '#C9D1DB',
-    textMid:   '#8A929C',
-    muted:     '#4A5058',   // lo / dividers with text
+    // Terminal text — amber primary (Bloomberg), green for positives.
+    text:      '#FFAA00',   // primary terminal amber
+    textSub:   '#E69900',   // dim amber
+    textMid:   '#997300',   // dimmer amber
+    muted:     '#5C4600',   // darkest amber (secondary labels)
 
-    // Accent — volt green, the single "brand" colour. Reserved for primary
-    // actions + the one hero highlight per screen.
-    accent:    '#C6FF3D',
-    accentDim: '#8CB82C',
+    // White text for cap headers + key numbers
+    white:     '#E8E8E8',
 
-    // Signal colours — meaning only. Never decorative.
-    good:      '#3DDC97',   // good biomech / form
-    warn:      '#FFB547',   // drift / watch
-    bad:       '#FF5A5F',   // injury risk / spike
-    info:      '#6B8AFE',   // neutral data viz
+    // Accent — treat cyan as the "command" colour (like Bloomberg's field indicators)
+    accent:    '#00E5FF',
+    accentDim: '#00B8D9',
 
-    // Legacy palette — kept so screens mid-migration don't break. New code
-    // should prefer the named tokens above.
-    cyan:      '#06B6D4',
-    orange:    '#F97316',
-    green:     '#22C55E',
-    yellow:    '#FACC15',
-    purple:    '#8B5CF6',
-    red:       '#EF4444',
-    indigo:    '#6366F1',
-    pink:      '#EC4899',
-    teal:      '#14B8A6',
-    amber:     '#F59E0B',
-    rose:      '#F43F5E',
-    violet:    '#A855F7',
+    // Signal colours — trader semantics.
+    good:      '#00E676',   // up / in range (phosphor green)
+    warn:      '#FFB300',   // warning amber
+    bad:       '#FF3B30',   // down / out of range (red)
+    info:      '#00E5FF',   // neutral info (cyan)
+
+    // Back-compat (so other screens don't explode)
+    cyan:      '#00E5FF',
+    orange:    '#FFB300',
+    green:     '#00E676',
+    yellow:    '#FFD600',
+    purple:    '#E040FB',
+    red:       '#FF3B30',
+    indigo:    '#536DFE',
+    pink:      '#FF4081',
+    teal:      '#1DE9B6',
+    amber:     '#FFAA00',
+    rose:      '#FF3B30',
+    violet:    '#E040FB',
 };
 
-// Training-zone colours — used on HR and training-load surfaces only.
 export const ZONES = {
-    recovery:  '#38BDF8',
-    endurance: '#3DDC97',
-    tempo:     '#FACC15',
-    threshold: '#F97316',
-    anaerobic: '#FF5A5F',
+    recovery:  '#00B8D9',
+    endurance: '#00E676',
+    tempo:     '#FFD600',
+    threshold: '#FFB300',
+    anaerobic: '#FF3B30',
 };
 
-// Fitness level band colours (L1 → L7). Kept for legacy screens; new code
-// should pick from the signal colours above when possible.
 export const LEVEL_COLORS = {
-    1: '#FF5A5F',
-    2: '#F97316',
-    3: '#EAB308',
-    4: '#84CC16',
-    5: '#3DDC97',
-    6: '#06B6D4',
-    7: '#A855F7',
+    1: '#FF3B30',
+    2: '#FFB300',
+    3: '#FFD600',
+    4: '#C6FF00',
+    5: '#00E676',
+    6: '#00E5FF',
+    7: '#E040FB',
 };
 
 export const LEVEL_LABELS = {
-    1: 'Work Harder',
-    2: 'Must Improve',
-    3: 'Can do better',
-    4: 'Good',
-    5: 'Very Good',
-    6: 'Athletic',
-    7: 'Excellent',
+    1: 'WORK HARDER',
+    2: 'MUST IMPROVE',
+    3: 'CAN DO BETTER',
+    4: 'GOOD',
+    5: 'VERY GOOD',
+    6: 'ATHLETIC',
+    7: 'EXCELLENT',
 };
 
-// Minimal gradient set — only ever used INSIDE a chart's fill area or the
-// single hero arc stroke per screen. Never on card backgrounds.
 export const GRADIENTS = {
-    volt:   ['#C6FF3D', '#8CB82C'],
-    signal: ['#3DDC97', '#06B6D4'],
-    warn:   ['#FFB547', '#F97316'],
-    bad:    ['#FF5A5F', '#EF4444'],
-    // Back-compat
-    cyan:   ['#06B6D4', '#3B82F6'],
-    sunset: ['#F97316', '#EC4899'],
-    forest: ['#22C55E', '#14B8A6'],
-    amber:  ['#FACC15', '#F97316'],
-    violet: ['#8B5CF6', '#EC4899'],
-    rose:   ['#F43F5E', '#8B5CF6'],
-    ocean:  ['#0EA5E9', '#6366F1'],
-    gold:   ['#FBBF24', '#F59E0B'],
-    lime:   ['#84CC16', '#22C55E'],
-    flame:  ['#EF4444', '#F97316'],
+    terminal: ['#FFAA00', '#FFD600'],
+    phosphor: ['#00E676', '#00E5FF'],
+    alert:    ['#FFB300', '#FF3B30'],
+    // back-compat
+    cyan:   ['#00E5FF', '#00B8D9'],
+    forest: ['#00E676', '#00B8D9'],
+    amber:  ['#FFD600', '#FFB300'],
+    violet: ['#E040FB', '#00E5FF'],
+    ocean:  ['#00E5FF', '#536DFE'],
+    gold:   ['#FFD600', '#FFAA00'],
+    lime:   ['#C6FF00', '#00E676'],
+    flame:  ['#FF3B30', '#FFB300'],
+    volt:   ['#C6FF00', '#00E676'],
+    signal: ['#00E676', '#00E5FF'],
+    rose:   ['#FF3B30', '#E040FB'],
+    bad:    ['#FF3B30', '#FFB300'],
+    sunset: ['#FFB300', '#FF3B30'],
 };
 
-// Typography tokens — import {T} and pass T.display / T.h1 / T.stat / T.label
-// so every screen shares the same scale. Numbers use the mono family for
-// tabular stability (no horizontal jitter when a digit rolls over).
 import { Platform } from 'react-native';
 
+// Everything is mono. That's the whole point.
 const MONO = Platform.OS === 'android' ? 'monospace' : 'Menlo';
-const DISPLAY = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
+const DISPLAY = MONO;
+const UI = MONO;
 
 export const T = {
-    // Hero score only — one per screen.
-    display: { fontSize: 72, fontWeight: '300', letterSpacing: -1, fontFamily: DISPLAY, color: C.text },
+    // "Display" here is still mono — it's big but not heavy.
+    display: { fontSize: 56, fontWeight: '600', fontFamily: MONO, letterSpacing: -1, color: '#E8E8E8' },
 
-    // Screen titles.
-    h1:    { fontSize: 32, fontWeight: '700', letterSpacing: -0.5, color: C.text },
+    h1: { fontSize: 20, fontWeight: '700', fontFamily: MONO, letterSpacing: 1, color: '#E8E8E8', textTransform: 'uppercase' },
+    h2: { fontSize: 14, fontWeight: '700', fontFamily: MONO, letterSpacing: 1, color: '#E8E8E8', textTransform: 'uppercase' },
+    h3: { fontSize: 12, fontWeight: '700', fontFamily: MONO, letterSpacing: 1, color: C.text, textTransform: 'uppercase' },
 
-    // Card titles.
-    h2:    { fontSize: 22, fontWeight: '700', letterSpacing: -0.2, color: C.text },
+    // Numeric
+    stat:   { fontSize: 18, fontWeight: '600', fontFamily: MONO, color: '#E8E8E8' },
+    statXL: { fontSize: 36, fontWeight: '700', fontFamily: MONO, letterSpacing: -1, color: '#E8E8E8' },
+    statSm: { fontSize: 13, fontWeight: '600', fontFamily: MONO, color: '#E8E8E8' },
 
-    // Tabular numbers.
-    stat:  { fontSize: 28, fontWeight: '600', fontFamily: MONO, letterSpacing: 0, color: C.text },
-    statXL: { fontSize: 44, fontWeight: '700', fontFamily: MONO, letterSpacing: -0.5, color: C.text },
-    statSm: { fontSize: 18, fontWeight: '600', fontFamily: MONO, color: C.text },
+    body:    { fontSize: 12, fontWeight: '400', fontFamily: MONO, color: C.textSub, lineHeight: 18 },
+    caption: { fontSize: 10, fontWeight: '400', fontFamily: MONO, color: C.textMid },
 
-    // Body / captions.
-    body:     { fontSize: 15, fontWeight: '400', color: C.textSub, lineHeight: 22 },
-    caption:  { fontSize: 12, fontWeight: '400', color: C.textMid },
+    label:   { fontSize: 10, fontWeight: '700', fontFamily: MONO, color: C.textMid, letterSpacing: 1, textTransform: 'uppercase' },
+    micro:   { fontSize: 9,  fontWeight: '700', fontFamily: MONO, color: C.textMid, letterSpacing: 0.8, textTransform: 'uppercase' },
 
-    // Labels — UPPERCASE with letter spacing. Use UPPER wrapper when rendering.
-    label:    { fontSize: 11, fontWeight: '600', letterSpacing: 1.5, color: C.textMid, textTransform: 'uppercase' },
-    micro:    { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, color: C.textMid, textTransform: 'uppercase' },
-
-    // Back-compat aliases.
-    MONO, DISPLAY,
+    MONO, DISPLAY, UI,
 };
 
 export default C;

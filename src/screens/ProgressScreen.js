@@ -1,164 +1,76 @@
-// ProgressScreen — Nike-inspired. Pure black canvas. Bold typography IS the design.
-// No cards. No borders. No containers. Content floats on black.
+// ProgressScreen — Bloomberg terminal.
+// Dense tables of athlete telemetry. No cards, no gradients, no emoji. Every
+// row is label-left / mono-right. Charts are sparklines and mono bar tables.
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     View, Text, ScrollView, StyleSheet,
-    Dimensions, Platform, ActivityIndicator, StatusBar, RefreshControl,
+    Dimensions, StatusBar, ActivityIndicator, RefreshControl, Pressable,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Polyline, Circle, Line, Text as SvgText, Defs, LinearGradient as SvgGrad, Stop } from 'react-native-svg';
+
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
-import { Tap, Fade } from '../ui';
-import { Ring, Bar as ChartBar, Radar, Gauge, Heatmap, Sparkline, MultiLine } from '../components/charts';
-import { Card, SectionHead, StatTriad, Chip } from '../components/primitives';
+import { Fade } from '../ui';
+import { Sparkline, Heatmap, Bar as ChartBar, Radar, Gauge } from '../components/charts';
 import { C, T } from '../styles/colors';
+import { sportLabel } from '../config/sports';
+import {
+    Panel, Header, HdrMeta, Rule, FieldRow, Triad, SysBar, Ticker, DistBar,
+    TerminalScreen, Footer, useLiveClock,
+    fmt, fmtInt, signPct, signVal, trendColor, bandColor, nowISO,
+} from '../components/terminal';
 
 const { width: W } = Dimensions.get('window');
-const FONT_CONDENSED = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
 
 const PERIODS = [
-    { label: '7D', days: 7 },
+    { label: '7D',  days: 7 },
     { label: '30D', days: 30 },
     { label: '90D', days: 90 },
 ];
 
-const RISK_COLORS = { low: '#22c55e', watch: '#f97316', high: '#ef4444' };
-
-// ── Progress ring ───────────────────────────────────────────────────────────
-
-function ProgressRing({ pct, color, size = 140, stroke = 6 }) {
-    const r = (size - stroke) / 2;
-    const c = 2 * Math.PI * r;
-    return (
-        <Svg width={size} height={size}>
-            <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.06)" fill="none" strokeWidth={stroke} />
-            <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
-                strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(1, (pct || 0) / 100))}
-                strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`} />
-        </Svg>
-    );
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
 function scoreColor(v) {
-    if (v >= 75) return '#22c55e';
-    if (v >= 50) return '#f97316';
-    return '#ef4444';
+    if (v >= 75) return C.good;
+    if (v >= 50) return C.warn;
+    return C.bad;
 }
-
-function titleCase(s) {
-    return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
-function fmtDate(d) {
-    const dt = new Date(d);
-    return `${dt.getDate()}/${dt.getMonth() + 1}`;
-}
-
-// ── SVG Form Trend Chart (on pure black) ────────────────────────────────────
-
-function FormTrendChart({ data, trendPct }) {
-    if (!data || data.length < 2) return null;
-
-    const chartW = W - 48;
-    const chartH = 160;
-    const padT = 16;
-    const padB = 24;
-    const padL = 32;
-    const padR = 8;
-    const innerW = chartW - padL - padR;
-    const innerH = chartH - padT - padB;
-
-    const pts = data.map((d, i) => {
-        const x = padL + (i / (data.length - 1)) * innerW;
-        const y = padT + innerH - ((d.score / 100) * innerH);
-        return { x, y, score: d.score, date: d.date };
-    });
-
-    const polyStr = pts.map(p => `${p.x},${p.y}`).join(' ');
-    const areaStr = `${pts[0].x},${padT + innerH} ${polyStr} ${pts[pts.length - 1].x},${padT + innerH}`;
-    const yLines = [0, 25, 50, 75, 100];
-
-    return (
-        <View style={{ marginBottom: 32 }}>
-            <Svg width={chartW} height={chartH}>
-                <Defs>
-                    <SvgGrad id="areaFill" x1="0" y1="0" x2="0" y2="1">
-                        <Stop offset="0" stopColor="#06b6d4" stopOpacity="0.15" />
-                        <Stop offset="1" stopColor="#06b6d4" stopOpacity="0.01" />
-                    </SvgGrad>
-                </Defs>
-
-                {yLines.map(v => {
-                    const y = padT + innerH - ((v / 100) * innerH);
-                    return (
-                        <React.Fragment key={v}>
-                            <Line x1={padL} y1={y} x2={padL + innerW} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
-                            <SvgText x={padL - 6} y={y + 4} fontSize={9} fill="#4b5563" textAnchor="end" fontWeight="700">{v}</SvgText>
-                        </React.Fragment>
-                    );
-                })}
-
-                <Polyline points={areaStr} fill="url(#areaFill)" stroke="none" />
-                <Polyline points={polyStr} fill="none" stroke="#06b6d4" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-
-                {pts.map((p, i) => (
-                    <Circle key={i} cx={p.x} cy={p.y} r={3.5} fill="#06b6d4" stroke="#000" strokeWidth={2} />
-                ))}
-
-                {[0, Math.floor(data.length / 2), data.length - 1].map(idx => (
-                    <SvgText key={idx} x={pts[idx].x} y={chartH - 4} fontSize={8} fill="#4b5563" textAnchor="middle" fontWeight="700">
-                        {fmtDate(data[idx].date)}
-                    </SvgText>
-                ))}
-            </Svg>
-        </View>
-    );
-}
-
-// ── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProgressScreen() {
     const ins = useSafeAreaInsets();
     const { userData } = useUser();
     const athleteId = userData?.avatarId || 'athlete_01';
+    const userTag = (userData?.avatarId || 'ath').toUpperCase();
+    const sportTag = (userData?.sport || 'general').toUpperCase().replace('_', '-');
+    const clock = useLiveClock();
 
     const [days, setDays] = useState(30);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [online, setOnline] = useState(null);
 
     const [progress, setProgress] = useState(null);
     const [weakJoints, setWeakJoints] = useState(null);
     const [injuryRisk, setInjuryRisk] = useState(null);
     const [readiness, setReadiness] = useState(null);
-    const [summary, setSummary] = useState(null);
     const [advanced, setAdvanced] = useState(null);
 
     const load = useCallback(async () => {
         setLoading(true);
-        setError(false);
         try {
-            const [prog, wj, ir, rd, ws, adv] = await Promise.all([
+            const [prog, wj, ir, rd, adv, ping] = await Promise.all([
                 api.getProgress(athleteId, days),
                 api.getWeakJoints(athleteId, days),
                 api.getInjuryRisk(athleteId, Math.min(days, 14)),
                 api.getReadiness(athleteId, Math.min(days, 14)),
-                api.getWeeklySummary(athleteId, Math.min(days, 7)),
                 api.getAdvancedMetrics(athleteId, days),
+                api.ping(),
             ]);
             setProgress(prog);
             setWeakJoints(wj);
             setInjuryRisk(ir);
             setReadiness(rd);
-            setSummary(ws);
             setAdvanced(adv);
-        } catch (e) {
-            setError(true);
+            setOnline(!!ping);
         } finally {
             setLoading(false);
         }
@@ -171,445 +83,316 @@ export default function ProgressScreen() {
         load().finally(() => setRefreshing(false));
     }, [load]);
 
-    // ── Loading ─────────────────────────────────────────────────────────
-    if (loading) {
+    // Loading
+    if (loading && !progress) {
         return (
-            <View style={[$.root, { paddingTop: ins.top }]}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" />
-                <View style={$.center}>
-                    <ActivityIndicator size="large" color="#06b6d4" />
-                    <Text style={$.loadingText}>LOADING</Text>
+            <TerminalScreen style={{ paddingTop: ins.top }}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <SysBar online={online} identity={`${userTag}.${sportTag}`} clock={clock} />
+                <View style={s.center}>
+                    <ActivityIndicator size="small" color={C.text} />
+                    <Text style={s.loadingText}>LOADING TELEMETRY.....</Text>
                 </View>
-            </View>
+            </TerminalScreen>
         );
     }
 
-    // ── Error ───────────────────────────────────────────────────────────
-    if (error) {
-        return (
-            <View style={[$.root, { paddingTop: ins.top }]}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" />
-                <View style={$.center}>
-                    <Text style={$.errorText}>COULD NOT LOAD DATA</Text>
-                    <Tap onPress={load} style={$.retryRow}>
-                        <Text style={$.retryText}>RETRY</Text>
-                        <Text style={$.retryArrow}>›</Text>
-                    </Tap>
-                </View>
-            </View>
-        );
-    }
-
-    // ── Empty ───────────────────────────────────────────────────────────
-    const hasData = progress?.session_count > 0;
-    if (!hasData) {
-        return (
-            <View style={[$.root, { paddingTop: ins.top }]}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" />
-                <View style={$.center}>
-                    <Text style={$.emptyTitle}>COMPLETE YOUR{'\n'}FIRST SESSION</Text>
-                    <Text style={$.emptySubtext}>Progress data will appear here</Text>
-                </View>
-            </View>
-        );
-    }
-
-    // ── Data ────────────────────────────────────────────────────────────
-    const avgScore = progress?.avg_form_score ?? 0;
-    const bestJump = progress?.best_jump_cm ?? 0;
-    const sessions = progress?.session_count ?? 0;
-    const bpiDelta = progress?.bpi_delta ?? 0;
-    const trendPct = progress?.form_trend_pct ?? 0;
-    const trendUp = trendPct >= 0;
-    const currentScore = progress?.form_score_trend?.length
-        ? progress.form_score_trend[progress.form_score_trend.length - 1].score
-        : avgScore;
-
-    const riskData = injuryRisk;
-    const riskColor = RISK_COLORS[riskData?.risk] || '#4b5563';
-
-    const rd = readiness;
-    const rdColor = rd ? (rd.score >= 65 ? '#22c55e' : rd.score >= 45 ? '#f97316' : '#ef4444') : '#4b5563';
+    const tickerItems = [
+        { label: 'FITSCR',  value: String(progress?.avg_form_score || 0).padStart(3, '0'), delta: progress?.form_trend_pct || 0 },
+        { label: 'RDY',     value: String(Math.round(readiness?.score || 0)).padStart(3, '0'), color: bandColor(readiness?.band) },
+        { label: 'RISK',    value: (injuryRisk?.band || '--').toUpperCase(), color: bandColor(injuryRisk?.band) },
+        { label: 'REPS',    value: fmtInt(progress?.total_reps || 0) },
+        { label: 'JUMP',    value: fmt(progress?.best_jump_cm || 0, 1) + 'CM', color: C.info },
+        { label: 'ACWR',    value: fmt(advanced?.acwr?.acwr || 0, 2), color: bandColor(advanced?.acwr?.band) },
+    ];
 
     return (
-        <View style={[$.root, { paddingTop: ins.top }]}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" />
-            <ScrollView showsVerticalScrollIndicator={false}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333" progressBackgroundColor="#000" colors={['#06b6d4']} />}
+        <TerminalScreen style={{ paddingTop: ins.top }}>
+            <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+
+            <SysBar online={online} identity={`${userTag}.${sportTag}.PROG`} clock={clock} />
+            <Ticker items={tickerItems} />
+
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text} colors={[C.text]} progressBackgroundColor="#000" />}
             >
 
-                {/* ═══ Header + Period Tabs ═══ */}
-                <Fade style={$.topBar}>
-                    <Text style={$.brand}>PROGRESS</Text>
-                    <View style={$.periodRow}>
+                {/* Identity / range selector */}
+                <Fade style={s.identity}>
+                    <Text style={s.prompt}>{'> progress --athlete='}<Text style={{ color: C.text }}>{userTag}</Text></Text>
+                    <View style={s.rangeRow}>
+                        <Text style={s.rangeLabel}>RANGE:</Text>
                         {PERIODS.map(p => (
-                            <Tap key={p.days} onPress={() => setDays(p.days)}>
-                                <View style={$.periodTab}>
-                                    <Text style={[$.periodText, days === p.days && $.periodTextActive]}>{p.label}</Text>
-                                    {days === p.days && <View style={$.periodUnderline} />}
-                                </View>
-                            </Tap>
+                            <Pressable key={p.label} onPress={() => setDays(p.days)} style={({ pressed }) => [s.rangeBtn, pressed && { backgroundColor: '#111' }]}>
+                                <Text style={[s.rangeText, days === p.days && { color: C.text }]}>[{p.label}]</Text>
+                            </Pressable>
                         ))}
                     </View>
                 </Fade>
 
-                {/* ═══ Form Trend Hero ═══ */}
-                <Fade delay={100} style={$.heroSection}>
-                    <Text style={$.sectionLabel}>FORM SCORE</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-                        <Text style={[$.heroNumber, { color: '#06b6d4' }]}>{currentScore.toFixed(0)}</Text>
-                        <Text style={[$.trendArrow, { color: trendUp ? '#22c55e' : '#ef4444' }]}>
-                            {trendUp ? '\u25B2' : '\u25BC'} {Math.abs(trendPct).toFixed(1)}%
-                        </Text>
-                    </View>
-                </Fade>
-
-                {/* ═══ SVG Chart ═══ */}
-                <Fade delay={200} style={{ paddingHorizontal: 24 }}>
-                    <FormTrendChart data={progress?.form_score_trend} trendPct={trendPct} />
-                </Fade>
-
-                {/* ═══ Stats Row ═══ */}
-                <Fade delay={300} style={$.statsSection}>
-                    <Text style={$.sectionLabel}>STATS</Text>
-                    <View style={$.statsRow}>
-                        <View style={$.statItem}>
-                            <Text style={[$.statNumber, { color: '#06b6d4' }]}>{avgScore.toFixed(1)}</Text>
-                            <Text style={$.statLabel}>AVG SCORE</Text>
-                        </View>
-                        <View style={$.statDivider} />
-                        <View style={$.statItem}>
-                            <Text style={[$.statNumber, { color: '#f97316' }]}>{bestJump.toFixed(1)}</Text>
-                            <Text style={$.statLabel}>BEST JUMP</Text>
-                        </View>
-                        <View style={$.statDivider} />
-                        <View style={$.statItem}>
-                            <Text style={[$.statNumber, { color: '#22c55e' }]}>{sessions}</Text>
-                            <Text style={$.statLabel}>SESSIONS</Text>
-                        </View>
-                        <View style={$.statDivider} />
-                        <View style={$.statItem}>
-                            <Text style={[$.statNumber, { color: bpiDelta >= 0 ? '#22c55e' : '#ef4444' }]}>
-                                {bpiDelta >= 0 ? '+' : ''}{bpiDelta}
-                            </Text>
-                            <Text style={$.statLabel}>BPI DELTA</Text>
-                        </View>
-                    </View>
-                </Fade>
-
-                {/* ═══ Weak Points ═══ */}
-                {weakJoints?.weak_joints?.length > 0 && (
-                    <Fade delay={400} style={$.section}>
-                        <Text style={$.sectionLabel}>WEAK POINTS</Text>
-                        {weakJoints.weak_joints.slice(0, 4).map((j, i) => {
-                            const outOfRange = j.mean_deg < j.ideal_min || j.mean_deg > j.ideal_max;
-                            const dotColor = outOfRange ? '#f97316' : '#22c55e';
-                            return (
-                                <React.Fragment key={i}>
-                                    <View style={$.jointRow}>
-                                        <Text style={$.jointName}>{titleCase(j.joint)}</Text>
-                                        <Text style={[$.jointDev, { color: dotColor }]}>{j.deviation_deg.toFixed(1)}deg</Text>
-                                    </View>
-                                    {i < weakJoints.weak_joints.length - 1 && (
-                                        <LinearGradient colors={['transparent', '#06b6d4', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1, opacity: 0.2 }} />
-                                    )}
-                                </React.Fragment>
-                            );
-                        })}
-                    </Fade>
-                )}
-
-                {/* ═══ Injury Risk ═══ */}
-                {riskData && (
-                    <Fade delay={500} style={$.section}>
-                        <Text style={$.sectionLabel}>INJURY RISK</Text>
-                        <View style={$.riskRow}>
-                            <View style={[$.riskDot, { backgroundColor: riskColor }]} />
-                            <Text style={[$.riskBand, { color: riskColor }]}>{(riskData.risk || '').toUpperCase()}</Text>
-                            <Text style={$.riskPct}>{riskData.deviation_pct}%</Text>
-                        </View>
-                        {riskData.reason ? (
-                            <Text style={$.riskReason}>{riskData.reason}</Text>
-                        ) : null}
-                        {riskData.mean_symmetry != null && (
-                            <View style={$.riskSymRow}>
-                                <Text style={$.riskSymLabel}>SYMMETRY</Text>
-                                <Text style={$.riskSymValue}>{(riskData.mean_symmetry * 100).toFixed(1)}%</Text>
-                            </View>
-                        )}
-                    </Fade>
-                )}
-
-                {/* ═══ AI Coaching ═══ */}
-                {summary?.coaching_note?.bullets?.length > 0 && (
-                    <Fade delay={600} style={$.section}>
-                        <Text style={[$.sectionLabel, { color: '#06b6d4' }]}>AI COACHING</Text>
-                        {summary.coaching_note.bullets.slice(0, 4).map((b, i) => (
-                            <View key={i} style={$.bulletRow}>
-                                <View style={$.bulletDot} />
-                                <Text style={$.bulletText}>{b}</Text>
-                            </View>
-                        ))}
-                    </Fade>
-                )}
-
-                {/* ═══ Competition Readiness ═══ */}
-                {rd && (
-                    <Fade delay={700} style={$.readinessSection}>
-                        <Text style={$.sectionLabel}>COMPETITION READINESS</Text>
-                        <View style={$.readinessHero}>
-                            <View style={$.ringContainer}>
-                                <ProgressRing pct={rd.score} color={rdColor} size={120} stroke={6} />
-                                <View style={$.ringInner}>
-                                    <Text style={[$.readinessNumber, { color: rdColor }]}>{Math.round(rd.score)}</Text>
+                {/* Form trend */}
+                {progress && (
+                    <Fade delay={60}>
+                        <Panel>
+                            <Header title={`FORM SCORE · ${days}D`} right={
+                                <HdrMeta color={trendColor(progress.form_trend_pct || 0)}>
+                                    {signPct(progress.form_trend_pct || 0)}
+                                </HdrMeta>
+                            } />
+                            <View style={s.scoreBody}>
+                                <Text style={s.scoreBig}>{String(Math.round(progress.avg_form_score || 0)).padStart(3, '0')}</Text>
+                                <View style={s.scoreRight}>
+                                    <Text style={s.scoreMax}>/ 100.00</Text>
+                                    <Text style={[s.scoreCaption, { color: scoreColor(progress.avg_form_score || 0) }]}>AVG</Text>
+                                    <Text style={[s.scoreCaption, { color: C.muted }]}>N={progress.session_count || 0} SESS</Text>
                                 </View>
                             </View>
-                            <Text style={[$.readinessBand, { color: rdColor }]}>{(rd.band || '').toUpperCase()}</Text>
-                        </View>
-
-                        {rd.components && Object.entries(rd.components).map(([key, comp]) => {
-                            const pct = comp.value || 0;
-                            const barColor = pct >= 70 ? '#22c55e' : pct >= 50 ? '#f97316' : '#ef4444';
-                            const labels = { form: 'FORM', symmetry: 'SYMMETRY', volume: 'VOLUME', hrv: 'RECOVERY' };
-                            return (
-                                <View key={key} style={$.compRow}>
-                                    <Text style={$.compLabel}>{labels[key] || key.toUpperCase()}</Text>
-                                    <View style={$.compBarBg}>
-                                        <View style={[$.compBarFill, { width: `${pct}%`, backgroundColor: barColor }]} />
-                                    </View>
-                                    <Text style={[$.compPct, { color: barColor }]}>{Math.round(pct)}</Text>
-                                </View>
-                            );
-                        })}
-                    </Fade>
-                )}
-
-                {/* ═══ Advanced charts — wrapped in Cards to match home screen ═══ */}
-                {advanced && (
-                    <>
-                        {/* ACWR gauge card */}
-                        <Fade delay={760} style={$.advSection}>
-                            <Card accent={acwrColor(advanced.acwr?.band)}>
-                                <SectionHead title="TRAINING LOAD · ACWR" right={
-                                    <Text style={[$.advBand, { color: acwrColor(advanced.acwr?.band) }]}>
-                                        {(advanced.acwr?.band || '').toUpperCase()}
-                                    </Text>
-                                } />
-                                <View style={{ alignItems: 'center', marginTop: 8 }}>
-                                    <Gauge value={Math.min(2.5, advanced.acwr?.acwr || 0)} max={2.5}
-                                        color={acwrColor(advanced.acwr?.band)} size={200}
-                                        label="ACWR"
-                                        zones={[
-                                            { from: 0, to: 0.8, color: C.info },
-                                            { from: 0.8, to: 1.3, color: C.good },
-                                            { from: 1.3, to: 1.5, color: C.warn },
-                                            { from: 1.5, to: 2.5, color: C.bad },
-                                        ]} />
-                                </View>
-                                <View style={$.advTriad}>
-                                    <StatTriad items={[
-                                        { label: 'MONOTONY', value: (advanced.monotony?.monotony || 0).toFixed(2), color: C.text },
-                                        { label: 'STRAIN', value: Math.round(advanced.monotony?.strain || 0), color: C.text },
-                                        { label: 'MOMENTUM', value: (advanced.momentum || 0).toFixed(1), color: (advanced.momentum || 0) >= 0 ? C.good : C.bad },
-                                    ]} />
-                                </View>
-                            </Card>
-                        </Fade>
-
-                        {/* Symmetry radar */}
-                        <Fade delay={820} style={$.advSection}>
-                            <Card accent={asymColor(advanced.asymmetry?.band)}>
-                                <SectionHead title="SYMMETRY RADAR" right={
-                                    <Text style={[$.advBand, { color: asymColor(advanced.asymmetry?.band) }]}>
-                                        {(advanced.asymmetry?.band || '').toUpperCase()}
-                                    </Text>
-                                } />
-                                <View style={{ alignItems: 'center', marginTop: 8 }}>
-                                    <Radar
-                                        axes={[
-                                            { label: 'KNEE',  value: Math.max(0, 100 - (advanced.asymmetry?.knee || 0) * 5) },
-                                            { label: 'HIP',   value: Math.max(0, 100 - (advanced.asymmetry?.hip || 0) * 5) },
-                                            { label: 'SHLDR', value: Math.max(0, 100 - (advanced.asymmetry?.shoulder || 0) * 5) },
-                                            { label: 'FORM',  value: Math.min(100, advanced.aggregate?.avg_form_score || 0) },
-                                            { label: 'MOMTM', value: Math.max(0, Math.min(100, 50 + (advanced.momentum || 0) * 2)) },
-                                            { label: 'INTNS', value: Math.min(100, advanced.latest_intensity || 0) },
-                                        ]}
-                                        color={asymColor(advanced.asymmetry?.band)}
-                                        size={Math.min(240, W - 120)}
+                            {progress.form_score_trend?.length > 1 && (
+                                <View style={s.sparkWrap}>
+                                    <Sparkline
+                                        data={progress.form_score_trend.map(t => t.score)}
+                                        width={W - 32} height={48}
+                                        color={scoreColor(progress.avg_form_score || 0)}
+                                        stroke={1.5}
                                     />
+                                    <View style={s.sparkRange}>
+                                        <Text style={s.sparkRangeText}>T-{days}D</Text>
+                                        <Text style={s.sparkRangeText}>NOW</Text>
+                                    </View>
                                 </View>
-                            </Card>
-                        </Fade>
+                            )}
+                        </Panel>
+                    </Fade>
+                )}
 
-                        {/* Quality distribution */}
-                        <Fade delay={880} style={$.advSection}>
-                            <Card>
-                                <SectionHead title="FORM QUALITY · 60D" />
+                {/* Training volume */}
+                {progress && (
+                    <Fade delay={100}>
+                        <Panel>
+                            <Header title={`VOLUME AGG · ${days}D`} />
+                            <Triad items={[
+                                { label: 'SES.CNT',   value: fmtInt(progress.session_count || 0), color: '#E8E8E8' },
+                                { label: 'TOT.REPS',  value: fmtInt(progress.total_reps || 0),    color: C.text },
+                                { label: 'BPI.DELTA', value: signVal(progress.bpi_delta || 0, 0), color: trendColor(progress.bpi_delta || 0) },
+                            ]} />
+                            <Rule />
+                            <FieldRow label="AVG.FORM.............. MEAN FORM SCORE" value={fmt(progress.avg_form_score, 1)} color={C.text} />
+                            <FieldRow label="PK.JUMP.CM............ PEAK JUMP HEIGHT" value={fmt(progress.best_jump_cm, 1)} color={C.info} />
+                            <FieldRow label="TREND.................. %/PRIOR-PERIOD" value={signPct(progress.form_trend_pct || 0)} color={trendColor(progress.form_trend_pct || 0)} />
+                            <FieldRow label="LAST.SES.............. EPOCH" value={progress.last_session_at ? String(progress.last_session_at).slice(0, 16).replace('T', ' ') : '--'} color={C.textSub} dim size="sm" />
+                        </Panel>
+                    </Fade>
+                )}
+
+                {/* Readiness */}
+                {readiness && (
+                    <Fade delay={140}>
+                        <Panel>
+                            <Header title="READINESS" right={<HdrMeta color={bandColor(readiness.band)}>[{(readiness.band || '--').toUpperCase()}]</HdrMeta>} />
+                            <View style={s.readyBody}>
+                                <Text style={[s.readyBig, { color: bandColor(readiness.band) }]}>
+                                    {String(Math.round(readiness.score || 0)).padStart(3, '0')}
+                                </Text>
+                                <Text style={s.readyMax}>/ 100</Text>
+                            </View>
+                            <Rule />
+                            {readiness.components && Object.entries(readiness.components).map(([key, comp]) => {
+                                const labels = { form: 'FORM.TREND', symmetry: 'SYMMETRY', volume: 'VOLUME', hrv: 'RECOVERY' };
+                                const value = typeof comp === 'number' ? comp : (comp?.value ?? 0);
+                                const col = value >= 70 ? C.good : value >= 50 ? C.warn : C.bad;
+                                return (
+                                    <DistBar key={key} label={labels[key] || key.toUpperCase()} value={Math.round(value)} total={100} color={col} pct={value} />
+                                );
+                            })}
+                        </Panel>
+                    </Fade>
+                )}
+
+                {/* Weak joints table */}
+                {weakJoints?.length > 0 && (
+                    <Fade delay={180}>
+                        <Panel>
+                            <Header title="WEAK JOINTS · DEVIATION" />
+                            {weakJoints.slice(0, 8).map((j, i) => (
+                                <FieldRow
+                                    key={i}
+                                    label={`${String(j.joint || j.name || 'joint').toUpperCase().padEnd(16, '.')}  ${String(j.direction || '').toUpperCase().slice(0, 8)}`}
+                                    value={signVal(j.deviation || j.delta || 0, 1) + '°'}
+                                    color={Math.abs(j.deviation || j.delta || 0) > 15 ? C.bad : Math.abs(j.deviation || j.delta || 0) > 8 ? C.warn : C.good}
+                                />
+                            ))}
+                        </Panel>
+                    </Fade>
+                )}
+
+                {/* Injury risk */}
+                {injuryRisk && (
+                    <Fade delay={220}>
+                        <Panel>
+                            <Header title="INJURY RISK" right={<HdrMeta color={bandColor(injuryRisk.band)}>[{(injuryRisk.band || '--').toUpperCase()}]</HdrMeta>} />
+                            <FieldRow label="RSK.......... RISK INDEX" value={fmt(injuryRisk.risk_score || 0, 2)} color={bandColor(injuryRisk.band)} size="lg" />
+                            <FieldRow label="SYM.......... LIMB SYMMETRY" value={fmt(injuryRisk.limb_symmetry || 1, 3)} color={C.text} />
+                            <FieldRow label="ASY.......... MAX ASYMMETRY" value={fmt(injuryRisk.max_asymmetry || 0, 1) + '°'} color={C.warn} />
+                            {injuryRisk.reasons?.slice(0, 3).map((r, i) => (
+                                <FieldRow key={i} label={`R${i + 1}.......... CONTRIBUTING SIGNAL`} value={String(r).toUpperCase().slice(0, 20)} color={C.textSub} dim size="sm" />
+                            ))}
+                        </Panel>
+                    </Fade>
+                )}
+
+                {/* Advanced: ACWR gauge */}
+                {advanced?.acwr && (
+                    <Fade delay={260}>
+                        <Panel>
+                            <Header title="TRAINING LOAD · ACWR" right={<HdrMeta color={bandColor(advanced.acwr.band)}>[{(advanced.acwr.band || '--').toUpperCase()}]</HdrMeta>} />
+                            <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+                                <Gauge
+                                    value={Math.min(2.5, advanced.acwr.acwr || 0)} max={2.5}
+                                    color={bandColor(advanced.acwr.band)} size={180}
+                                    label="ACWR"
+                                    zones={[
+                                        { from: 0,   to: 0.8, color: C.info },
+                                        { from: 0.8, to: 1.3, color: C.good },
+                                        { from: 1.3, to: 1.5, color: C.warn },
+                                        { from: 1.5, to: 2.5, color: C.bad },
+                                    ]}
+                                />
+                            </View>
+                            <Triad items={[
+                                { label: 'MONOTONY', value: fmt(advanced.monotony?.monotony || 0, 2), color: C.text },
+                                { label: 'STRAIN',   value: fmtInt(Math.round(advanced.monotony?.strain || 0)), color: C.text },
+                                { label: 'MOMTM',    value: signVal(advanced.momentum || 0, 2), color: trendColor(advanced.momentum || 0) },
+                            ]} />
+                        </Panel>
+                    </Fade>
+                )}
+
+                {/* Symmetry radar */}
+                {advanced?.asymmetry && (
+                    <Fade delay={300}>
+                        <Panel>
+                            <Header title="SYMMETRY RADAR" right={<HdrMeta color={bandColor(advanced.asymmetry.band)}>[{(advanced.asymmetry.band || '--').toUpperCase()}]</HdrMeta>} />
+                            <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+                                <Radar
+                                    axes={[
+                                        { label: 'KNEE',  value: Math.max(0, 100 - (advanced.asymmetry.knee || 0) * 5) },
+                                        { label: 'HIP',   value: Math.max(0, 100 - (advanced.asymmetry.hip || 0) * 5) },
+                                        { label: 'SHLDR', value: Math.max(0, 100 - (advanced.asymmetry.shoulder || 0) * 5) },
+                                        { label: 'FORM',  value: Math.min(100, advanced.aggregate?.avg_form_score || 0) },
+                                        { label: 'MOMTM', value: Math.max(0, Math.min(100, 50 + (advanced.momentum || 0) * 2)) },
+                                        { label: 'INTNS', value: Math.min(100, advanced.latest_intensity || 0) },
+                                    ]}
+                                    color={bandColor(advanced.asymmetry.band)}
+                                    size={Math.min(240, W - 80)}
+                                />
+                            </View>
+                            <Rule />
+                            <FieldRow label="ASY.KNEE...... L/R KNEE ANGLE" value={fmt(advanced.asymmetry.knee, 1) + '%'} color={advanced.asymmetry.knee > 10 ? C.bad : C.good} />
+                            <FieldRow label="ASY.HIP....... L/R HIP ANGLE"  value={fmt(advanced.asymmetry.hip, 1) + '%'}  color={advanced.asymmetry.hip > 10 ? C.bad : C.good} />
+                            <FieldRow label="ASY.SHDR...... L/R SHOULDER"   value={fmt(advanced.asymmetry.shoulder, 1) + '%'} color={advanced.asymmetry.shoulder > 10 ? C.bad : C.good} />
+                        </Panel>
+                    </Fade>
+                )}
+
+                {/* Quality distribution */}
+                {advanced?.aggregate?.quality_distribution && (
+                    <Fade delay={340}>
+                        <Panel>
+                            <Header title={`FORM QUALITY · ${days}D`} />
+                            {Object.entries(advanced.aggregate.quality_distribution).map(([q, n]) => {
+                                const total = Object.values(advanced.aggregate.quality_distribution).reduce((a, b) => a + b, 0) || 1;
+                                const col = q === 'elite' ? C.good : q === 'good' ? C.info : q === 'average' ? C.warn : C.bad;
+                                return <DistBar key={q} label={q} value={n} total={total} color={col} />;
+                            })}
+                        </Panel>
+                    </Fade>
+                )}
+
+                {/* Daily load bars */}
+                {advanced?.load_series?.length > 0 && (
+                    <Fade delay={380}>
+                        <Panel>
+                            <Header title={`DAILY LOAD · ${Math.min(14, advanced.load_series.length)}D`} />
+                            <View style={{ alignItems: 'flex-start' }}>
                                 <ChartBar
-                                    data={[
-                                        { label: 'ELITE', value: advanced.aggregate?.quality_distribution?.elite || 0, color: C.good },
-                                        { label: 'GOOD',  value: advanced.aggregate?.quality_distribution?.good || 0, color: C.info },
-                                        { label: 'AVG',   value: advanced.aggregate?.quality_distribution?.average || 0, color: C.warn },
-                                        { label: 'POOR',  value: advanced.aggregate?.quality_distribution?.poor || 0, color: C.bad },
-                                    ]} width={W - 80} height={140} />
-                            </Card>
-                        </Fade>
-
-                        {/* Daily load */}
-                        {advanced.load_series?.length > 0 && (
-                            <Fade delay={940} style={$.advSection}>
-                                <Card>
-                                    <SectionHead title={`DAILY LOAD · ${Math.min(14, advanced.load_series.length)}D`} />
-                                    <ChartBar
-                                        data={advanced.load_series.slice(-14).map(t => ({
-                                            label: t.date.slice(-2),
-                                            value: t.load,
-                                            color: C.accent,
-                                        }))}
-                                        width={W - 80} height={140}
-                                    />
-                                </Card>
-                            </Fade>
-                        )}
-
-                        {/* Heatmap */}
-                        {advanced.load_series?.length > 0 && (
-                            <Fade delay={1000} style={$.advSection}>
-                                <Card>
-                                    <SectionHead title="28-DAY HEATMAP" />
-                                    <Heatmap
-                                        cells={advanced.load_series.slice(-28).map(t => ({ date: t.date, value: t.load }))}
-                                        cols={7} width={W - 80}
-                                        colorLow={C.bg2} colorHigh={C.accent}
-                                    />
-                                </Card>
-                            </Fade>
-                        )}
-
-                        {/* Fatigue gauge */}
-                        <Fade delay={1060} style={$.advSection}>
-                            <Card accent={fatigueColor(advanced.fatigue?.band)}>
-                                <SectionHead title="FATIGUE INDEX" right={
-                                    <Text style={[$.advBand, { color: fatigueColor(advanced.fatigue?.band) }]}>
-                                        {(advanced.fatigue?.band || '').toUpperCase()}
-                                    </Text>
-                                } />
-                                <View style={{ alignItems: 'center', marginTop: 8 }}>
-                                    <Gauge value={Math.max(0, Math.min(20, (advanced.fatigue?.index || 0) + 10))}
-                                        max={20} color={fatigueColor(advanced.fatigue?.band)} size={180} label="FATIGUE" />
-                                </View>
-                            </Card>
-                        </Fade>
-                    </>
+                                    data={advanced.load_series.slice(-14).map(t => ({
+                                        label: t.date.slice(-2),
+                                        value: t.load,
+                                        color: C.text,
+                                    }))}
+                                    width={W - 32} height={120}
+                                />
+                            </View>
+                        </Panel>
+                    </Fade>
                 )}
 
-                <View style={{ height: 40 }} />
+                {/* Heatmap */}
+                {advanced?.load_series?.length > 0 && (
+                    <Fade delay={420}>
+                        <Panel>
+                            <Header title="LOAD MATRIX · 28D" right={<HdrMeta>MAX {fmtInt(Math.max(...advanced.load_series.map(t => t.load), 0))}</HdrMeta>} />
+                            <View style={{ alignItems: 'flex-start' }}>
+                                <Heatmap
+                                    cells={advanced.load_series.slice(-28).map(t => ({ date: t.date, value: t.load }))}
+                                    cols={7} width={W - 32}
+                                    colorLow="#0A0A0A" colorHigh={C.text}
+                                />
+                            </View>
+                        </Panel>
+                    </Fade>
+                )}
+
+                {/* Fatigue gauge */}
+                {advanced?.fatigue && (
+                    <Fade delay={460}>
+                        <Panel>
+                            <Header title="FATIGUE INDEX" right={<HdrMeta color={bandColor(advanced.fatigue.band)}>[{(advanced.fatigue.band || '--').toUpperCase()}]</HdrMeta>} />
+                            <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+                                <Gauge
+                                    value={Math.max(0, Math.min(20, (advanced.fatigue.index || 0) + 10))}
+                                    max={20}
+                                    color={bandColor(advanced.fatigue.band)} size={180} label="FATIGUE"
+                                />
+                            </View>
+                        </Panel>
+                    </Fade>
+                )}
+
+                <Footer lines={[
+                    { text: `END OF REPORT · ${nowISO()}` },
+                    { text: `RANGE ${days}D · ATHLETE ${userTag}` },
+                ]} />
             </ScrollView>
-        </View>
+        </TerminalScreen>
     );
 }
 
-function acwrColor(band) {
-    return band === 'sweet spot' ? C.good
-        : band === 'high' ? C.warn
-        : band?.startsWith('spike') ? C.bad
-        : band === 'under-loaded' ? C.info
-        : C.textMid;
-}
-function asymColor(band) {
-    return band === 'symmetrical' ? C.good
-        : band === 'minor' ? C.info
-        : band === 'watch' ? C.warn
-        : band?.startsWith('flag') ? C.bad : C.textMid;
-}
-function fatigueColor(band) {
-    return band === 'fresh' ? C.good
-        : band === 'neutral' ? C.info
-        : band === 'accumulating' ? C.warn
-        : band === 'fatigued' ? C.bad : C.textMid;
-}
+const s = StyleSheet.create({
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    loadingText: { color: C.textMid, fontFamily: T.MONO, fontSize: 11, letterSpacing: 2, marginTop: 14 },
 
-// ── Styles ───────────────────────────────────────────────────────────────────
-// Pure black. No cards. No borders. Bold uppercase type. Nike DNA.
+    identity:  { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
+    prompt:    { fontSize: 12, color: C.textMid, fontFamily: T.MONO, fontWeight: '600' },
 
-const $ = StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#000' },
-    center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+    rangeRow:  { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
+    rangeLabel:{ fontSize: 10, color: C.textMid, fontFamily: T.MONO, fontWeight: '700', marginRight: 10, letterSpacing: 1 },
+    rangeBtn:  { paddingHorizontal: 8, paddingVertical: 4, marginRight: 6, borderWidth: 1, borderColor: C.border },
+    rangeText: { fontSize: 11, color: C.muted, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 1 },
 
-    // Top bar
-    topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 12, marginBottom: 8 },
-    brand: { fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 3 },
+    scoreBody:  { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 14 },
+    scoreBig:   { fontSize: 72, fontWeight: '700', color: '#E8E8E8', fontFamily: T.MONO, letterSpacing: -3, lineHeight: 66 },
+    scoreRight: { marginLeft: 12, marginBottom: 4, flex: 1 },
+    scoreMax:   { fontSize: 13, color: C.muted, fontFamily: T.MONO, fontWeight: '600' },
+    scoreCaption:{fontSize: 10, fontFamily: T.MONO, fontWeight: '700', marginTop: 4, letterSpacing: 1 },
 
-    // Period tabs
-    periodRow: { flexDirection: 'row', gap: 20 },
-    periodTab: { alignItems: 'center', paddingVertical: 4 },
-    periodText: { fontSize: 13, fontWeight: '700', color: '#4b5563', letterSpacing: 2 },
-    periodTextActive: { color: '#fff' },
-    periodUnderline: { width: 20, height: 2, backgroundColor: '#06b6d4', marginTop: 4, borderRadius: 1 },
+    sparkWrap:     { paddingHorizontal: 0, paddingBottom: 12 },
+    sparkRange:    { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingHorizontal: 12 },
+    sparkRangeText:{ fontSize: 9, color: C.muted, fontFamily: T.MONO, letterSpacing: 0.5 },
 
-    // Hero
-    heroSection: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 8 },
-    heroNumber: { fontSize: 64, fontWeight: '900', fontFamily: FONT_CONDENSED, lineHeight: 68 },
-    trendArrow: { fontSize: 16, fontWeight: '800', fontFamily: FONT_CONDENSED, marginLeft: 12, marginBottom: 10 },
-
-    // Section
-    section: { paddingHorizontal: 24, marginBottom: 32 },
-    sectionLabel: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginBottom: 16 },
-
-    // Stats row
-    statsSection: { paddingHorizontal: 24, marginBottom: 32 },
-    statsRow: { flexDirection: 'row', alignItems: 'center' },
-    statItem: { flex: 1, alignItems: 'center' },
-    statNumber: { fontSize: 22, fontWeight: '800', fontFamily: FONT_CONDENSED },
-    statLabel: { fontSize: 9, fontWeight: '600', color: '#4b5563', letterSpacing: 2, marginTop: 4 },
-    statDivider: { width: 1, height: 32, backgroundColor: '#1a1a1a', opacity: 0.6 },
-
-    // Weak joints
-    jointRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14 },
-    jointName: { fontSize: 14, fontWeight: '600', color: '#fff' },
-    jointDev: { fontSize: 16, fontWeight: '800', fontFamily: FONT_CONDENSED },
-    divider: { height: 1, backgroundColor: '#1a1a1a' },
-
-    // Injury risk
-    riskRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-    riskDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
-    riskBand: { fontSize: 18, fontWeight: '900', fontFamily: FONT_CONDENSED, letterSpacing: 2 },
-    riskPct: { fontSize: 14, fontWeight: '700', color: '#4b5563', fontFamily: FONT_CONDENSED, marginLeft: 'auto' },
-    riskReason: { fontSize: 13, fontWeight: '500', color: '#6b7280', lineHeight: 20 },
-    riskSymRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
-    riskSymLabel: { fontSize: 9, fontWeight: '800', color: '#4b5563', letterSpacing: 2 },
-    riskSymValue: { fontSize: 14, fontWeight: '800', color: '#fff', fontFamily: FONT_CONDENSED, marginLeft: 10 },
-
-    // Coaching bullets
-    bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
-    bulletDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#06b6d4', marginTop: 7, marginRight: 12 },
-    bulletText: { fontSize: 14, fontWeight: '500', color: '#d1d5db', flex: 1, lineHeight: 21 },
-
-    // Competition readiness
-    readinessSection: { paddingHorizontal: 24, marginBottom: 32 },
-    readinessHero: { alignItems: 'center', marginBottom: 24 },
-    ringContainer: { marginBottom: 8 },
-    ringInner: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-    readinessNumber: { fontSize: 36, fontWeight: '900', fontFamily: FONT_CONDENSED },
-    readinessBand: { fontSize: 11, fontWeight: '800', letterSpacing: 3 },
-    compRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-    compLabel: { width: 80, fontSize: 10, fontWeight: '700', color: '#4b5563', letterSpacing: 1 },
-    compBarBg: { flex: 1, height: 3, backgroundColor: '#111', borderRadius: 2, overflow: 'hidden', marginHorizontal: 10 },
-    compBarFill: { height: 3, borderRadius: 2 },
-    compPct: { width: 28, fontSize: 13, fontWeight: '800', fontFamily: FONT_CONDENSED, textAlign: 'right' },
-
-    // Advanced-section card wrapper: matches Home's 20pt horizontal padding so
-    // the cards visually line up when navigating between tabs.
-    advSection: { paddingHorizontal: 20, marginBottom: 12 },
-    advBand: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' },
-    advTriad: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: C.border },
-
-    // States
-    loadingText: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginTop: 16 },
-    errorText: { fontSize: 15, fontWeight: '700', color: '#ef4444', letterSpacing: 2, marginBottom: 20 },
-    retryRow: { flexDirection: 'row', alignItems: 'center' },
-    retryText: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 2 },
-    retryArrow: { fontSize: 22, color: '#4b5563', fontWeight: '300', marginLeft: 8 },
-    emptyTitle: { fontSize: 28, fontWeight: '900', color: '#fff', fontFamily: FONT_CONDENSED, textAlign: 'center', letterSpacing: 2, lineHeight: 34 },
-    emptySubtext: { fontSize: 13, fontWeight: '500', color: '#4b5563', marginTop: 12 },
+    readyBody:  { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 14 },
+    readyBig:   { fontSize: 72, fontWeight: '700', fontFamily: T.MONO, letterSpacing: -3, lineHeight: 66 },
+    readyMax:   { fontSize: 14, color: C.muted, fontFamily: T.MONO, marginLeft: 10, marginBottom: 6, fontWeight: '600' },
 });

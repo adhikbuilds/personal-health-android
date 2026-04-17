@@ -1,61 +1,51 @@
-// ProfileScreen — Nike-inspired. Pure black canvas. Bold typography IS the design.
-// No cards. No borders. No containers. Content floats on black.
+// ProfileScreen — Bloomberg terminal.
+// Athlete identity, system info, session log table. All mono, no cards.
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     View, Text, ScrollView, StyleSheet,
-    Dimensions, Platform, ActivityIndicator, StatusBar, RefreshControl,
+    Dimensions, StatusBar, ActivityIndicator, RefreshControl,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
-import { LEVEL_COLORS, LEVEL_LABELS } from '../styles/colors';
-import { SPORT_LABELS } from '../data/constants';
-import { Tap, Fade } from '../ui';
-import { Ring, Sparkline, Gauge, Bar as ChartBar } from '../components/charts';
-import { Card, StatTriad, SectionHead } from '../components/primitives';
-import { C, T } from '../styles/colors';
+import { Fade } from '../ui';
+import { Sparkline } from '../components/charts';
+import { C, T, LEVEL_COLORS, LEVEL_LABELS } from '../styles/colors';
+import { sportLabel, SPORT_LABELS } from '../config/sports';
+import {
+    Panel, Header, HdrMeta, Rule, FieldRow, Triad, SysBar, Ticker, DistBar, Table,
+    TerminalScreen, Footer, useLiveClock,
+    fmt, fmtInt, signPct, trendColor, bandColor, nowISO,
+} from '../components/terminal';
 
 const { width: W } = Dimensions.get('window');
-const FONT_CONDENSED = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function initials(name) {
-    return (name || 'AB').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-}
-
-function profReadinessColor(band) {
-    return band === 'elite' ? '#22c55e'
-        : band === 'ready' ? '#06b6d4'
-        : band === 'caution' ? '#f97316'
-        : band === 'recover' ? '#ef4444' : '#4b5563';
-}
 
 function scoreColor(v) {
-    if (v >= 75) return '#22c55e';
-    if (v >= 50) return '#f97316';
-    return '#ef4444';
+    if (v >= 75) return C.good;
+    if (v >= 50) return C.warn;
+    return C.bad;
 }
 
-function fmtDate(d) {
-    if (!d) return '--';
-    const dt = new Date(d);
-    const day = dt.getDate();
-    const mon = dt.toLocaleString('en', { month: 'short' }).toUpperCase();
-    return `${day} ${mon}`;
+function fmtDate(iso) {
+    if (!iso) return '--';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '--';
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
-
-// ── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProfileScreen({ navigation }) {
     const ins = useSafeAreaInsets();
     const { userData, fitnessScore, dataMode } = useUser();
     const athleteId = userData?.avatarId || 'athlete_01';
+    const userTag = athleteId.toUpperCase();
+    const sportTag = (userData?.sport || 'general').toUpperCase().replace('_', '-');
+    const clock = useLiveClock();
 
-    const [sessions, setSessions] = useState(null);
-    const [isOnline, setIsOnline] = useState(false);
+    const [sessions, setSessions] = useState([]);
+    const [online, setOnline] = useState(false);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [advanced, setAdvanced] = useState(null);
@@ -64,15 +54,13 @@ export default function ProfileScreen({ navigation }) {
         setLoading(true);
         try {
             const [sess, ping, adv] = await Promise.all([
-                api.getSessions(athleteId, 10),
+                api.getSessions(athleteId, 15),
                 api.ping(),
                 api.getAdvancedMetrics(athleteId, 60),
             ]);
             setSessions(sess?.sessions || sess || []);
-            setIsOnline(!!ping);
+            setOnline(!!ping);
             setAdvanced(adv);
-        } catch (_) {
-            setIsOnline(false);
         } finally {
             setLoading(false);
         }
@@ -85,266 +73,203 @@ export default function ProfileScreen({ navigation }) {
         load().finally(() => setRefreshing(false));
     }, [load]);
 
-    const handleRetake = useCallback(() => {
-        navigation.navigate('FitnessTest');
-    }, [navigation]);
+    const sessionList = Array.isArray(sessions) ? sessions : [];
+    const sport = sportLabel(userData?.sport || 'vertical_jump');
+    const lvl = userData?.level || 1;
+    const fs = fitnessScore?.score || 0;
 
-    const handleSessionTap = useCallback((session) => {
-        const sid = session.session_id || session.id;
-        if (sid) navigation.navigate('ScoreCard', { sessionId: sid });
-    }, [navigation]);
-
-    const sessionList = Array.isArray(sessions) ? sessions.slice(0, 10) : [];
-    const sportLabel = SPORT_LABELS[userData?.sport] || 'Athlete';
-    const hasTested = fitnessScore?.level > 0;
-    const lvl = fitnessScore?.level || 0;
-    const lvlColor = fitnessScore?.color || LEVEL_COLORS[lvl] || '#06b6d4';
-    const lvlLabel = fitnessScore?.label || LEVEL_LABELS[lvl] || '';
+    const tickerItems = [
+        { label: 'BPI',    value: fmtInt(userData?.bpi || 0) },
+        { label: 'FITSCR', value: String(fs).padStart(3, '0'), color: fitnessScore?.color || C.text },
+        { label: 'LVL',    value: `L${lvl}`, color: LEVEL_COLORS[lvl] || C.text },
+        { label: 'SESS',   value: fmtInt(userData?.sessions || 0) },
+        { label: 'STRK',   value: fmtInt(userData?.streak || 0) + 'D', color: C.good },
+        { label: 'DATA',   value: (dataMode || 'mock').toUpperCase(), color: dataMode === 'real' ? C.good : dataMode === 'hybrid' ? C.warn : C.muted },
+    ];
 
     return (
-        <View style={[$.root, { paddingTop: ins.top }]}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" />
-            <ScrollView showsVerticalScrollIndicator={false}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#333" progressBackgroundColor="#000" colors={['#06b6d4']} />}
+        <TerminalScreen style={{ paddingTop: ins.top }}>
+            <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+
+            <SysBar online={online} identity={`${userTag}.${sportTag}.PROF`} clock={clock} />
+            <Ticker items={tickerItems} />
+
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text} colors={[C.text]} progressBackgroundColor="#000" />}
             >
 
-                {/* ═══ Identity ═══ */}
-                <Fade style={$.identitySection}>
-                    <View style={$.avatarCircle}>
-                        <Text style={$.avatarText}>{initials(userData?.name)}</Text>
-                    </View>
-                    <Text style={$.nameText}>{(userData?.name || 'Athlete').toUpperCase()}</Text>
-                    <Text style={$.metaText}>{sportLabel.toUpperCase()}  ·  {(userData?.tier || 'District').toUpperCase()}</Text>
+                {/* Identity */}
+                <Fade style={s.identity}>
+                    <Text style={s.prompt}>{'> whoami'}</Text>
+                    <Text style={s.name}>{(userData?.name || 'ATHLETE').toUpperCase()}</Text>
+                    <Text style={s.ident}>
+                        ID {userTag} · L{lvl} · {(userData?.tier || 'District').toUpperCase()} · {sport.toUpperCase()}
+                    </Text>
+                    <Text style={s.code}>
+                        HASH: {userTag}.{sportTag}.{(userData?.bpi || 0).toString(16).toUpperCase().padStart(4, '0')}
+                    </Text>
                 </Fade>
 
-                {/* ═══ Stats Row ═══ */}
-                <Fade delay={100} style={$.statsSection}>
-                    <View style={$.statsRow}>
-                        <View style={$.statItem}>
-                            <Text style={[$.statNumber, { color: '#06b6d4' }]}>{(userData?.bpi ?? 0).toLocaleString()}</Text>
-                            <Text style={$.statLabel}>BPI</Text>
-                        </View>
-                        <View style={$.statDivider} />
-                        <View style={$.statItem}>
-                            <Text style={[$.statNumber, { color: '#f97316' }]}>{userData?.sessions ?? 0}</Text>
-                            <Text style={$.statLabel}>SESSIONS</Text>
-                        </View>
-                        <View style={$.statDivider} />
-                        <View style={$.statItem}>
-                            <Text style={[$.statNumber, { color: '#22c55e' }]}>{userData?.streak ?? 0}</Text>
-                            <Text style={$.statLabel}>DAY STREAK</Text>
-                        </View>
-                    </View>
+                {/* Athlete card */}
+                <Fade delay={60}>
+                    <Panel>
+                        <Header title="ATHLETE" right={<HdrMeta color={LEVEL_COLORS[lvl] || C.text}>[L{lvl}] {(LEVEL_LABELS[lvl] || 'UNRATED').toUpperCase()}</HdrMeta>} />
+                        <FieldRow label="NAME.......... FULL NAME" value={(userData?.name || '--').toUpperCase()} color="#E8E8E8" />
+                        <FieldRow label="AID........... ATHLETE ID" value={userTag} color={C.text} />
+                        <FieldRow label="SPT........... SPORT" value={sport.toUpperCase()} color={C.info} />
+                        <FieldRow label="TIR........... TIER" value={(userData?.tier || '--').toUpperCase()} color={C.text} />
+                        <FieldRow label="LVL........... FIT INDIA BAND" value={`L${lvl} · ${(LEVEL_LABELS[lvl] || '').toUpperCase()}`} color={LEVEL_COLORS[lvl] || C.text} />
+                    </Panel>
                 </Fade>
 
-                {/* ═══ Fitness Level ═══ */}
-                <Fade delay={200} style={$.section}>
-                    <Text style={$.sectionLabel}>FITNESS LEVEL</Text>
-                    {hasTested ? (
-                        <>
-                            <View style={$.levelBandRow}>
-                                {[1, 2, 3, 4, 5, 6, 7].map(l => (
-                                    <View
-                                        key={l}
-                                        style={[
-                                            $.levelSeg,
-                                            { backgroundColor: l <= lvl ? (LEVEL_COLORS[l] || '#4b5563') : '#1a1a1a' },
-                                        ]}
-                                    />
-                                ))}
+                {/* Fitness test */}
+                <Fade delay={100}>
+                    <Panel>
+                        <Header title="FIT INDIA · LATEST" right={fitnessScore?.lastTested ? <HdrMeta>{fmtDate(fitnessScore.lastTested)}</HdrMeta> : <HdrMeta>[UNTESTED]</HdrMeta>} />
+                        <View style={s.fsBody}>
+                            <Text style={[s.fsBig, { color: fitnessScore?.color || C.muted }]}>{String(fs).padStart(3, '0')}</Text>
+                            <View style={s.fsRight}>
+                                <Text style={s.fsMax}>/ 100.00</Text>
+                                <Text style={[s.fsBand, { color: fitnessScore?.color || C.muted }]}>
+                                    [{(fitnessScore?.label || 'NOT TESTED').toUpperCase()}]
+                                </Text>
                             </View>
-                            <View style={$.levelInfoRow}>
-                                <Text style={[$.levelScore, { color: lvlColor }]}>{fitnessScore?.score || 0}</Text>
-                                <Text style={[$.levelName, { color: lvlColor }]}>L{lvl} — {lvlLabel}</Text>
-                            </View>
-                            <LinearGradient colors={['transparent', '#06b6d4', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1, opacity: 0.2 }} />
-                            <Tap onPress={handleRetake} style={$.actionRow}>
-                                <Text style={$.actionTitle}>RETAKE TEST</Text>
-                                <Text style={$.actionArrow}>›</Text>
-                            </Tap>
-                        </>
-                    ) : (
-                        <>
-                            <Text style={$.emptyHint}>No fitness test taken yet</Text>
-                            <LinearGradient colors={['transparent', '#06b6d4', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1, opacity: 0.2 }} />
-                            <Tap onPress={handleRetake} style={$.actionRow}>
-                                <Text style={$.actionTitle}>TAKE FITNESS TEST</Text>
-                                <Text style={$.actionArrow}>›</Text>
-                            </Tap>
-                        </>
-                    )}
+                        </View>
+                    </Panel>
                 </Fade>
 
-                {/* ═══ Performance snapshot — Card with triad + sparkline ═══ */}
+                {/* 60d summary */}
                 {advanced && (
-                    <Fade delay={250} style={$.cardWrap}>
-                        <Card accent={C.info}>
-                            <SectionHead title="LAST 60 DAYS" />
-                            <StatTriad items={[
-                                { label: 'FORM AVG', value: Math.round(advanced.aggregate?.avg_form_score || 0), color: C.info },
-                                { label: 'READINESS', value: Math.round(advanced.readiness?.score || 0), caption: (advanced.readiness?.band || '').toUpperCase(), color: profReadinessColor(advanced.readiness?.band) },
-                                { label: 'SESSIONS', value: advanced.aggregate?.total_sessions || 0, color: C.text },
+                    <Fade delay={140}>
+                        <Panel>
+                            <Header title="PERF SUMMARY · 60D" />
+                            <Triad items={[
+                                { label: 'AVG.FORM',  value: fmt(advanced.aggregate?.avg_form_score, 1), color: scoreColor(advanced.aggregate?.avg_form_score || 0) },
+                                { label: 'READY',     value: String(Math.round(advanced.readiness?.score || 0)).padStart(3, '0'), color: bandColor(advanced.readiness?.band) },
+                                { label: 'SESS',      value: fmtInt(advanced.aggregate?.total_sessions || 0), color: C.text },
                             ]} />
-                            <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: C.border }}>
-                                <Text style={[T.micro, { marginBottom: 8 }]}>FORM TRAJECTORY</Text>
-                                <Sparkline
-                                    data={(advanced.form_trend_series || []).map(t => t.score)}
-                                    width={W - 80} height={56}
-                                    color={C.info} stroke={2.5}
-                                />
-                            </View>
-                        </Card>
-                    </Fade>
-                )}
-
-                {advanced && (
-                    <Fade delay={280} style={$.cardWrap}>
-                        <Card>
-                            <SectionHead title="QUALITY MIX" />
-                            <ChartBar
-                                data={[
-                                    { label: 'ELITE', value: advanced.aggregate?.quality_distribution?.elite || 0, color: C.good },
-                                    { label: 'GOOD',  value: advanced.aggregate?.quality_distribution?.good || 0, color: C.info },
-                                    { label: 'AVG',   value: advanced.aggregate?.quality_distribution?.average || 0, color: C.warn },
-                                    { label: 'POOR',  value: advanced.aggregate?.quality_distribution?.poor || 0, color: C.bad },
-                                ]} width={W - 80} height={140} />
-                        </Card>
-                    </Fade>
-                )}
-
-                {/* ═══ Recent Sessions ═══ */}
-                <Fade delay={300} style={$.section}>
-                    <Text style={$.sectionLabel}>RECENT SESSIONS</Text>
-                    {loading ? (
-                        <ActivityIndicator size="small" color="#06b6d4" style={{ marginTop: 16 }} />
-                    ) : sessionList.length === 0 ? (
-                        <Text style={$.emptyHint}>No sessions recorded yet</Text>
-                    ) : (
-                        sessionList.map((sess, i) => {
-                            const formScore = sess.avg_form_score ?? sess.form_score ?? 0;
-                            const sport = SPORT_LABELS[sess.sport] || sess.sport || 'Session';
-                            const xp = sess.xp_earned ?? sess.xp ?? 0;
-                            const color = scoreColor(formScore);
-                            const date = fmtDate(sess.ended_at || sess.started_at || sess.date);
-                            return (
-                                <React.Fragment key={sess.session_id || sess.id || i}>
-                                    <Tap onPress={() => handleSessionTap(sess)} style={$.sessionRow}>
-                                        <View style={{ flex: 1 }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                <Text style={$.sessionDate}>{date}</Text>
-                                                <Text style={$.sessionSep}>|</Text>
-                                                <Text style={$.sessionSport}>{sport}</Text>
-                                            </View>
+                            {advanced.form_trend_series?.length > 1 && (
+                                <>
+                                    <Rule />
+                                    <View style={s.sparkWrap}>
+                                        <View style={s.sparkHead}>
+                                            <Text style={s.sparkLabel}>FORM TRAJECTORY</Text>
+                                            <Text style={[s.sparkTrend, { color: trendColor(advanced.trend_pct || 0) }]}>
+                                                {signPct(advanced.trend_pct || 0)}
+                                            </Text>
                                         </View>
-                                        <Text style={[$.sessionScore, { color }]}>{formScore.toFixed(0)}</Text>
-                                        <Text style={$.sessionXp}>+{xp} XP</Text>
-                                        <Text style={$.sessionArrow}>›</Text>
-                                    </Tap>
-                                    {i < sessionList.length - 1 && (
-                                        <LinearGradient colors={['transparent', '#06b6d4', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1, opacity: 0.2 }} />
-                                    )}
-                                </React.Fragment>
-                            );
-                        })
-                    )}
+                                        <Sparkline
+                                            data={advanced.form_trend_series.map(t => t.score)}
+                                            width={W - 32} height={42}
+                                            color={trendColor(advanced.momentum || 0) === C.textMid ? C.text : trendColor(advanced.momentum || 0)}
+                                            stroke={1.5}
+                                        />
+                                    </View>
+                                </>
+                            )}
+                            {advanced.aggregate?.quality_distribution && (
+                                <>
+                                    <Rule />
+                                    <View style={{ paddingTop: 8, paddingBottom: 4 }}>
+                                        {Object.entries(advanced.aggregate.quality_distribution).map(([q, n]) => {
+                                            const total = Object.values(advanced.aggregate.quality_distribution).reduce((a, b) => a + b, 0) || 1;
+                                            const col = q === 'elite' ? C.good : q === 'good' ? C.info : q === 'average' ? C.warn : C.bad;
+                                            return <DistBar key={q} label={q} value={n} total={total} color={col} />;
+                                        })}
+                                    </View>
+                                </>
+                            )}
+                        </Panel>
+                    </Fade>
+                )}
+
+                {/* Session log table */}
+                <Fade delay={180}>
+                    <Panel>
+                        <Header title="SESSION LOG" right={<HdrMeta>N={sessionList.length}</HdrMeta>} />
+                        {loading ? (
+                            <View style={s.loadingWrap}><ActivityIndicator size="small" color={C.text} /></View>
+                        ) : sessionList.length === 0 ? (
+                            <Text style={s.emptyText}>NO SESSIONS RECORDED</Text>
+                        ) : (
+                            <Table
+                                cols={[
+                                    { label: 'DATE',  flex: 3, align: 'left' },
+                                    { label: 'SPORT', flex: 2, align: 'left' },
+                                    { label: 'SCR',   flex: 1, align: 'right' },
+                                    { label: 'XP',    flex: 1, align: 'right' },
+                                ]}
+                                rows={sessionList.map(sess => {
+                                    const fscore = sess.summary?.avg_form_score ?? sess.avg_form_score ?? sess.form_score ?? 0;
+                                    const xp = sess.summary?.xp_earned ?? sess.xp_earned ?? sess.xp ?? 0;
+                                    const sportKey = sess.sport || 'general';
+                                    return {
+                                        onPress: () => {
+                                            const sid = sess.session_id || sess.id;
+                                            if (sid) navigation.navigate('ScoreCard', { sessionId: sid });
+                                        },
+                                        cells: [
+                                            { value: fmtDate(sess.ended_at || sess.started_at) },
+                                            { value: (SPORT_LABELS[sportKey] || sportKey).toUpperCase().slice(0, 10), color: C.info },
+                                            { value: String(Math.round(fscore)).padStart(3, '0'), color: scoreColor(fscore) },
+                                            { value: '+' + fmtInt(xp), color: C.warn },
+                                        ],
+                                    };
+                                })}
+                            />
+                        )}
+                    </Panel>
                 </Fade>
 
-                {/* ═══ System ═══ */}
-                <Fade delay={400} style={$.section}>
-                    <Text style={$.sectionLabel}>SYSTEM</Text>
-
-                    <View style={$.systemRow}>
-                        <Text style={$.systemLabel}>Backend</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <View style={[$.statusDot, { backgroundColor: isOnline ? '#22c55e' : '#ef4444' }]} />
-                            <Text style={[$.systemValue, { color: isOnline ? '#22c55e' : '#ef4444' }]}>
-                                {isOnline ? 'CONNECTED' : 'OFFLINE'}
-                            </Text>
-                        </View>
-                    </View>
-                    <LinearGradient colors={['transparent', '#06b6d4', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1, opacity: 0.2 }} />
-
-                    <View style={$.systemRow}>
-                        <Text style={$.systemLabel}>Data Mode</Text>
-                        <Text style={[$.systemValue, { color: dataMode === 'real' ? '#22c55e' : dataMode === 'hybrid' ? '#facc15' : '#f97316' }]}>
-                            {(dataMode || 'mock').toUpperCase()}
-                        </Text>
-                    </View>
-                    <LinearGradient colors={['transparent', '#06b6d4', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1, opacity: 0.2 }} />
-
-                    <View style={$.systemRow}>
-                        <Text style={$.systemLabel}>Version</Text>
-                        <Text style={$.systemValue}>2.0.0</Text>
-                    </View>
+                {/* System */}
+                <Fade delay={220}>
+                    <Panel>
+                        <Header title="SYSTEM" />
+                        <FieldRow
+                            label="CONN.......... BACKEND STATUS"
+                            value={online ? 'CONNECTED' : 'OFFLINE'}
+                            color={online ? C.good : C.bad}
+                        />
+                        <FieldRow
+                            label="DATA.......... DATA MODE"
+                            value={(dataMode || 'mock').toUpperCase()}
+                            color={dataMode === 'real' ? C.good : dataMode === 'hybrid' ? C.warn : C.muted}
+                        />
+                        <FieldRow label="VER........... BUILD" value="2.1.0" color={C.text} />
+                        <FieldRow label="ENG........... POSE ENGINE" value="MEDIAPIPE" color={C.text} />
+                        <FieldRow label="PRTO.......... PROTOCOL" value="HTTP/WS" color={C.textSub} dim />
+                    </Panel>
                 </Fade>
 
-                <View style={{ height: 40 }} />
+                <Footer lines={[
+                    { text: `END OF PROFILE · ${nowISO()}` },
+                    { text: `ATHLETE ${userTag} · ${sportTag} · L${lvl}` },
+                ]} />
             </ScrollView>
-        </View>
+        </TerminalScreen>
     );
 }
 
-// ── Styles ───────────────────────────────────────────────────────────────────
-// Pure black. No cards. No borders. Bold uppercase type. Nike DNA.
+const s = StyleSheet.create({
+    identity:  { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
+    prompt:    { fontSize: 12, color: C.textMid, fontFamily: T.MONO, fontWeight: '600' },
+    name:      { fontSize: 26, fontWeight: '700', color: '#E8E8E8', fontFamily: T.MONO, letterSpacing: 1, marginTop: 6 },
+    ident:     { fontSize: 11, color: C.textMid, fontFamily: T.MONO, letterSpacing: 1, marginTop: 6 },
+    code:      { fontSize: 10, color: C.muted, fontFamily: T.MONO, letterSpacing: 0.5, marginTop: 3 },
 
-const $ = StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#000' },
+    fsBody:   { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 14 },
+    fsBig:    { fontSize: 64, fontWeight: '700', fontFamily: T.MONO, letterSpacing: -3, lineHeight: 58 },
+    fsRight:  { marginLeft: 12, marginBottom: 4, flex: 1 },
+    fsMax:    { fontSize: 13, color: C.muted, fontFamily: T.MONO, fontWeight: '600' },
+    fsBand:   { fontSize: 11, fontFamily: T.MONO, fontWeight: '700', marginTop: 4, letterSpacing: 1 },
 
-    // Identity
-    identitySection: { alignItems: 'center', paddingTop: 32, paddingBottom: 32 },
-    avatarCircle: {
-        width: 80, height: 80, borderRadius: 40, backgroundColor: '#111',
-        alignItems: 'center', justifyContent: 'center', marginBottom: 16,
-        borderWidth: 2, borderColor: '#06b6d4',
-    },
-    avatarText: { fontSize: 28, fontWeight: '900', color: '#06b6d4', fontFamily: FONT_CONDENSED },
-    nameText: { fontSize: 22, fontWeight: '900', color: '#fff', fontFamily: FONT_CONDENSED, letterSpacing: 4, marginBottom: 6 },
-    metaText: { fontSize: 11, fontWeight: '700', color: '#4b5563', letterSpacing: 3 },
+    sparkWrap:  { paddingHorizontal: 0, paddingVertical: 10 },
+    sparkHead:  { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, marginBottom: 6 },
+    sparkLabel: { fontSize: 10, color: C.textMid, fontFamily: T.MONO, letterSpacing: 1, fontWeight: '700' },
+    sparkTrend: { fontSize: 11, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 0.5 },
 
-    // Stats row
-    statsSection: { paddingHorizontal: 24, marginBottom: 40 },
-    statsRow: { flexDirection: 'row', alignItems: 'center' },
-    statItem: { flex: 1, alignItems: 'center' },
-    statNumber: { fontSize: 24, fontWeight: '800', fontFamily: FONT_CONDENSED },
-    statLabel: { fontSize: 9, fontWeight: '600', color: '#4b5563', letterSpacing: 2, marginTop: 4 },
-    statDivider: { width: 1, height: 28, backgroundColor: '#1a1a1a' },
-
-    // Section
-    section: { paddingHorizontal: 24, marginBottom: 32 },
-    sectionLabel: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginBottom: 16 },
-
-    cardWrap: { paddingHorizontal: 20, marginBottom: 12 },
-
-    // Divider
-    divider: { height: 1, backgroundColor: '#1a1a1a' },
-
-    // Fitness level
-    levelBandRow: { flexDirection: 'row', gap: 3, height: 4, marginBottom: 16 },
-    levelSeg: { flex: 1, borderRadius: 2 },
-    levelInfoRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 16 },
-    levelScore: { fontSize: 32, fontWeight: '900', fontFamily: FONT_CONDENSED, marginRight: 12 },
-    levelName: { fontSize: 14, fontWeight: '700', letterSpacing: 2 },
-
-    // Action row (Nike style)
-    actionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18 },
-    actionTitle: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 2 },
-    actionArrow: { fontSize: 22, color: '#4b5563', fontWeight: '300' },
-
-    // Sessions
-    sessionRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
-    sessionDate: { fontSize: 12, fontWeight: '700', color: '#4b5563', letterSpacing: 1 },
-    sessionSep: { fontSize: 12, color: '#1a1a1a', marginHorizontal: 8 },
-    sessionSport: { fontSize: 13, fontWeight: '600', color: '#9ca3af' },
-    sessionScore: { fontSize: 20, fontWeight: '900', fontFamily: FONT_CONDENSED, marginRight: 10 },
-    sessionXp: { fontSize: 11, fontWeight: '800', color: '#22c55e', fontFamily: FONT_CONDENSED, marginRight: 10 },
-    sessionArrow: { fontSize: 18, color: '#4b5563', fontWeight: '300' },
-
-    // System
-    systemRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
-    systemLabel: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
-    systemValue: { fontSize: 12, fontWeight: '800', color: '#4b5563', letterSpacing: 1, fontFamily: FONT_CONDENSED },
-    statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-
-    // Empty
-    emptyHint: { fontSize: 13, fontWeight: '500', color: '#374151', marginBottom: 8 },
+    loadingWrap: { paddingVertical: 20, alignItems: 'center' },
+    emptyText:   { paddingVertical: 14, textAlign: 'center', color: C.muted, fontFamily: T.MONO, fontSize: 11, letterSpacing: 1 },
 });

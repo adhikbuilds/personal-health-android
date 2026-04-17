@@ -1,40 +1,56 @@
-// TrainingPlanScreen — Nike-inspired. Pure black canvas. Bold typography IS the design.
-// No cards. No borders. No containers. Content floats on black.
+// TrainingPlanScreen — Bloomberg terminal.
+// Weekly plan as a terminal schedule. Each day is a panel with drill list.
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView,
-    Platform, ActivityIndicator, Alert, RefreshControl, StatusBar,
+    View, Text, ScrollView, StyleSheet,
+    StatusBar, ActivityIndicator, Alert, RefreshControl, Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
-import { Tap, Fade, useAsyncTap } from '../ui';
-
-const FONT_CONDENSED = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
+import { Fade, useAsyncTap } from '../ui';
+import { C, T } from '../styles/colors';
+import {
+    Panel, Header, HdrMeta, Rule, FieldRow, Triad, SysBar, TerminalScreen, Footer, useLiveClock,
+    fmt, fmtInt, bandColor, nowISO,
+} from '../components/terminal';
 
 const TYPE_COLORS = {
-    strength:  '#f97316',
-    power:     '#ef4444',
-    speed:     '#facc15',
-    technique: '#06b6d4',
-    recovery:  '#22c55e',
-    rest:      '#4b5563',
+    strength:  C.warn,
+    power:     C.bad,
+    speed:     C.amber,
+    technique: C.info,
+    recovery:  C.good,
+    rest:      C.muted,
 };
 
-// ── Main Screen ─────────────────────────────────────────────────────────────
+function weekdayAbbr(dateStr) {
+    try {
+        return new Date(dateStr).toLocaleDateString('en', { weekday: 'short' }).toUpperCase();
+    } catch { return '---'; }
+}
+
+function mmddStr(dateStr) {
+    try {
+        const d = new Date(dateStr);
+        const p = (n) => String(n).padStart(2, '0');
+        return `${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    } catch { return '--/--'; }
+}
 
 export default function TrainingPlanScreen({ navigation }) {
     const ins = useSafeAreaInsets();
     const { userData } = useUser();
     const athleteId = userData?.avatarId || 'athlete_01';
+    const userTag = athleteId.toUpperCase();
+    const sportTag = (userData?.sport || 'general').toUpperCase().replace('_', '-');
+    const clock = useLiveClock();
 
     const [plan, setPlan] = useState(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [completing, setCompleting] = useState(null);
-
-    const today = new Date().toISOString().slice(0, 10);
 
     const fetchPlan = useCallback(async () => {
         const data = await api.getWeeklyPlan(athleteId);
@@ -44,7 +60,7 @@ export default function TrainingPlanScreen({ navigation }) {
 
     useEffect(() => { fetchPlan(); }, [fetchPlan]);
 
-    const [onRefresh, refreshPending] = useAsyncTap(async () => {
+    const [onRefresh] = useAsyncTap(async () => {
         setRefreshing(true);
         try { await fetchPlan(); } finally { setRefreshing(false); }
     }, { minInterval: 800 });
@@ -52,12 +68,12 @@ export default function TrainingPlanScreen({ navigation }) {
     const [handleRegenerate, regeneratePending] = useAsyncTap(async () => {
         return new Promise((resolve) => {
             Alert.alert(
-                'Regenerate Plan',
-                'This will create a fresh plan based on your latest data. Days already completed stay marked.',
+                'REGENERATE PLAN',
+                'Create a fresh plan based on latest telemetry. Completed days stay marked.',
                 [
-                    { text: 'Cancel', style: 'cancel', onPress: () => resolve() },
+                    { text: 'CANCEL', style: 'cancel', onPress: () => resolve() },
                     {
-                        text: 'Regenerate',
+                        text: 'REGENERATE',
                         onPress: async () => {
                             setLoading(true);
                             try {
@@ -77,194 +93,195 @@ export default function TrainingPlanScreen({ navigation }) {
     const handleComplete = useCallback(async (dateStr) => {
         setCompleting(dateStr);
         const result = await api.completePlanDay(athleteId, dateStr);
-        if (result) {
-            await fetchPlan();
-        }
+        if (result) await fetchPlan();
         setCompleting(null);
     }, [athleteId, fetchPlan]);
 
-    // ── Loading ─────────────────────────────────────────────────────────
     if (loading && !plan) {
         return (
-            <View style={[$.root, { paddingTop: ins.top }]}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" />
-                <View style={$.center}>
-                    <ActivityIndicator size="large" color="#06b6d4" />
-                    <Text style={$.loadingText}>LOADING</Text>
+            <TerminalScreen style={{ paddingTop: ins.top }}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <SysBar online={null} identity={`${userTag}.${sportTag}.PLAN`} clock={clock} />
+                <View style={s.center}>
+                    <ActivityIndicator size="small" color={C.text} />
+                    <Text style={s.loadingText}>FETCHING PLAN.....</Text>
                 </View>
-            </View>
+            </TerminalScreen>
         );
     }
 
-    // ── Error / empty ───────────────────────────────────────────────────
     if (!plan) {
         return (
-            <View style={[$.root, { paddingTop: ins.top }]}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" />
-                <View style={$.center}>
-                    <Text style={$.errorText}>COULD NOT LOAD PLAN</Text>
-                    <Tap onPress={fetchPlan} style={$.retryRow}>
-                        <Text style={$.retryText}>RETRY</Text>
-                        <Text style={$.retryArrow}>›</Text>
-                    </Tap>
+            <TerminalScreen style={{ paddingTop: ins.top }}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <SysBar online={null} identity={`${userTag}.${sportTag}.PLAN`} clock={clock} />
+                <View style={s.center}>
+                    <Text style={[s.loadingText, { color: C.bad }]}>PLAN UNAVAILABLE</Text>
+                    <Pressable onPress={fetchPlan} style={({ pressed }) => [s.retryBtn, pressed && { backgroundColor: '#111' }]}>
+                        <Text style={s.retryText}>[R] RETRY</Text>
+                    </Pressable>
                 </View>
-            </View>
+            </TerminalScreen>
         );
     }
 
     const days = plan.days || [];
+    const adherence = plan.adherence_pct || 0;
+    const adherenceCol = adherence >= 80 ? C.good : adherence >= 50 ? C.warn : C.bad;
 
     return (
-        <View style={[$.root, { paddingTop: ins.top }]}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" />
+        <TerminalScreen style={{ paddingTop: ins.top }}>
+            <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+
+            <SysBar online={true} identity={`${userTag}.${sportTag}.PLAN`} clock={clock} />
+
             <ScrollView
                 showsVerticalScrollIndicator={false}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#06b6d4" colors={['#06b6d4']} />}
+                contentContainerStyle={{ paddingBottom: 40 }}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text} colors={[C.text]} progressBackgroundColor="#000" />}
             >
 
-                {/* ═══ Header ═══ */}
-                <Fade style={$.topBar}>
-                    <View>
-                        <Text style={$.brand}>TRAINING PLAN</Text>
-                        <Text style={$.weekRange}>{plan.week_start} — {plan.week_end}</Text>
+                {/* Identity / header */}
+                <Fade style={s.identity}>
+                    <Text style={s.prompt}>{'> plan --week=current --sport='}{sportTag.toLowerCase()}</Text>
+                    <View style={s.headerRow}>
+                        <Text style={s.title}>WEEKLY PLAN</Text>
+                        <Pressable onPress={handleRegenerate} style={({ pressed }) => [s.actionBtn, pressed && { backgroundColor: '#111' }]}>
+                            <Text style={s.actionText}>[{regeneratePending ? 'WORKING' : 'REGEN'}]</Text>
+                        </Pressable>
                     </View>
-                    <Tap onPress={handleRegenerate}>
-                        <Text style={$.regenText}>{regeneratePending ? 'WORKING…' : 'REGEN ›'}</Text>
-                    </Tap>
+                    <Text style={s.range}>
+                        {plan.week_start} → {plan.week_end}
+                    </Text>
                 </Fade>
 
-                {/* ═══ Summary + Adherence ═══ */}
-                <Fade delay={100} style={$.summarySection}>
-                    {plan.summary ? <Text style={$.summaryText}>{plan.summary}</Text> : null}
-                    <View style={$.adherenceRow}>
-                        <Text style={$.adherenceLabel}>ADHERENCE</Text>
-                        <Text style={[$.adherenceValue, {
-                            color: (plan.adherence_pct || 0) >= 80 ? '#22c55e' : (plan.adherence_pct || 0) >= 50 ? '#f97316' : '#ef4444'
-                        }]}>{plan.adherence_pct || 0}%</Text>
-                    </View>
+                {/* Summary + adherence */}
+                <Fade delay={60}>
+                    <Panel>
+                        <Header title="PLAN SUMMARY" right={<HdrMeta color={adherenceCol}>ADH {adherence}%</HdrMeta>} />
+                        {plan.summary && (
+                            <View style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
+                                <Text style={s.summaryText}>{plan.summary}</Text>
+                            </View>
+                        )}
+                        <Rule />
+                        <Triad items={[
+                            { label: 'DAYS',     value: fmtInt(days.length), color: C.text },
+                            { label: 'DONE',     value: fmtInt(days.filter(d => d.completed).length), color: C.good },
+                            { label: 'REMAINING',value: fmtInt(days.filter(d => !d.completed && d.type !== 'rest').length), color: C.warn },
+                        ]} />
+                    </Panel>
                 </Fade>
 
-                {/* ═══ Day Sections ═══ */}
+                {/* Days */}
                 {days.map((day, idx) => {
-                    const color = TYPE_COLORS[day.type] || '#4b5563';
-                    const isToday = day.date === today;
+                    const col = TYPE_COLORS[day.type] || C.muted;
+                    const dateStr = day.date;
+                    const isToday = dateStr === new Date().toISOString().slice(0, 10);
+                    const drills = day.drills || [];
+                    const status = day.completed
+                        ? { label: 'DONE', color: C.good }
+                        : day.type === 'rest'
+                            ? { label: 'REST', color: C.muted }
+                            : isToday
+                                ? { label: 'TODAY', color: C.text }
+                                : { label: 'PENDING', color: C.textMid };
 
                     return (
-                        <Fade key={day.date} delay={200 + idx * 80} style={$.daySection}>
-                            {/* Day header */}
-                            <View style={$.dayHeader}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <View style={[$.typeDot, { backgroundColor: color }]} />
-                                    <Text style={$.dayName}>{day.day_name?.toUpperCase()}</Text>
-                                    {isToday && <Text style={$.todayBadge}>TODAY</Text>}
-                                    {day.completed && <Text style={$.doneBadge}>DONE</Text>}
-                                </View>
-                                <Text style={$.dayDate}>{day.date}</Text>
-                            </View>
+                        <Fade key={idx} delay={100 + idx * 40}>
+                            <Panel>
+                                <Header
+                                    title={`DAY ${idx + 1} · ${weekdayAbbr(dateStr)} ${mmddStr(dateStr)}`}
+                                    right={<HdrMeta color={col}>[{(day.type || 'SESSION').toUpperCase()}]</HdrMeta>}
+                                    accent={col}
+                                />
 
-                            {/* Type label */}
-                            <Text style={[$.typeLabel, { color }]}>{day.label}</Text>
+                                <FieldRow
+                                    label="STATUS........ DAY STATUS"
+                                    value={`[${status.label}]`}
+                                    color={status.color}
+                                />
+                                {day.volume_min != null && (
+                                    <FieldRow label="VOL........... MINUTES" value={`${fmtInt(day.volume_min)} MIN`} color={C.text} />
+                                )}
+                                {day.intensity != null && (
+                                    <FieldRow label="INT........... INTENSITY" value={`${fmtInt(day.intensity)}/10`} color={C.info} />
+                                )}
 
-                            {/* Meta */}
-                            {day.type !== 'rest' && (
-                                <Text style={$.dayMeta}>RPE {day.rpe}  ·  {day.duration_min} MIN</Text>
-                            )}
-
-                            {/* Rationale */}
-                            {day.rationale ? (
-                                <Text style={$.rationaleText}>{day.rationale}</Text>
-                            ) : null}
-
-                            {/* Drills */}
-                            {day.drills?.length > 0 && (
-                                <View style={$.drillsBlock}>
-                                    {day.drills.map((drill, i) => (
-                                        <View key={i} style={$.drillRow}>
-                                            <Text style={[$.drillSets, { color }]}>{drill.sets}</Text>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={$.drillName}>{drill.name}</Text>
-                                                {drill.cue ? <Text style={$.drillCue}>{drill.cue}</Text> : null}
-                                            </View>
+                                {drills.length > 0 && (
+                                    <>
+                                        <Rule />
+                                        <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
+                                            <HdrMeta>DRILLS</HdrMeta>
                                         </View>
-                                    ))}
-                                </View>
-                            )}
+                                        {drills.map((drill, di) => (
+                                            <View key={di} style={s.drillRow}>
+                                                <Text style={[s.drillIdx, { color: col }]}>▸</Text>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={s.drillName}>{String(drill.name || '--').toUpperCase()}</Text>
+                                                    <Text style={s.drillMeta}>
+                                                        {drill.sets || '--'}
+                                                        {drill.joint ? `  ·  ${String(drill.joint).toUpperCase()}` : ''}
+                                                    </Text>
+                                                    {drill.cue && <Text style={s.drillCue}>"{drill.cue}"</Text>}
+                                                </View>
+                                            </View>
+                                        ))}
+                                    </>
+                                )}
 
-                            {/* Complete action */}
-                            {!day.completed && day.type !== 'rest' && (
-                                <>
-                                    <View style={$.divider} />
-                                    <Tap onPress={() => handleComplete(day.date)} style={$.actionRow}>
-                                        <Text style={[$.actionTitle, { color }]}>MARK COMPLETE</Text>
-                                        <Text style={$.actionArrow}>›</Text>
-                                    </Tap>
-                                </>
-                            )}
-
-                            {/* Bottom divider between days */}
-                            <View style={$.thickDivider} />
+                                {!day.completed && day.type !== 'rest' && (
+                                    <Pressable
+                                        onPress={() => handleComplete(dateStr)}
+                                        disabled={completing === dateStr}
+                                        style={({ pressed }) => [
+                                            s.doneBtn,
+                                            pressed && { backgroundColor: '#111' },
+                                            completing === dateStr && { opacity: 0.5 },
+                                        ]}
+                                    >
+                                        <Text style={[s.doneBtnText, { color: col }]}>
+                                            [{completing === dateStr ? 'MARKING...' : 'MARK COMPLETE'}]
+                                        </Text>
+                                    </Pressable>
+                                )}
+                            </Panel>
                         </Fade>
                     );
                 })}
 
-                <View style={{ height: 40 }} />
+                <Footer lines={[
+                    { text: `END OF PLAN · ${nowISO()}` },
+                    { text: `WEEK ${plan.week_start} · ${days.length} DAYS · ADH ${adherence}%`, color: adherenceCol },
+                ]} />
             </ScrollView>
-        </View>
+        </TerminalScreen>
     );
 }
 
-// ── Styles ───────────────────────────────────────────────────────────────────
-// Pure black. No cards. No borders. Bold uppercase type. Nike DNA.
+const s = StyleSheet.create({
+    center:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    loadingText: { color: C.textMid, fontFamily: T.MONO, fontSize: 11, letterSpacing: 2, marginTop: 14 },
+    retryBtn:    { marginTop: 16, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: C.border },
+    retryText:   { color: C.text, fontFamily: T.MONO, fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
 
-const $ = StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#000' },
-    center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+    identity:  { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
+    prompt:    { fontSize: 11, color: C.textMid, fontFamily: T.MONO, fontWeight: '600' },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
+    title:     { fontSize: 22, fontWeight: '700', color: '#E8E8E8', fontFamily: T.MONO, letterSpacing: 1 },
+    range:     { fontSize: 11, color: C.textMid, fontFamily: T.MONO, marginTop: 4, letterSpacing: 1 },
 
-    // Top bar
-    topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 24, paddingTop: 12, marginBottom: 24 },
-    brand: { fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 3 },
-    weekRange: { fontSize: 12, fontWeight: '600', color: '#4b5563', marginTop: 4, fontFamily: FONT_CONDENSED, letterSpacing: 1 },
-    regenText: { fontSize: 12, fontWeight: '700', color: '#06b6d4', letterSpacing: 1 },
+    actionBtn: { paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: C.border },
+    actionText:{ fontSize: 11, color: C.text, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 1 },
 
-    // Summary
-    summarySection: { paddingHorizontal: 24, marginBottom: 32 },
-    summaryText: { fontSize: 14, fontWeight: '500', color: '#6b7280', lineHeight: 21, marginBottom: 16 },
-    adherenceRow: { flexDirection: 'row', alignItems: 'center' },
-    adherenceLabel: { fontSize: 9, fontWeight: '800', color: '#4b5563', letterSpacing: 2, marginRight: 10 },
-    adherenceValue: { fontSize: 22, fontWeight: '900', fontFamily: FONT_CONDENSED },
+    summaryText: { fontSize: 11, color: C.textSub, fontFamily: T.MONO, lineHeight: 16, letterSpacing: 0.3 },
 
-    // Day section
-    daySection: { paddingHorizontal: 24, marginBottom: 0 },
-    dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    typeDot: { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
-    dayName: { fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: 3, fontFamily: FONT_CONDENSED },
-    dayDate: { fontSize: 11, fontWeight: '600', color: '#374151', fontFamily: FONT_CONDENSED },
-    todayBadge: { fontSize: 9, fontWeight: '800', color: '#06b6d4', letterSpacing: 2, marginLeft: 10 },
-    doneBadge: { fontSize: 9, fontWeight: '800', color: '#22c55e', letterSpacing: 2, marginLeft: 10 },
+    drillRow:   { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#0A0A0A' },
+    drillIdx:   { fontSize: 12, fontFamily: T.MONO, fontWeight: '700', marginRight: 10, marginTop: 2 },
+    drillName:  { fontSize: 12, fontFamily: T.MONO, fontWeight: '700', color: '#E8E8E8', letterSpacing: 0.5 },
+    drillMeta:  { fontSize: 10, fontFamily: T.MONO, fontWeight: '600', color: C.textMid, marginTop: 2, letterSpacing: 0.5 },
+    drillCue:   { fontSize: 10, fontFamily: T.MONO, color: C.muted, marginTop: 2, fontStyle: 'italic' },
 
-    typeLabel: { fontSize: 18, fontWeight: '800', fontFamily: FONT_CONDENSED, marginBottom: 4 },
-    dayMeta: { fontSize: 11, fontWeight: '700', color: '#4b5563', letterSpacing: 2, marginBottom: 10 },
-
-    rationaleText: { fontSize: 13, fontWeight: '400', color: '#6b7280', fontStyle: 'italic', lineHeight: 20, marginBottom: 12 },
-
-    // Drills
-    drillsBlock: { marginBottom: 8 },
-    drillRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#1a1a1a' },
-    drillSets: { fontFamily: FONT_CONDENSED, fontSize: 12, fontWeight: '700', minWidth: 65, letterSpacing: 1 },
-    drillName: { fontSize: 13, fontWeight: '600', color: '#d1d5db', marginBottom: 2 },
-    drillCue: { fontSize: 11, fontWeight: '400', color: '#4b5563' },
-
-    // Action row
-    divider: { height: 1, backgroundColor: '#1a1a1a' },
-    thickDivider: { height: 1, backgroundColor: '#1a1a1a', marginTop: 20, marginBottom: 24 },
-    actionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16 },
-    actionTitle: { fontSize: 14, fontWeight: '700', letterSpacing: 2 },
-    actionArrow: { fontSize: 22, color: '#4b5563', fontWeight: '300' },
-
-    // States
-    loadingText: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginTop: 16 },
-    errorText: { fontSize: 15, fontWeight: '700', color: '#ef4444', letterSpacing: 2, marginBottom: 20 },
-    retryRow: { flexDirection: 'row', alignItems: 'center' },
-    retryText: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 2 },
-    retryArrow: { fontSize: 22, color: '#4b5563', fontWeight: '300', marginLeft: 8 },
+    doneBtn:    { margin: 12, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: C.border },
+    doneBtnText:{ fontSize: 12, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 1.5 },
 });

@@ -6,7 +6,7 @@ import React, { useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { UserProvider } from './src/context/UserContext';
@@ -144,23 +144,27 @@ export default function App() {
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
+const MONO_FONT = Platform.OS === 'android' ? 'monospace' : 'Menlo';
+
 const styles = StyleSheet.create({
+    // Terminal-style tab bar: dead black, mono labels, amber accent when active.
     tabBar: {
         backgroundColor: '#000',
-        borderTopColor: '#111',
+        borderTopColor: '#262B31',
         borderTopWidth: 1,
         height: 60,
         paddingBottom: 6,
         paddingTop: 6,
         elevation: 0,
     },
-    tabLabel: { fontSize: 10, fontWeight: '700', color: '#4b5563', letterSpacing: 1.5 },
-    tabLabelActive: { color: '#fff' },
+    tabLabel: { fontSize: 10, fontWeight: '700', color: '#5C4600', letterSpacing: 1.5, fontFamily: MONO_FONT },
+    tabLabelActive: { color: '#FFAA00' },
     toast: {
-        position: 'absolute', left: 20, right: 20,
-        backgroundColor: 'rgba(6,182,212,0.95)',
-        borderRadius: 14, padding: 14, alignItems: 'center',
+        position: 'absolute', left: 16, right: 16,
+        backgroundColor: '#000',
+        borderWidth: 1, borderColor: '#FFAA00',
+        padding: 12, alignItems: 'center',
         elevation: 99,
     },
-    toastText: { color: '#000', fontWeight: '800', fontSize: 13 },
+    toastText: { color: '#FFAA00', fontWeight: '700', fontSize: 11, letterSpacing: 1.5, fontFamily: MONO_FONT },
 });
