@@ -25,6 +25,13 @@ function initials(name) {
     return (name || 'AB').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 
+function profReadinessColor(band) {
+    return band === 'elite' ? '#22c55e'
+        : band === 'ready' ? '#06b6d4'
+        : band === 'caution' ? '#f97316'
+        : band === 'recover' ? '#ef4444' : '#4b5563';
+}
+
 function scoreColor(v) {
     if (v >= 75) return '#22c55e';
     if (v >= 50) return '#f97316';
@@ -167,23 +174,26 @@ export default function ProfileScreen({ navigation }) {
                     )}
                 </Fade>
 
-                {/* ═══ Performance snapshot ═══ */}
+                {/* ═══ Performance snapshot — pure black minimal tiles ═══ */}
                 {advanced && (
                     <Fade delay={250} style={$.snapshotRow}>
-                        <LinearGradient colors={GRADIENTS.cyan} start={{x:0,y:0}} end={{x:1,y:1}} style={$.snapshotCard}>
-                            <Text style={$.snapshotLabel}>FORM AVG</Text>
-                            <Text style={$.snapshotBig}>{Math.round(advanced.aggregate?.avg_form_score || 0)}</Text>
+                        <View style={$.snapshotTile}>
+                            <Text style={$.snapshotLabel}>FORM AVG · 60D</Text>
+                            <Text style={[$.snapshotBig, { color: '#06b6d4' }]}>
+                                {Math.round(advanced.aggregate?.avg_form_score || 0)}
+                            </Text>
                             <Sparkline data={(advanced.form_trend_series || []).map(t => t.score)}
-                                width={W/2 - 56} height={28} color="#fff" stroke={2.5} />
-                        </LinearGradient>
-                        <LinearGradient colors={GRADIENTS.violet} start={{x:0,y:0}} end={{x:1,y:1}} style={$.snapshotCard}>
+                                width={W/2 - 32} height={32} color="#06b6d4" stroke={2} />
+                        </View>
+                        <View style={$.snapshotTile}>
                             <Text style={$.snapshotLabel}>READINESS</Text>
-                            <View style={{ alignItems: 'center' }}>
-                                <Ring pct={advanced.readiness?.score || 0} color="#fff" size={70} stroke={5}
-                                    value={Math.round(advanced.readiness?.score || 0)} />
-                            </View>
-                            <Text style={$.snapshotBand}>{(advanced.readiness?.band || '').toUpperCase()}</Text>
-                        </LinearGradient>
+                            <Text style={[$.snapshotBig, { color: profReadinessColor(advanced.readiness?.band) }]}>
+                                {Math.round(advanced.readiness?.score || 0)}
+                            </Text>
+                            <Text style={[$.snapshotBand, { color: profReadinessColor(advanced.readiness?.band) }]}>
+                                {(advanced.readiness?.band || '').toUpperCase()}
+                            </Text>
+                        </View>
                     </Fade>
                 )}
 
@@ -301,14 +311,11 @@ const $ = StyleSheet.create({
     section: { paddingHorizontal: 24, marginBottom: 32 },
     sectionLabel: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginBottom: 16 },
 
-    snapshotRow: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 24 },
-    snapshotCard: {
-        flex: 1, marginHorizontal: 6, padding: 14, borderRadius: 14, minHeight: 140,
-        ...Platform.select({ android: { elevation: 5 }, ios: { shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 8 } }),
-    },
-    snapshotLabel: { fontSize: 9, fontWeight: '800', color: 'rgba(255,255,255,0.85)', letterSpacing: 2 },
-    snapshotBig: { fontSize: 30, fontWeight: '900', color: '#fff', fontFamily: FONT_CONDENSED, marginTop: 6, marginBottom: 4 },
-    snapshotBand: { fontSize: 9, color: 'rgba(255,255,255,0.85)', letterSpacing: 2, fontWeight: '700', marginTop: 6, textAlign: 'center' },
+    snapshotRow: { flexDirection: 'row', paddingHorizontal: 24, marginBottom: 28 },
+    snapshotTile: { flex: 1, paddingRight: 12 },
+    snapshotLabel: { fontSize: 9, fontWeight: '800', color: '#4b5563', letterSpacing: 2.5 },
+    snapshotBig: { fontSize: 34, fontWeight: '900', fontFamily: FONT_CONDENSED, marginTop: 4, marginBottom: 4 },
+    snapshotBand: { fontSize: 9, letterSpacing: 2, fontWeight: '800', marginTop: 4 },
 
     // Divider
     divider: { height: 1, backgroundColor: '#1a1a1a' },
