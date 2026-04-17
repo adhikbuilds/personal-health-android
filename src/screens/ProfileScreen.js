@@ -1,9 +1,9 @@
 // ProfileScreen — Nike-inspired. Pure black canvas. Bold typography IS the design.
 // No cards. No borders. No containers. Content floats on black.
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-    View, Text, ScrollView, StyleSheet, Pressable, Animated,
+    View, Text, ScrollView, StyleSheet,
     Dimensions, Platform, ActivityIndicator, StatusBar, RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,36 +12,10 @@ import { useUser } from '../context/UserContext';
 import api from '../services/api';
 import { LEVEL_COLORS, LEVEL_LABELS } from '../styles/colors';
 import { SPORT_LABELS } from '../data/constants';
+import { Tap, Fade } from '../ui';
 
 const { width: W } = Dimensions.get('window');
 const FONT_CONDENSED = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
-
-// ── Shared: Tap with scale ──────────────────────────────────────────────────
-
-function Tap({ onPress, children, style }) {
-    const s = useRef(new Animated.Value(1)).current;
-    return (
-        <Pressable onPress={onPress}
-            onPressIn={() => Animated.spring(s, { toValue: 0.96, useNativeDriver: true, speed: 50 }).start()}
-            onPressOut={() => Animated.spring(s, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 6 }).start()}>
-            <Animated.View style={[style, { transform: [{ scale: s }] }]}>{children}</Animated.View>
-        </Pressable>
-    );
-}
-
-// ── Shared: Fade in on mount ────────────────────────────────────────────────
-
-function Fade({ delay = 0, children, style }) {
-    const o = useRef(new Animated.Value(0)).current;
-    const y = useRef(new Animated.Value(20)).current;
-    useEffect(() => {
-        Animated.parallel([
-            Animated.timing(o, { toValue: 1, duration: 600, delay, useNativeDriver: true }),
-            Animated.spring(y, { toValue: 0, delay, useNativeDriver: true, speed: 12 }),
-        ]).start();
-    }, []);
-    return <Animated.View style={[style, { opacity: o, transform: [{ translateY: y }] }]}>{children}</Animated.View>;
-}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 // Shared UI primitives — used across all screens.
 // Tap feedback, fade-in animation, haptic touch, typography helpers.
 
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, Platform, StyleSheet, Text, View, Vibration } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -168,6 +168,43 @@ const ui = StyleSheet.create({
     divider: { height: 1, backgroundColor: '#1a1a1a' },
     dividerThick: { height: 2, backgroundColor: '#111' },
 });
+
+// ── Debounce + async-tap hooks ──────────────────────────────────────────────
+//
+// useDebouncedCallback — coalesces bursty calls (e.g. slider drag) into one.
+// useAsyncTap — prevents double-taps on refresh/regenerate buttons by
+//   dropping presses while the previous call is still in flight.
+
+export function useDebouncedCallback(fn, delay = 300) {
+    const timer = useRef(null);
+    const fnRef = useRef(fn);
+    useEffect(() => { fnRef.current = fn; }, [fn]);
+    useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+    return useCallback((...args) => {
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => fnRef.current(...args), delay);
+    }, [delay]);
+}
+
+export function useAsyncTap(fn, { minInterval = 400 } = {}) {
+    const [pending, setPending] = useState(false);
+    const lastCallRef = useRef(0);
+    const fnRef = useRef(fn);
+    useEffect(() => { fnRef.current = fn; }, [fn]);
+    const wrapped = useCallback(async (...args) => {
+        const now = Date.now();
+        if (pending) return;
+        if (now - lastCallRef.current < minInterval) return;
+        lastCallRef.current = now;
+        setPending(true);
+        try {
+            return await fnRef.current(...args);
+        } finally {
+            setPending(false);
+        }
+    }, [pending, minInterval]);
+    return [wrapped, pending];
+}
 
 export { CONDENSED, MONO };
 export default ui;

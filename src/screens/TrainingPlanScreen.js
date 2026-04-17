@@ -1,14 +1,15 @@
 // TrainingPlanScreen — Nike-inspired. Pure black canvas. Bold typography IS the design.
 // No cards. No borders. No containers. Content floats on black.
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView, Pressable, Animated,
+    View, Text, StyleSheet, ScrollView,
     Platform, ActivityIndicator, Alert, RefreshControl, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
+import { Tap, Fade, useAsyncTap } from '../ui';
 
 const FONT_CONDENSED = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
 
@@ -20,33 +21,6 @@ const TYPE_COLORS = {
     recovery:  '#22c55e',
     rest:      '#4b5563',
 };
-
-// ── Shared: Tap with scale ──────────────────────────────────────────────────
-
-function Tap({ onPress, children, style }) {
-    const s = useRef(new Animated.Value(1)).current;
-    return (
-        <Pressable onPress={onPress}
-            onPressIn={() => Animated.spring(s, { toValue: 0.96, useNativeDriver: true, speed: 50 }).start()}
-            onPressOut={() => Animated.spring(s, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 6 }).start()}>
-            <Animated.View style={[style, { transform: [{ scale: s }] }]}>{children}</Animated.View>
-        </Pressable>
-    );
-}
-
-// ── Shared: Fade in on mount ────────────────────────────────────────────────
-
-function Fade({ delay = 0, children, style }) {
-    const o = useRef(new Animated.Value(0)).current;
-    const y = useRef(new Animated.Value(20)).current;
-    useEffect(() => {
-        Animated.parallel([
-            Animated.timing(o, { toValue: 1, duration: 600, delay, useNativeDriver: true }),
-            Animated.spring(y, { toValue: 0, delay, useNativeDriver: true, speed: 12 }),
-        ]).start();
-    }, []);
-    return <Animated.View style={[style, { opacity: o, transform: [{ translateY: y }] }]}>{children}</Animated.View>;
-}
 
 // ── Main Screen ─────────────────────────────────────────────────────────────
 
@@ -70,30 +44,35 @@ export default function TrainingPlanScreen({ navigation }) {
 
     useEffect(() => { fetchPlan(); }, [fetchPlan]);
 
-    const onRefresh = useCallback(async () => {
+    const [onRefresh, refreshPending] = useAsyncTap(async () => {
         setRefreshing(true);
-        await fetchPlan();
-        setRefreshing(false);
-    }, [fetchPlan]);
+        try { await fetchPlan(); } finally { setRefreshing(false); }
+    }, { minInterval: 800 });
 
-    const handleRegenerate = useCallback(async () => {
-        Alert.alert(
-            'Regenerate Plan',
-            'This will create a fresh plan based on your latest data. Days already completed stay marked.',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Regenerate',
-                    onPress: async () => {
-                        setLoading(true);
-                        const data = await api.regeneratePlan(athleteId);
-                        if (data) setPlan(data);
-                        setLoading(false);
+    const [handleRegenerate, regeneratePending] = useAsyncTap(async () => {
+        return new Promise((resolve) => {
+            Alert.alert(
+                'Regenerate Plan',
+                'This will create a fresh plan based on your latest data. Days already completed stay marked.',
+                [
+                    { text: 'Cancel', style: 'cancel', onPress: () => resolve() },
+                    {
+                        text: 'Regenerate',
+                        onPress: async () => {
+                            setLoading(true);
+                            try {
+                                const data = await api.regeneratePlan(athleteId);
+                                if (data) setPlan(data);
+                            } finally {
+                                setLoading(false);
+                                resolve();
+                            }
+                        },
                     },
-                },
-            ],
-        );
-    }, [athleteId]);
+                ],
+            );
+        });
+    }, { minInterval: 1500 });
 
     const handleComplete = useCallback(async (dateStr) => {
         setCompleting(dateStr);
@@ -150,7 +129,7 @@ export default function TrainingPlanScreen({ navigation }) {
                         <Text style={$.weekRange}>{plan.week_start} — {plan.week_end}</Text>
                     </View>
                     <Tap onPress={handleRegenerate}>
-                        <Text style={$.regenText}>REGEN ›</Text>
+                        <Text style={$.regenText}>{regeneratePending ? 'WORKING…' : 'REGEN ›'}</Text>
                     </Tap>
                 </Fade>
 
