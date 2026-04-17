@@ -10,6 +10,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { UserProvider } from './src/context/UserContext';
+import ErrorBoundary from './src/ErrorBoundary';
 
 // Tabs
 import HomeScreen from './src/screens/HomeScreen';
@@ -129,12 +130,14 @@ export default function App() {
     return (
         <SafeAreaProvider>
             <StatusBar style="light" backgroundColor="transparent" translucent />
-            <UserProvider>
-                <NavigationContainer>
-                    <AppNavigator showToast={showToast} />
-                </NavigationContainer>
-                <ToastOverlay message={toastMsg} />
-            </UserProvider>
+            <ErrorBoundary>
+                <UserProvider>
+                    <NavigationContainer>
+                        <AppNavigator showToast={showToast} />
+                    </NavigationContainer>
+                    <ToastOverlay message={toastMsg} />
+                </UserProvider>
+            </ErrorBoundary>
         </SafeAreaProvider>
     );
 }

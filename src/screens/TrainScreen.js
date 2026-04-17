@@ -95,6 +95,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
     const isCapturingRef = useRef(false); // prevents overlapping captures
     const lastPhaseRef = useRef(null);
     const analysisModeRef = useRef('sim');
+    const lastGoodMetricsRef = useRef(null); // kept across connection drops
     const [repCount, setRepCount] = useState(0);
 
     // #3 Bouncy CTA on mount
@@ -212,6 +213,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
                         estimated_jump_height: result.estimated_jump_height ?? 0,
                     };
                     setMetrics(frame);
+                    lastGoodMetricsRef.current = frame;
                     setAnalysisMode('real');
                     analysisModeRef.current = 'real';
                     setFrameNum(n => n + 1);
@@ -407,11 +409,18 @@ export default function TrainScreen({ showToast, navigation, route }) {
 
     // ── Live Camera View ──────────────────────────────────────────────────────────
 
-    const qColor = metrics ? (Q_COLORS[metrics.form_quality] || '#06b6d4') : '#06b6d4';
+    // During error, fall back to the last good frame so the overlay doesn't
+    // go blank — users stay oriented while the backend reconnects.
+    const displayMetrics = analysisMode === 'error'
+        ? (metrics || lastGoodMetricsRef.current)
+        : metrics;
+    const staleMetrics = analysisMode === 'error' && !metrics && lastGoodMetricsRef.current;
+
+    const qColor = displayMetrics ? (Q_COLORS[displayMetrics.form_quality] || '#06b6d4') : '#06b6d4';
     const modeLabel = analysisMode === 'real' ? 'REAL AI'
         : analysisMode === 'no_pose' ? 'NO POSE'
         : analysisMode === 'waiting' ? 'ANALYZING...'
-        : analysisMode === 'error' ? 'CONNECTION LOST'
+        : analysisMode === 'error' ? (staleMetrics ? 'OFFLINE · LAST SEEN' : 'CONNECTION LOST')
         : 'WAITING';
     const modeColor = analysisMode === 'real' ? '#22c55e'
         : analysisMode === 'no_pose' ? '#f97316'
@@ -440,13 +449,13 @@ export default function TrainScreen({ showToast, navigation, route }) {
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: modeColor, marginRight: 8 }} />
                     <Text style={[s.overlayMode, { color: modeColor }]}>{modeLabel}</Text>
                 </View>
-                {metrics && (
-                    <>
-                        <Text style={s.overlayAngle}>{`KNEE  ${metrics.knee_angle_l?.toFixed(0)}°`}</Text>
-                        <Text style={s.overlayAngle}>{`HIP   ${metrics.hip_angle_l?.toFixed(0)}°`}</Text>
-                        <Text style={s.overlayAngle}>{`TRUNK ${metrics.trunk_lean?.toFixed(0)}°`}</Text>
-                        <Text style={s.overlayAngle}>{`SYM   ${metrics.limb_symmetry_idx?.toFixed(2)}`}</Text>
-                    </>
+                {displayMetrics && (
+                    <View style={{ opacity: staleMetrics ? 0.5 : 1 }}>
+                        <Text style={s.overlayAngle}>{`KNEE  ${displayMetrics.knee_angle_l?.toFixed(0)}°`}</Text>
+                        <Text style={s.overlayAngle}>{`HIP   ${displayMetrics.hip_angle_l?.toFixed(0)}°`}</Text>
+                        <Text style={s.overlayAngle}>{`TRUNK ${displayMetrics.trunk_lean?.toFixed(0)}°`}</Text>
+                        <Text style={s.overlayAngle}>{`SYM   ${displayMetrics.limb_symmetry_idx?.toFixed(2)}`}</Text>
+                    </View>
                 )}
             </View>
 
@@ -465,7 +474,9 @@ export default function TrainScreen({ showToast, navigation, route }) {
                             {analysisMode === 'no_pose'
                                 ? 'Stand back — full body must be visible, head to feet'
                                 : analysisMode === 'error'
-                                ? 'Check your connection. Frames will be analyzed when reconnected.'
+                                ? (staleMetrics
+                                    ? `Offline — showing last good frame. ${displayMetrics?.primary_feedback || ''}`.trim()
+                                    : 'Check your connection. Frames will be analyzed when reconnected.')
                                 : analysisMode === 'real'
                                 ? (metrics?.primary_feedback || 'Great form!')
                                 : 'Point camera at your full body. Stay still...'}
