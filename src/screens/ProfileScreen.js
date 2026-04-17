@@ -14,7 +14,8 @@ import { LEVEL_COLORS, LEVEL_LABELS } from '../styles/colors';
 import { SPORT_LABELS } from '../data/constants';
 import { Tap, Fade } from '../ui';
 import { Ring, Sparkline, Gauge, Bar as ChartBar } from '../components/charts';
-import { GRADIENTS } from '../styles/colors';
+import { Card, StatTriad, SectionHead } from '../components/primitives';
+import { C, T } from '../styles/colors';
 
 const { width: W } = Dimensions.get('window');
 const FONT_CONDENSED = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
@@ -174,39 +175,40 @@ export default function ProfileScreen({ navigation }) {
                     )}
                 </Fade>
 
-                {/* ═══ Performance snapshot — pure black minimal tiles ═══ */}
+                {/* ═══ Performance snapshot — Card with triad + sparkline ═══ */}
                 {advanced && (
-                    <Fade delay={250} style={$.snapshotRow}>
-                        <View style={$.snapshotTile}>
-                            <Text style={$.snapshotLabel}>FORM AVG · 60D</Text>
-                            <Text style={[$.snapshotBig, { color: '#06b6d4' }]}>
-                                {Math.round(advanced.aggregate?.avg_form_score || 0)}
-                            </Text>
-                            <Sparkline data={(advanced.form_trend_series || []).map(t => t.score)}
-                                width={W/2 - 32} height={32} color="#06b6d4" stroke={2} />
-                        </View>
-                        <View style={$.snapshotTile}>
-                            <Text style={$.snapshotLabel}>READINESS</Text>
-                            <Text style={[$.snapshotBig, { color: profReadinessColor(advanced.readiness?.band) }]}>
-                                {Math.round(advanced.readiness?.score || 0)}
-                            </Text>
-                            <Text style={[$.snapshotBand, { color: profReadinessColor(advanced.readiness?.band) }]}>
-                                {(advanced.readiness?.band || '').toUpperCase()}
-                            </Text>
-                        </View>
+                    <Fade delay={250} style={$.cardWrap}>
+                        <Card accent={C.info}>
+                            <SectionHead title="LAST 60 DAYS" />
+                            <StatTriad items={[
+                                { label: 'FORM AVG', value: Math.round(advanced.aggregate?.avg_form_score || 0), color: C.info },
+                                { label: 'READINESS', value: Math.round(advanced.readiness?.score || 0), caption: (advanced.readiness?.band || '').toUpperCase(), color: profReadinessColor(advanced.readiness?.band) },
+                                { label: 'SESSIONS', value: advanced.aggregate?.total_sessions || 0, color: C.text },
+                            ]} />
+                            <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: C.border }}>
+                                <Text style={[T.micro, { marginBottom: 8 }]}>FORM TRAJECTORY</Text>
+                                <Sparkline
+                                    data={(advanced.form_trend_series || []).map(t => t.score)}
+                                    width={W - 80} height={56}
+                                    color={C.info} stroke={2.5}
+                                />
+                            </View>
+                        </Card>
                     </Fade>
                 )}
 
                 {advanced && (
-                    <Fade delay={280} style={$.section}>
-                        <Text style={$.sectionLabel}>QUALITY MIX</Text>
-                        <ChartBar
-                            data={[
-                                { label: 'ELITE', value: advanced.aggregate?.quality_distribution?.elite || 0, color: '#22c55e' },
-                                { label: 'GOOD',  value: advanced.aggregate?.quality_distribution?.good || 0, color: '#06b6d4' },
-                                { label: 'AVG',   value: advanced.aggregate?.quality_distribution?.average || 0, color: '#f97316' },
-                                { label: 'POOR',  value: advanced.aggregate?.quality_distribution?.poor || 0, color: '#ef4444' },
-                            ]} width={W - 48} height={140} />
+                    <Fade delay={280} style={$.cardWrap}>
+                        <Card>
+                            <SectionHead title="QUALITY MIX" />
+                            <ChartBar
+                                data={[
+                                    { label: 'ELITE', value: advanced.aggregate?.quality_distribution?.elite || 0, color: C.good },
+                                    { label: 'GOOD',  value: advanced.aggregate?.quality_distribution?.good || 0, color: C.info },
+                                    { label: 'AVG',   value: advanced.aggregate?.quality_distribution?.average || 0, color: C.warn },
+                                    { label: 'POOR',  value: advanced.aggregate?.quality_distribution?.poor || 0, color: C.bad },
+                                ]} width={W - 80} height={140} />
+                        </Card>
                     </Fade>
                 )}
 
@@ -311,11 +313,7 @@ const $ = StyleSheet.create({
     section: { paddingHorizontal: 24, marginBottom: 32 },
     sectionLabel: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginBottom: 16 },
 
-    snapshotRow: { flexDirection: 'row', paddingHorizontal: 24, marginBottom: 28 },
-    snapshotTile: { flex: 1, paddingRight: 12 },
-    snapshotLabel: { fontSize: 9, fontWeight: '800', color: '#4b5563', letterSpacing: 2.5 },
-    snapshotBig: { fontSize: 34, fontWeight: '900', fontFamily: FONT_CONDENSED, marginTop: 4, marginBottom: 4 },
-    snapshotBand: { fontSize: 9, letterSpacing: 2, fontWeight: '800', marginTop: 4 },
+    cardWrap: { paddingHorizontal: 20, marginBottom: 12 },
 
     // Divider
     divider: { height: 1, backgroundColor: '#1a1a1a' },

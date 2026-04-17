@@ -1,21 +1,25 @@
-// HomeScreen — Premium Nike/Adidas language.
-// Pure black canvas. Confident type. Single focal point per section.
-// Colored accents only on data. No cards, no borders — the numbers carry.
+// HomeScreen — referenced from Linear (structure), Whoop (hero restraint),
+// Strava (stat triad), Apple Fitness (ring hierarchy), Arc Browser (depth
+// without shadows). Every block is a flat-surface Card with a hairline
+// border and one accent colour per meaning.
 
 import React, { useEffect, useState, useRef } from 'react';
 import {
     View, Text, ScrollView, StyleSheet, Animated,
-    Dimensions, Platform, StatusBar, RefreshControl,
+    Dimensions, Platform, StatusBar, RefreshControl, Pressable,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
 import { DAILY_TRACKER_DEFAULTS } from '../data/constants';
-import { Tap, Fade, CountUp, PulsingDot, ProgressRing, CONDENSED } from '../ui';
+
+import { Tap, Fade, PulsingDot, ProgressRing } from '../ui';
+import { Card, StatTriad, StatCell, Chip, Divider, ListRow, SectionHead, TextButton } from '../components/primitives';
 import { Sparkline, Heatmap } from '../components/charts';
-import { sportColor, sportLabel } from '../config/sports';
+import { C, T } from '../styles/colors';
+import { sportLabel } from '../config/sports';
 
 const { width: W } = Dimensions.get('window');
 
@@ -23,79 +27,46 @@ const { width: W } = Dimensions.get('window');
 
 function greet() {
     const h = new Date().getHours();
-    return h < 5 ? 'Late night' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+    return h < 5 ? 'LATE NIGHT' : h < 12 ? 'GOOD MORNING' : h < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING';
 }
 
-function motivation(streak) {
-    if (streak >= 14) return "You're on fire. Keep the fire burning.";
-    if (streak >= 7) return "A full week. That's real consistency.";
-    if (streak >= 3) return "Momentum builds. Stay with it.";
-    if (streak >= 1) return "Yesterday was good. Make today better.";
-    return "Every champion started with one session.";
+function readinessBandColor(band) {
+    if (band === 'elite') return C.good;
+    if (band === 'ready') return C.good;
+    if (band === 'caution') return C.warn;
+    if (band === 'recover') return C.bad;
+    return C.textMid;
 }
 
-function readinessColor(band) {
-    return band === 'elite' ? '#22c55e'
-        : band === 'ready' ? '#06b6d4'
-        : band === 'caution' ? '#f97316'
-        : band === 'recover' ? '#ef4444' : '#64748b';
+function acwrBandColor(band) {
+    if (band === 'sweet spot') return C.good;
+    if (band === 'high') return C.warn;
+    if (band && band.startsWith('spike')) return C.bad;
+    if (band === 'under-loaded') return C.info;
+    return C.textMid;
 }
 
-function acwrColor(band) {
-    return band === 'sweet spot' ? '#22c55e'
-        : band === 'high' ? '#f97316'
-        : band && band.startsWith('spike') ? '#ef4444'
-        : band === 'under-loaded' ? '#38bdf8' : '#64748b';
+function trendColor(v) {
+    if (v > 0.5) return C.good;
+    if (v < -0.5) return C.bad;
+    return C.textMid;
 }
 
-function trendSymbol(v) { return v > 0 ? '▲' : v < 0 ? '▼' : '—'; }
-function trendColor(v) { return v > 0 ? '#22c55e' : v < 0 ? '#ef4444' : '#64748b'; }
+function deltaLabel(v) {
+    const n = Math.abs(v).toFixed(1);
+    const sym = v > 0 ? '↑' : v < 0 ? '↓' : '·';
+    return `${sym} ${n}%`;
+}
 
 // Animated horizontal bar for the daily tracker.
-function Bar({ pct, color, delay }) {
+function TrackBar({ pct, color, delay }) {
     const w = useRef(new Animated.Value(0)).current;
     useEffect(() => {
         Animated.timing(w, { toValue: pct, duration: 900, delay: delay + 200, useNativeDriver: false }).start();
     }, [pct]);
     return (
-        <View style={$.barTrack}>
-            <Animated.View style={[$.barFill, { backgroundColor: color, width: w.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
-        </View>
-    );
-}
-
-// A single tap-to-navigate row with a colored left stroke — replaces the
-// generic gradient dividers for a crisper, more intentional feel.
-function QuickRow({ label, caption, color, onPress }) {
-    const scale = useRef(new Animated.Value(1)).current;
-    const onIn = () => Animated.spring(scale, { toValue: 0.98, useNativeDriver: true, speed: 50 }).start();
-    const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 6 }).start();
-    return (
-        <Animated.View style={{ transform: [{ scale }] }}>
-            <Tap onPress={onPress}>
-                <View style={$.quickRow}>
-                    <View style={[$.quickStroke, { backgroundColor: color }]} />
-                    <View style={{ flex: 1 }}>
-                        <Text style={$.quickLabel}>{label}</Text>
-                        {!!caption && <Text style={$.quickCaption}>{caption}</Text>}
-                    </View>
-                    <Text style={[$.quickArrow, { color }]}>→</Text>
-                </View>
-            </Tap>
-        </Animated.View>
-    );
-}
-
-// A tight 2-column stat row with labels on the left and big condensed
-// numbers on the right. Reads like a scoreboard.
-function ScoreboardRow({ label, value, color = '#fff', caption }) {
-    return (
-        <View style={$.scoreRow}>
-            <Text style={$.scoreLabel}>{label}</Text>
-            <View style={{ alignItems: 'flex-end' }}>
-                <Text style={[$.scoreValue, { color }]}>{value}</Text>
-                {!!caption && <Text style={[$.scoreCaption, { color }]}>{caption}</Text>}
-            </View>
+        <View style={s.barTrack}>
+            <Animated.View style={[s.barFill, { backgroundColor: color, width: w.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
         </View>
     );
 }
@@ -110,7 +81,6 @@ export default function HomeScreen({ navigation }) {
     const [tracker, setTracker] = useState(DAILY_TRACKER_DEFAULTS);
     const [metrics, setMetrics] = useState(null);
 
-    const accent = sportColor(userData.sport || 'vertical_jump');
     const TK = `@dt_${new Date().toISOString().slice(0, 10)}`;
 
     const load = () => {
@@ -127,242 +97,226 @@ export default function HomeScreen({ navigation }) {
         setTimeout(() => setRefreshing(false), 800);
     };
 
-    // Hero score ring — pulse glow sync
-    const ringGlow = useRef(new Animated.Value(0.8)).current;
+    const ringGlow = useRef(new Animated.Value(0.92)).current;
     useEffect(() => {
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(ringGlow, { toValue: 1, duration: 2000, useNativeDriver: true }),
-                Animated.timing(ringGlow, { toValue: 0.8, duration: 2000, useNativeDriver: true }),
-            ])
-        ).start();
-    }, []);
-
-    // CTA bounce on mount
-    const ctaBounce = useRef(new Animated.Value(0.9)).current;
-    useEffect(() => {
-        Animated.spring(ctaBounce, { toValue: 1, useNativeDriver: true, speed: 5, bounciness: 12 }).start();
+        Animated.loop(Animated.sequence([
+            Animated.timing(ringGlow, { toValue: 1, duration: 2400, useNativeDriver: true }),
+            Animated.timing(ringGlow, { toValue: 0.92, duration: 2400, useNativeDriver: true }),
+        ])).start();
     }, []);
 
     const sc = fitnessScore?.score || 0;
-    const scColor = fitnessScore?.color || accent;
-    const first = (userData.name || 'Athlete').split(' ')[0].toUpperCase();
-    const full = (userData.name || 'Athlete').toUpperCase();
-    const daily = Object.values(tracker);
+    const scColor = fitnessScore?.color || C.accent;
+    const first = (userData.name || 'Athlete').split(' ')[0];
     const sportName = sportLabel(userData.sport || 'vertical_jump');
 
-    return (
-        <View style={[$.root, { paddingTop: ins.top }]}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+    const readinessScore = metrics?.readiness?.score;
+    const readinessBand = metrics?.readiness?.band;
+    const acwr = metrics?.acwr?.acwr ?? 0;
+    const trendPct = metrics?.trend_pct ?? 0;
+    const momentum = metrics?.momentum ?? 0;
 
-            {/* Subtle top-down gradient wash gives the hero visual weight without
-                a card background — matches Whoop/Nike Training Club DNA. */}
-            <LinearGradient
-                colors={[accent + '25', 'transparent']}
-                style={$.heroWash}
-                pointerEvents="none"
-            />
+    return (
+        <View style={[s.root, { paddingTop: ins.top }]}>
+            <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
 
             <ScrollView
                 showsVerticalScrollIndicator={false}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#444" progressBackgroundColor="#000" colors={[accent]} />}
+                contentContainerStyle={{ paddingBottom: 56 }}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.border} colors={[C.accent]} progressBackgroundColor={C.bg2} />}
             >
 
-                {/* ═══ Brand row ═══ */}
-                <Fade style={$.top}>
-                    <Text style={$.brand}>ACTIVE<Text style={{ color: accent }}>BHARAT</Text></Text>
-                    <View style={$.onlineWrap}>
-                        <PulsingDot color={online ? '#22c55e' : online === false ? '#ef4444' : '#facc15'} size={6} />
-                        <Text style={[$.onlineText, { color: online ? '#22c55e' : online === false ? '#ef4444' : '#facc15' }]}>
+                {/* ═══ Brand + status ═══ */}
+                <Fade style={s.topBar}>
+                    <Text style={s.brand}>
+                        ACTIVE<Text style={{ color: C.accent }}>BHARAT</Text>
+                    </Text>
+                    <View style={s.statusWrap}>
+                        <PulsingDot color={online ? C.good : online === false ? C.bad : C.warn} size={6} />
+                        <Text style={[s.statusText, { color: online ? C.good : online === false ? C.bad : C.warn }]}>
                             {online ? 'LIVE' : online === false ? 'OFFLINE' : 'SYNC'}
                         </Text>
                     </View>
                 </Fade>
 
-                {/* ═══ Greeting + name hero ═══ */}
-                <Fade delay={40} style={$.greetSection}>
-                    <Text style={$.greetText}>{greet()}</Text>
-                    <Text style={$.heroName}>{first}</Text>
-                    <View style={$.tierRow}>
-                        <Text style={[$.tierBadge, { color: accent }]}>L{userData.level || 1}</Text>
-                        <View style={$.tierDot} />
-                        <Text style={$.tierText}>{(userData.tier || 'District').toUpperCase()}</Text>
-                        <View style={$.tierDot} />
-                        <Text style={$.tierText}>{sportName.toUpperCase()}</Text>
+                {/* ═══ Greeting ═══ */}
+                <Fade delay={40} style={s.greetSection}>
+                    <Text style={T.micro}>{greet()}</Text>
+                    <Text style={s.heroName}>{first}</Text>
+                    <View style={s.tierRow}>
+                        <Chip label={`L${userData.level || 1}`} color={C.accent} bg="rgba(198,255,61,0.08)" />
+                        <Text style={s.tierSep}>·</Text>
+                        <Text style={s.tierText}>{(userData.tier || 'District').toUpperCase()}</Text>
+                        <Text style={s.tierSep}>·</Text>
+                        <Text style={s.tierText}>{sportName.toUpperCase()}</Text>
                     </View>
                 </Fade>
 
-                {/* ═══ Fitness Score — THE focal point ═══ */}
-                <Fade delay={120} style={$.scoreHero}>
-                    <View style={$.scoreLeft}>
-                        <Text style={$.eyebrow}>FITNESS SCORE</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                            <CountUp to={sc} duration={1200} delay={300} style={[$.heroScoreBig, { color: scColor }]} />
-                            <Text style={$.heroScoreDiv}>/100</Text>
-                        </View>
-                        <Text style={[$.heroScoreBand, { color: scColor }]}>
-                            {(fitnessScore?.label || 'Not tested').toUpperCase()}
-                        </Text>
-                        {metrics && (
-                            <View style={$.trendPill}>
-                                <Text style={[$.trendArrow, { color: trendColor(metrics.trend_pct || 0) }]}>
-                                    {trendSymbol(metrics.trend_pct || 0)}
+                {/* ═══ HERO — Fitness Score ═══ */}
+                <Fade delay={100} style={{ paddingHorizontal: 20 }}>
+                    <Card padding={0} style={{ overflow: 'hidden' }}>
+                        <View style={s.heroInner}>
+                            <View style={s.heroLeft}>
+                                <Text style={T.micro}>FITNESS SCORE</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 8 }}>
+                                    <Text style={[T.display, { color: scColor }]}>{sc}</Text>
+                                    <Text style={s.heroDiv}>/100</Text>
+                                </View>
+                                <Text style={[s.heroBand, { color: scColor }]}>
+                                    {(fitnessScore?.label || 'Not tested').toUpperCase()}
                                 </Text>
-                                <Text style={[$.trendText, { color: trendColor(metrics.trend_pct || 0) }]}>
-                                    {Math.abs(metrics.trend_pct || 0).toFixed(1)}%
-                                </Text>
-                                <Text style={$.trendUnit}>14D</Text>
+                                {metrics && (
+                                    <View style={s.heroChips}>
+                                        <View style={[s.heroChip, { borderColor: trendColor(trendPct) + '44' }]}>
+                                            <Text style={[s.heroChipText, { color: trendColor(trendPct) }]}>
+                                                {deltaLabel(trendPct)} · 14D
+                                            </Text>
+                                        </View>
+                                    </View>
+                                )}
                             </View>
-                        )}
-                    </View>
-                    <Animated.View style={[$.ringWrap, { opacity: ringGlow }]}>
-                        <ProgressRing pct={sc} color={scColor} size={128} stroke={6} />
-                    </Animated.View>
+                            <Animated.View style={{ opacity: ringGlow, marginLeft: 12 }}>
+                                <ProgressRing pct={sc} color={scColor} size={112} stroke={4} />
+                            </Animated.View>
+                        </View>
+                    </Card>
                 </Fade>
 
-                {/* ═══ Scoreboard — dense numbers, all aligned right ═══ */}
-                <View style={$.scoreboard}>
-                    <ScoreboardRow label="BPI" value={(userData.bpi || 0).toLocaleString()} color={accent} />
-                    <View style={$.scoreSep} />
-                    <ScoreboardRow label="SESSIONS" value={userData.sessions || 0} color="#22c55e" />
-                    <View style={$.scoreSep} />
-                    <ScoreboardRow label="STREAK" value={`${userData.streak || 0}`} caption={userData.streak === 1 ? 'DAY' : 'DAYS'} color="#f97316" />
-                    {metrics?.readiness && (
-                        <>
-                            <View style={$.scoreSep} />
-                            <ScoreboardRow
-                                label="READINESS"
-                                value={Math.round(metrics.readiness.score || 0)}
-                                caption={(metrics.readiness.band || '').toUpperCase()}
-                                color={readinessColor(metrics.readiness.band)}
-                            />
-                        </>
-                    )}
-                    {metrics && (
-                        <>
-                            <View style={$.scoreSep} />
-                            <ScoreboardRow
-                                label="ACWR"
-                                value={(metrics.acwr?.acwr || 0).toFixed(2)}
-                                caption={(metrics.acwr?.band || '').toUpperCase()}
-                                color={acwrColor(metrics.acwr?.band)}
-                            />
-                            <View style={$.scoreSep} />
-                            <ScoreboardRow
-                                label="INTENSITY"
-                                value={Math.round(metrics.latest_intensity || 0)}
-                                caption="LAST"
-                                color="#a855f7"
-                            />
-                        </>
-                    )}
-                </View>
+                {/* ═══ Scoreboard triad — Strava pattern ═══ */}
+                <Fade delay={140} style={{ paddingHorizontal: 20, marginTop: 16 }}>
+                    <Card>
+                        <StatTriad items={[
+                            { label: 'BPI', value: (userData.bpi || 0).toLocaleString(), color: C.accent },
+                            { label: 'SESSIONS', value: userData.sessions || 0, color: C.text },
+                            { label: 'STREAK', value: userData.streak || 0, caption: (userData.streak === 1 ? 'DAY' : 'DAYS'), color: C.good },
+                        ]} />
+                    </Card>
+                </Fade>
 
-                {/* ═══ Momentum trail — full-bleed sparkline with area fill ═══ */}
+                {/* ═══ Performance triad (readiness / acwr / intensity) ═══ */}
+                {metrics && (
+                    <Fade delay={180} style={{ paddingHorizontal: 20, marginTop: 12 }}>
+                        <Card>
+                            <StatTriad items={[
+                                {
+                                    label: 'READINESS',
+                                    value: Math.round(readinessScore || 0),
+                                    caption: (readinessBand || '').toUpperCase(),
+                                    color: readinessBandColor(readinessBand),
+                                },
+                                {
+                                    label: 'ACWR',
+                                    value: acwr.toFixed(2),
+                                    caption: (metrics.acwr?.band || '').toUpperCase(),
+                                    color: acwrBandColor(metrics.acwr?.band),
+                                },
+                                {
+                                    label: 'INTENSITY',
+                                    value: Math.round(metrics.latest_intensity || 0),
+                                    caption: 'LAST',
+                                    color: C.info,
+                                },
+                            ]} />
+                        </Card>
+                    </Fade>
+                )}
+
+                {/* ═══ Momentum card ═══ */}
                 {metrics?.form_trend_series?.length > 1 && (
-                    <Fade delay={220} style={$.momentumSection}>
-                        <View style={$.momentumHeader}>
-                            <View>
-                                <Text style={$.eyebrow}>MOMENTUM · 14D</Text>
-                                <Text style={[$.momentumValue, { color: trendColor(metrics.momentum || 0) }]}>
-                                    {(metrics.momentum || 0) > 0 ? '+' : ''}{(metrics.momentum || 0).toFixed(1)}
+                    <Fade delay={220} style={{ paddingHorizontal: 20, marginTop: 12 }}>
+                        <Card accent={trendColor(momentum)}>
+                            <SectionHead title="MOMENTUM · 14D" right={
+                                <Text style={[s.momentumValue, { color: trendColor(momentum) }]}>
+                                    {momentum > 0 ? '+' : ''}{momentum.toFixed(1)}
                                 </Text>
-                            </View>
-                            <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={$.eyebrow}>AVG FORM</Text>
-                                <Text style={[$.momentumAvg, { color: '#f1f5f9' }]}>
-                                    {Math.round(metrics.aggregate?.avg_form_score || 0)}
-                                </Text>
-                            </View>
-                        </View>
-                        <View style={$.sparkWrap}>
+                            } />
                             <Sparkline
                                 data={metrics.form_trend_series.map(t => t.score)}
-                                width={W - 48} height={72}
-                                color={trendColor(metrics.momentum || 0) === '#64748b' ? accent : trendColor(metrics.momentum || 0)}
+                                width={W - 80} height={64}
+                                color={trendColor(momentum) === C.textMid ? C.info : trendColor(momentum)}
                                 stroke={2.5}
                             />
-                        </View>
+                            <View style={s.momentumFoot}>
+                                <StatCell label="AVG FORM" value={Math.round(metrics.aggregate?.avg_form_score || 0)} size="sm" />
+                                <StatCell label="PEAK" value={Math.round(metrics.aggregate?.peak_form_score || 0)} size="sm" align="right" />
+                            </View>
+                        </Card>
                     </Fade>
                 )}
 
                 {/* ═══ 28-day load heatmap ═══ */}
                 {metrics?.load_series?.length > 0 && (
-                    <Fade delay={260} style={$.heatSection}>
-                        <View style={$.heatHeader}>
-                            <Text style={$.eyebrow}>28-DAY LOAD</Text>
-                            <Text style={[$.heatMono, { color: '#94a3b8' }]}>
-                                M{(metrics.monotony?.monotony || 0).toFixed(1)} · S{Math.round(metrics.monotony?.strain || 0)}
-                            </Text>
-                        </View>
-                        <Heatmap
-                            cells={metrics.load_series.slice(-28).map(t => ({ date: t.date, value: t.load }))}
-                            cols={7} width={W - 48}
-                            colorLow="#0b1120" colorHigh={accent}
-                        />
+                    <Fade delay={260} style={{ paddingHorizontal: 20, marginTop: 12 }}>
+                        <Card>
+                            <SectionHead title="28-DAY LOAD" right={
+                                <Text style={s.smallMono}>
+                                    M {(metrics.monotony?.monotony || 0).toFixed(1)} · S {Math.round(metrics.monotony?.strain || 0)}
+                                </Text>
+                            } />
+                            <Heatmap
+                                cells={metrics.load_series.slice(-28).map(t => ({ date: t.date, value: t.load }))}
+                                cols={7} width={W - 80}
+                                colorLow={C.bg2} colorHigh={C.accent}
+                            />
+                        </Card>
                     </Fade>
                 )}
 
-                {/* ═══ CTA — large, sport-colored ═══ */}
-                <Fade delay={300}>
-                    <Animated.View style={{ transform: [{ scale: ctaBounce }] }}>
-                        <Tap onPress={() => navigation.navigate('GhostSkeleton', { sport: userData.sport || 'general' })}>
-                            <LinearGradient
-                                colors={[accent + 'dd', accent + '88']}
-                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                                style={$.cta}
-                            >
-                                <View style={$.ctaInner}>
-                                    <Text style={$.ctaEyebrow}>YOUR NEXT SESSION</Text>
-                                    <Text style={$.ctaTitle}>START{'\n'}TRAINING</Text>
-                                    <Text style={$.ctaCaption}>{sportName.toUpperCase()} · GHOST CALIBRATION → LIVE FORM</Text>
-                                </View>
-                                <View style={$.ctaBtn}>
-                                    <Text style={$.ctaBtnText}>GO</Text>
-                                </View>
-                            </LinearGradient>
-                        </Tap>
-                    </Animated.View>
+                {/* ═══ Primary CTA ═══ */}
+                <Fade delay={300} style={{ paddingHorizontal: 20, marginTop: 20 }}>
+                    <Pressable
+                        onPress={() => navigation.navigate('GhostSkeleton', { sport: userData.sport || 'general' })}
+                        style={({ pressed }) => [s.ctaButton, pressed && { opacity: 0.88 }]}
+                    >
+                        <View style={{ flex: 1 }}>
+                            <Text style={s.ctaEyebrow}>YOUR NEXT SESSION</Text>
+                            <Text style={s.ctaTitle}>Start training</Text>
+                            <Text style={s.ctaCaption}>{sportName} · ghost calibration → live form</Text>
+                        </View>
+                        <View style={s.ctaIcon}><Text style={s.ctaIconText}>→</Text></View>
+                    </Pressable>
                 </Fade>
 
-                {/* ═══ Quick actions — color-stroked rows ═══ */}
-                <Fade delay={360} style={$.quickSection}>
-                    <Text style={$.sectionHead}>QUICK ACTIONS</Text>
-                    <QuickRow label="HEART RATE" caption="Finger rPPG · 2.5s warmup" color="#ef4444"
-                        onPress={() => navigation.navigate('HeartRate', { sessionId: 'rppg_' + Date.now() })} />
-                    <QuickRow label="WEEKLY PLAN" caption="Personalized drills · adherence" color="#22c55e"
-                        onPress={() => navigation.navigate('TrainingPlan')} />
-                    <QuickRow label="NUTRITION AI" caption="Photo → macros via Claude vision" color="#f97316"
-                        onPress={() => navigation.navigate('Nutrition')} />
-                    <QuickRow label="FITNESS TEST" caption="BMI · flex · 600m · Fit India band" color="#06b6d4"
-                        onPress={() => navigation.navigate('FitnessTest')} />
+                {/* ═══ Quick actions ═══ */}
+                <Fade delay={340} style={{ paddingHorizontal: 20, marginTop: 28 }}>
+                    <SectionHead title="QUICK ACTIONS" />
+                    <Card padding={0}>
+                        <ListRow title="HEART RATE" caption="Finger rPPG · 2.5s warmup" accent={C.bad}
+                            onPress={() => navigation.navigate('HeartRate', { sessionId: 'rppg_' + Date.now() })} />
+                        <ListRow title="WEEKLY PLAN" caption="Personalised drills · adherence" accent={C.good}
+                            onPress={() => navigation.navigate('TrainingPlan')} />
+                        <ListRow title="NUTRITION" caption="Photo → macros via Claude vision" accent={C.warn}
+                            onPress={() => navigation.navigate('Nutrition')} />
+                        <ListRow title="FITNESS TEST" caption="BMI · flex · 600m · Fit India band" accent={C.info}
+                            onPress={() => navigation.navigate('FitnessTest')} />
+                    </Card>
                 </Fade>
 
-                {/* ═══ Today's tracking ═══ */}
-                <Fade delay={440} style={$.today}>
-                    <Text style={$.sectionHead}>TODAY</Text>
-                    <Text style={$.sectionSub}>{motivation(userData.streak || 0)}</Text>
-                    {daily.slice(0, 5).map((t, i) => {
-                        const pct = t.goal > 0 ? Math.min(1, t.current / t.goal) : 0;
-                        const colors = ['#06b6d4', '#f97316', '#22c55e', '#a855f7', '#eab308'];
-                        const val = typeof t.current === 'number' && t.current % 1 ? t.current.toFixed(1) : t.current;
-                        return (
-                            <Fade key={i} delay={500 + i * 40}>
-                                <View style={$.metricRow}>
-                                    <Text style={$.metricLabel}>{t.label.toUpperCase()}</Text>
-                                    <Text style={$.metricVal}>
-                                        <Text style={{ color: colors[i], fontWeight: '900' }}>{val}</Text>
-                                        <Text style={$.metricGoal}>  /  {t.goal}</Text>
-                                    </Text>
+                {/* ═══ Today tracking ═══ */}
+                <Fade delay={380} style={{ paddingHorizontal: 20, marginTop: 28 }}>
+                    <SectionHead title="TODAY" right={
+                        <Text style={T.caption}>{new Date().toLocaleDateString('en', { weekday: 'short', day: 'numeric', month: 'short' })}</Text>
+                    } />
+                    <Card>
+                        {Object.values(tracker).slice(0, 5).map((t, i) => {
+                            const pct = t.goal > 0 ? Math.min(1, t.current / t.goal) : 0;
+                            const rowColors = [C.accent, C.info, C.good, C.warn, C.accent];
+                            const val = typeof t.current === 'number' && t.current % 1 ? t.current.toFixed(1) : t.current;
+                            return (
+                                <View key={i} style={{ marginBottom: i < 4 ? 18 : 0 }}>
+                                    <View style={s.trackerRow}>
+                                        <Text style={s.trackerLabel}>{t.label.toUpperCase()}</Text>
+                                        <Text style={s.trackerValue}>
+                                            <Text style={{ color: rowColors[i] }}>{val}</Text>
+                                            <Text style={{ color: C.muted }}>  /  {t.goal}</Text>
+                                        </Text>
+                                    </View>
+                                    <TrackBar pct={pct} color={rowColors[i]} delay={500 + i * 40} />
                                 </View>
-                                <Bar pct={pct} color={colors[i]} delay={500 + i * 40} />
-                                {i < daily.slice(0, 5).length - 1 && <View style={{ height: 20 }} />}
-                            </Fade>
-                        );
-                    })}
+                            );
+                        })}
+                    </Card>
                 </Fade>
-
-                <View style={{ height: 56 }} />
             </ScrollView>
         </View>
     );
@@ -370,131 +324,72 @@ export default function HomeScreen({ navigation }) {
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
-const $ = StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#000' },
+const s = StyleSheet.create({
+    root: { flex: 1, backgroundColor: C.bg },
 
-    heroWash: {
-        position: 'absolute', top: 0, left: 0, right: 0, height: 340, zIndex: 0,
-    },
-
-    // Brand + status
-    top: {
+    // Top bar
+    topBar: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 24, paddingTop: 18, marginBottom: 28,
+        paddingHorizontal: 20, paddingTop: 18, marginBottom: 32,
     },
-    brand: { fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 3 },
-    onlineWrap: { flexDirection: 'row', alignItems: 'center' },
-    onlineText: { fontSize: 9, fontWeight: '800', letterSpacing: 2, marginLeft: 6 },
+    brand: { fontSize: 11, fontWeight: '800', color: C.text, letterSpacing: 3 },
+    statusWrap: { flexDirection: 'row', alignItems: 'center' },
+    statusText: { fontSize: 10, fontWeight: '700', letterSpacing: 2, marginLeft: 6 },
 
-    // Greeting + name
-    greetSection: { paddingHorizontal: 24, marginBottom: 28 },
-    greetText: { fontSize: 12, color: '#64748b', fontWeight: '700', letterSpacing: 2 },
+    // Greeting
+    greetSection: { paddingHorizontal: 20, marginBottom: 24 },
     heroName: {
-        fontSize: 44, fontWeight: '900', color: '#fff', marginTop: 6, letterSpacing: -1,
-        fontFamily: CONDENSED, lineHeight: 46,
+        fontSize: 44, fontWeight: '700', color: C.text, marginTop: 10,
+        letterSpacing: -1, lineHeight: 46,
     },
-    tierRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
-    tierBadge: { fontSize: 12, fontWeight: '900', letterSpacing: 2 },
-    tierDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#334155', marginHorizontal: 8 },
-    tierText: { fontSize: 10, fontWeight: '700', color: '#94a3b8', letterSpacing: 2 },
+    tierRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+    tierSep: { color: C.muted, marginHorizontal: 10, fontSize: 14 },
+    tierText: { fontSize: 11, fontWeight: '700', color: C.textMid, letterSpacing: 1.5 },
 
-    // Score hero — two-column scoreboard-style
-    scoreHero: {
-        flexDirection: 'row', paddingHorizontal: 24, marginBottom: 36,
-        alignItems: 'center', justifyContent: 'space-between',
-    },
-    scoreLeft: { flex: 1 },
-    eyebrow: { fontSize: 9, fontWeight: '800', color: '#64748b', letterSpacing: 2.5 },
-    heroScoreBig: { fontSize: 76, fontWeight: '900', fontFamily: CONDENSED, marginTop: 4, lineHeight: 72 },
-    heroScoreDiv: { fontSize: 18, color: '#475569', fontWeight: '700', marginLeft: 6 },
-    heroScoreBand: { fontSize: 10, fontWeight: '800', letterSpacing: 3, marginTop: 4 },
-
-    trendPill: {
-        flexDirection: 'row', alignItems: 'center', marginTop: 12,
-        paddingHorizontal: 10, paddingVertical: 6, borderRadius: 24,
-        backgroundColor: 'rgba(255,255,255,0.04)', alignSelf: 'flex-start',
-    },
-    trendArrow: { fontSize: 11, fontWeight: '900', marginRight: 4 },
-    trendText: { fontSize: 12, fontWeight: '900', letterSpacing: 1 },
-    trendUnit: { fontSize: 9, fontWeight: '800', color: '#64748b', letterSpacing: 2, marginLeft: 6 },
-
-    ringWrap: { marginLeft: 16 },
-
-    // Scoreboard
-    scoreboard: {
-        marginHorizontal: 24, paddingVertical: 8, marginBottom: 32,
-        borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    },
-    scoreRow: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingVertical: 12,
-    },
-    scoreSep: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)' },
-    scoreLabel: { fontSize: 10, fontWeight: '800', color: '#64748b', letterSpacing: 2.5 },
-    scoreValue: { fontSize: 24, fontWeight: '900', fontFamily: CONDENSED },
-    scoreCaption: { fontSize: 9, fontWeight: '800', letterSpacing: 2, marginTop: 2 },
-
-    // Momentum section
-    momentumSection: { paddingHorizontal: 24, marginBottom: 36 },
-    momentumHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-    momentumValue: { fontSize: 30, fontWeight: '900', fontFamily: CONDENSED, marginTop: 4 },
-    momentumAvg: { fontSize: 30, fontWeight: '900', fontFamily: CONDENSED, marginTop: 4 },
-    sparkWrap: { marginTop: 4 },
-
-    // Heatmap
-    heatSection: { paddingHorizontal: 24, marginBottom: 36 },
-    heatHeader: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 12,
-    },
-    heatMono: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
-
-    // CTA
-    cta: {
-        marginHorizontal: 20, borderRadius: 10, marginBottom: 36,
-        paddingVertical: 28, paddingHorizontal: 24, position: 'relative',
+    // Hero score card
+    heroInner: {
         flexDirection: 'row', alignItems: 'center',
-        ...Platform.select({
-            android: { elevation: 16 },
-            ios: { shadowColor: '#000', shadowOpacity: 0.5, shadowOffset: { width: 0, height: 10 }, shadowRadius: 22 },
-        }),
+        paddingVertical: 28, paddingHorizontal: 24,
     },
-    ctaInner: { flex: 1 },
-    ctaEyebrow: { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.7)', letterSpacing: 2.5, marginBottom: 8 },
-    ctaTitle: {
-        fontSize: 40, fontWeight: '900', color: '#fff', lineHeight: 40, letterSpacing: -1,
-        fontFamily: CONDENSED,
+    heroLeft: { flex: 1 },
+    heroDiv: { fontSize: 18, color: C.muted, fontWeight: '600', marginLeft: 6 },
+    heroBand: { fontSize: 10, fontWeight: '700', letterSpacing: 2, marginTop: 6, textTransform: 'uppercase' },
+    heroChips: { flexDirection: 'row', marginTop: 14 },
+    heroChip: {
+        paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16,
+        borderWidth: 1, backgroundColor: C.bg2,
     },
-    ctaCaption: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.65)', letterSpacing: 1.5, marginTop: 10 },
-    ctaBtn: {
-        width: 56, height: 56, borderRadius: 28,
-        backgroundColor: 'rgba(0,0,0,0.35)',
+    heroChipText: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
+
+    // Momentum
+    momentumValue: { fontSize: 22, fontWeight: '700', fontFamily: T.MONO, letterSpacing: -0.3 },
+    momentumFoot: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.border,
+    },
+    smallMono: { fontSize: 11, fontWeight: '600', fontFamily: T.MONO, color: C.textMid, letterSpacing: 0.5 },
+
+    // CTA — flat, no shadow, no gradient bg
+    ctaButton: {
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: C.accent,
+        paddingVertical: 22, paddingHorizontal: 22,
+        borderRadius: 16,
+    },
+    ctaEyebrow: { fontSize: 10, fontWeight: '800', color: 'rgba(0,0,0,0.55)', letterSpacing: 2, marginBottom: 4 },
+    ctaTitle: { fontSize: 26, fontWeight: '700', color: '#0A0A0A', letterSpacing: -0.5 },
+    ctaCaption: { fontSize: 12, fontWeight: '500', color: 'rgba(0,0,0,0.65)', marginTop: 6 },
+    ctaIcon: {
+        width: 44, height: 44, borderRadius: 22,
+        backgroundColor: '#0A0A0A',
         alignItems: 'center', justifyContent: 'center', marginLeft: 16,
-        borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
     },
-    ctaBtnText: { fontSize: 14, fontWeight: '900', color: '#fff', letterSpacing: 1 },
+    ctaIconText: { fontSize: 20, color: C.accent, fontWeight: '700' },
 
-    // Quick actions
-    quickSection: { paddingHorizontal: 24, marginBottom: 36 },
-    sectionHead: { fontSize: 10, fontWeight: '800', color: '#64748b', letterSpacing: 3, marginBottom: 16 },
-    sectionSub: { fontSize: 12, color: '#475569', fontStyle: 'italic', marginBottom: 20, marginTop: -8 },
-
-    quickRow: {
-        flexDirection: 'row', alignItems: 'center',
-        paddingVertical: 18, paddingHorizontal: 4,
-        borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
-    },
-    quickStroke: { width: 3, height: 28, borderRadius: 2, marginRight: 16 },
-    quickLabel: { fontSize: 15, fontWeight: '800', color: '#f1f5f9', letterSpacing: 2 },
-    quickCaption: { fontSize: 10, fontWeight: '600', color: '#64748b', marginTop: 3, letterSpacing: 0.8 },
-    quickArrow: { fontSize: 22, fontWeight: '900' },
-
-    // Today
-    today: { paddingHorizontal: 24 },
-    metricRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-    metricLabel: { fontSize: 11, color: '#94a3b8', fontWeight: '700', letterSpacing: 2 },
-    metricVal: { fontSize: 13, color: '#f9fafb', fontWeight: '700', fontFamily: CONDENSED },
-    metricGoal: { color: '#334155', fontWeight: '600' },
-    barTrack: { height: 4, backgroundColor: '#0f172a', borderRadius: 3, overflow: 'hidden' },
+    // Tracker rows
+    trackerRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    trackerLabel: { fontSize: 11, color: C.textMid, fontWeight: '700', letterSpacing: 1.5 },
+    trackerValue: { fontSize: 14, fontWeight: '700', fontFamily: T.MONO },
+    barTrack: { height: 4, backgroundColor: C.bg2, borderRadius: 3, overflow: 'hidden' },
     barFill: { height: '100%', borderRadius: 3 },
 });
