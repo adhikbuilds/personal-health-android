@@ -13,6 +13,8 @@ import api from '../services/api';
 import { LEVEL_COLORS, LEVEL_LABELS } from '../styles/colors';
 import { SPORT_LABELS } from '../data/constants';
 import { Tap, Fade } from '../ui';
+import { Ring, Sparkline, Gauge, Bar as ChartBar } from '../components/charts';
+import { GRADIENTS } from '../styles/colors';
 
 const { width: W } = Dimensions.get('window');
 const FONT_CONDENSED = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
@@ -48,16 +50,19 @@ export default function ProfileScreen({ navigation }) {
     const [isOnline, setIsOnline] = useState(false);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [advanced, setAdvanced] = useState(null);
 
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [sess, ping] = await Promise.all([
+            const [sess, ping, adv] = await Promise.all([
                 api.getSessions(athleteId, 10),
                 api.ping(),
+                api.getAdvancedMetrics(athleteId, 60),
             ]);
             setSessions(sess?.sessions || sess || []);
             setIsOnline(!!ping);
+            setAdvanced(adv);
         } catch (_) {
             setIsOnline(false);
         } finally {
@@ -162,6 +167,39 @@ export default function ProfileScreen({ navigation }) {
                     )}
                 </Fade>
 
+                {/* ═══ Performance snapshot ═══ */}
+                {advanced && (
+                    <Fade delay={250} style={$.snapshotRow}>
+                        <LinearGradient colors={GRADIENTS.cyan} start={{x:0,y:0}} end={{x:1,y:1}} style={$.snapshotCard}>
+                            <Text style={$.snapshotLabel}>FORM AVG</Text>
+                            <Text style={$.snapshotBig}>{Math.round(advanced.aggregate?.avg_form_score || 0)}</Text>
+                            <Sparkline data={(advanced.form_trend_series || []).map(t => t.score)}
+                                width={W/2 - 56} height={28} color="#fff" stroke={2.5} />
+                        </LinearGradient>
+                        <LinearGradient colors={GRADIENTS.violet} start={{x:0,y:0}} end={{x:1,y:1}} style={$.snapshotCard}>
+                            <Text style={$.snapshotLabel}>READINESS</Text>
+                            <View style={{ alignItems: 'center' }}>
+                                <Ring pct={advanced.readiness?.score || 0} color="#fff" size={70} stroke={5}
+                                    value={Math.round(advanced.readiness?.score || 0)} />
+                            </View>
+                            <Text style={$.snapshotBand}>{(advanced.readiness?.band || '').toUpperCase()}</Text>
+                        </LinearGradient>
+                    </Fade>
+                )}
+
+                {advanced && (
+                    <Fade delay={280} style={$.section}>
+                        <Text style={$.sectionLabel}>QUALITY MIX</Text>
+                        <ChartBar
+                            data={[
+                                { label: 'ELITE', value: advanced.aggregate?.quality_distribution?.elite || 0, color: '#22c55e' },
+                                { label: 'GOOD',  value: advanced.aggregate?.quality_distribution?.good || 0, color: '#06b6d4' },
+                                { label: 'AVG',   value: advanced.aggregate?.quality_distribution?.average || 0, color: '#f97316' },
+                                { label: 'POOR',  value: advanced.aggregate?.quality_distribution?.poor || 0, color: '#ef4444' },
+                            ]} width={W - 48} height={140} />
+                    </Fade>
+                )}
+
                 {/* ═══ Recent Sessions ═══ */}
                 <Fade delay={300} style={$.section}>
                     <Text style={$.sectionLabel}>RECENT SESSIONS</Text>
@@ -262,6 +300,15 @@ const $ = StyleSheet.create({
     // Section
     section: { paddingHorizontal: 24, marginBottom: 32 },
     sectionLabel: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginBottom: 16 },
+
+    snapshotRow: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 24 },
+    snapshotCard: {
+        flex: 1, marginHorizontal: 6, padding: 14, borderRadius: 14, minHeight: 140,
+        ...Platform.select({ android: { elevation: 5 }, ios: { shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 8 } }),
+    },
+    snapshotLabel: { fontSize: 9, fontWeight: '800', color: 'rgba(255,255,255,0.85)', letterSpacing: 2 },
+    snapshotBig: { fontSize: 30, fontWeight: '900', color: '#fff', fontFamily: FONT_CONDENSED, marginTop: 6, marginBottom: 4 },
+    snapshotBand: { fontSize: 9, color: 'rgba(255,255,255,0.85)', letterSpacing: 2, fontWeight: '700', marginTop: 6, textAlign: 'center' },
 
     // Divider
     divider: { height: 1, backgroundColor: '#1a1a1a' },
