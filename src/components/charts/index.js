@@ -240,6 +240,11 @@ export function StackedArea({
 }
 
 // ─── Radar chart ───────────────────────────────────────────────────────────
+//
+// Keeps axis labels *inside* the SVG viewBox by shrinking the data radius to
+// ~32% of size and placing labels at ~43%. Previously the data radius was
+// 38% and labels at `r + 14`, which placed right-side labels past the right
+// edge of the canvas and got clipped by the parent ScrollView.
 
 export function Radar({
     axes = [],                // [{ label, value (0-100) }]
@@ -248,7 +253,8 @@ export function Radar({
     if (!axes.length) return <View style={{ width: size, height: size }} />;
     const cx = size / 2;
     const cy = size / 2;
-    const r = size * 0.38;
+    const r = size * 0.32;              // data radius (smaller so labels fit)
+    const labelR = size * 0.43;         // label radius — inside canvas edges
     const n = axes.length;
     const step = (Math.PI * 2) / n;
 
@@ -256,9 +262,6 @@ export function Radar({
         const angle = -Math.PI / 2 + angleIdx * step;
         const norm = clamp(value / 100, 0, 1);
         return { x: cx + Math.cos(angle) * r * norm, y: cy + Math.sin(angle) * r * norm };
-    }
-    function outerPt(angleIdx) {
-        return polarPt(angleIdx, 100);
     }
 
     const gridLevels = [25, 50, 75, 100];
@@ -272,14 +275,18 @@ export function Radar({
                 return <Path key={gi} d={d} stroke="rgba(255,255,255,0.07)" strokeWidth="1" fill="none" />;
             })}
             {axes.map((a, i) => {
-                const op = outerPt(i);
+                const angle = -Math.PI / 2 + i * step;
+                const ox = cx + Math.cos(angle) * r;
+                const oy = cy + Math.sin(angle) * r;
+                const lx = cx + Math.cos(angle) * labelR;
+                const ly = cy + Math.sin(angle) * labelR + 3;
                 return (
                     <G key={`ax-${i}`}>
-                        <Line x1={cx} y1={cy} x2={op.x} y2={op.y} stroke="rgba(255,255,255,0.08)" />
+                        <Line x1={cx} y1={cy} x2={ox} y2={oy} stroke="rgba(255,255,255,0.08)" />
                         <SvgText
-                            x={cx + Math.cos(-Math.PI / 2 + i * step) * (r + 14)}
-                            y={cy + Math.sin(-Math.PI / 2 + i * step) * (r + 14) + 3}
+                            x={lx} y={ly}
                             fontSize="9"
+                            fontWeight="700"
                             fill={labelColor}
                             textAnchor="middle">
                             {a.label}
@@ -344,11 +351,16 @@ export function Heatmap({
 }
 
 // ─── Gauge ─────────────────────────────────────────────────────────────────
+//
+// Renders a half-circle gauge inside a height = size * 0.78 canvas so the
+// value + label text below the arc don't get clipped. Earlier versions used
+// height = size * 0.75 which clipped the bottom label on every phone.
 
 export function Gauge({ value = 0, max = 100, color = '#06b6d4', size = 180, label, zones = [] }) {
-    const r = size * 0.38;
+    const svgH = Math.round(size * 0.78);
+    const r = size * 0.36;
     const cx = size / 2;
-    const cy = size * 0.62;
+    const cy = size * 0.58;
     const strokeW = size * 0.08;
     const start = Math.PI;
     const end = 0;
@@ -365,19 +377,19 @@ export function Gauge({ value = 0, max = 100, color = '#06b6d4', size = 180, lab
     }
 
     return (
-        <Svg width={size} height={size * 0.75}>
+        <Svg width={size} height={svgH}>
             <Path d={arc(start, end)} stroke="rgba(255,255,255,0.1)" strokeWidth={strokeW} fill="none" strokeLinecap="round" />
             {zones.map((z, i) => {
                 const a1 = start + (z.from / max) * (end - start);
                 const a2 = start + (z.to / max) * (end - start);
-                return <Path key={i} d={arc(a1, a2)} stroke={z.color} strokeWidth={strokeW} fill="none" strokeLinecap="round" opacity="0.45" />;
+                return <Path key={i} d={arc(a1, a2)} stroke={z.color} strokeWidth={strokeW} fill="none" strokeLinecap="round" opacity="0.5" />;
             })}
             <Path d={arc(start, angle)} stroke={color} strokeWidth={strokeW} fill="none" strokeLinecap="round" />
             <SvgText x={cx} y={cy + 6} fontSize={size * 0.22} fontWeight="800" fill="#fff" textAnchor="middle">
                 {Math.round(value)}
             </SvgText>
             {label && (
-                <SvgText x={cx} y={cy + size * 0.14} fontSize="10" fill="#64748b" textAnchor="middle" letterSpacing="2">
+                <SvgText x={cx} y={svgH - 6} fontSize="10" fill="#64748b" textAnchor="middle" letterSpacing="2">
                     {label}
                 </SvgText>
             )}

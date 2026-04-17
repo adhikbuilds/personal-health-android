@@ -13,8 +13,8 @@ import { useUser } from '../context/UserContext';
 import api from '../services/api';
 import { Tap, Fade } from '../ui';
 import { Ring, Bar as ChartBar, Radar, Gauge, Heatmap, Sparkline, MultiLine } from '../components/charts';
-import { GRADIENTS } from '../styles/colors';
-import { LinearGradient as RNLinear } from 'expo-linear-gradient';
+import { Card, SectionHead, StatTriad, Chip } from '../components/primitives';
+import { C, T } from '../styles/colors';
 
 const { width: W } = Dimensions.get('window');
 const FONT_CONDENSED = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
@@ -384,113 +384,121 @@ export default function ProgressScreen() {
                     </Fade>
                 )}
 
-                {/* ═══ Advanced charts ═══ */}
+                {/* ═══ Advanced charts — wrapped in Cards to match home screen ═══ */}
                 {advanced && (
                     <>
-                        {/* ACWR Gauge with zones */}
-                        <Fade delay={760} style={$.section}>
-                            <Text style={$.sectionLabel}>TRAINING LOAD · ACWR</Text>
-                            <View style={{ alignItems: 'center', marginTop: 12 }}>
-                                <Gauge value={Math.min(2.5, advanced.acwr?.acwr || 0)} max={2.5}
-                                    color={acwrColor(advanced.acwr?.band)} size={200}
-                                    label="ACWR"
-                                    zones={[
-                                        { from: 0, to: 0.8, color: '#38bdf8' },
-                                        { from: 0.8, to: 1.3, color: '#22c55e' },
-                                        { from: 1.3, to: 1.5, color: '#f97316' },
-                                        { from: 1.5, to: 2.5, color: '#ef4444' },
-                                    ]} />
-                                <Text style={[$.bandText, { color: acwrColor(advanced.acwr?.band) }]}>{(advanced.acwr?.band || '').toUpperCase()}</Text>
-                                <View style={$.monoRow}>
-                                    <View style={$.monoCol}>
-                                        <Text style={$.monoLabel}>MONOTONY</Text>
-                                        <Text style={$.monoValue}>{(advanced.monotony?.monotony || 0).toFixed(2)}</Text>
-                                    </View>
-                                    <View style={$.monoCol}>
-                                        <Text style={$.monoLabel}>STRAIN</Text>
-                                        <Text style={$.monoValue}>{Math.round(advanced.monotony?.strain || 0)}</Text>
-                                    </View>
-                                    <View style={$.monoCol}>
-                                        <Text style={$.monoLabel}>MOMENTUM</Text>
-                                        <Text style={[$.monoValue, { color: (advanced.momentum || 0) >= 0 ? '#22c55e' : '#ef4444' }]}>
-                                            {(advanced.momentum || 0).toFixed(1)}
-                                        </Text>
-                                    </View>
+                        {/* ACWR gauge card */}
+                        <Fade delay={760} style={$.advSection}>
+                            <Card accent={acwrColor(advanced.acwr?.band)}>
+                                <SectionHead title="TRAINING LOAD · ACWR" right={
+                                    <Text style={[$.advBand, { color: acwrColor(advanced.acwr?.band) }]}>
+                                        {(advanced.acwr?.band || '').toUpperCase()}
+                                    </Text>
+                                } />
+                                <View style={{ alignItems: 'center', marginTop: 8 }}>
+                                    <Gauge value={Math.min(2.5, advanced.acwr?.acwr || 0)} max={2.5}
+                                        color={acwrColor(advanced.acwr?.band)} size={200}
+                                        label="ACWR"
+                                        zones={[
+                                            { from: 0, to: 0.8, color: C.info },
+                                            { from: 0.8, to: 1.3, color: C.good },
+                                            { from: 1.3, to: 1.5, color: C.warn },
+                                            { from: 1.5, to: 2.5, color: C.bad },
+                                        ]} />
                                 </View>
-                            </View>
+                                <View style={$.advTriad}>
+                                    <StatTriad items={[
+                                        { label: 'MONOTONY', value: (advanced.monotony?.monotony || 0).toFixed(2), color: C.text },
+                                        { label: 'STRAIN', value: Math.round(advanced.monotony?.strain || 0), color: C.text },
+                                        { label: 'MOMENTUM', value: (advanced.momentum || 0).toFixed(1), color: (advanced.momentum || 0) >= 0 ? C.good : C.bad },
+                                    ]} />
+                                </View>
+                            </Card>
                         </Fade>
 
                         {/* Symmetry radar */}
-                        <Fade delay={820} style={$.section}>
-                            <Text style={$.sectionLabel}>SYMMETRY RADAR</Text>
-                            <View style={{ alignItems: 'center', marginTop: 8 }}>
-                                <Radar
-                                    axes={[
-                                        { label: 'KNEE',  value: Math.max(0, 100 - (advanced.asymmetry?.knee || 0) * 5) },
-                                        { label: 'HIP',   value: Math.max(0, 100 - (advanced.asymmetry?.hip || 0) * 5) },
-                                        { label: 'SHLDR', value: Math.max(0, 100 - (advanced.asymmetry?.shoulder || 0) * 5) },
-                                        { label: 'FORM',  value: Math.min(100, advanced.aggregate?.avg_form_score || 0) },
-                                        { label: 'MOMTM', value: Math.max(0, Math.min(100, 50 + (advanced.momentum || 0) * 2)) },
-                                        { label: 'INTNS', value: Math.min(100, advanced.latest_intensity || 0) },
-                                    ]}
-                                    color={asymColor(advanced.asymmetry?.band)}
-                                    size={240}
-                                />
-                                <Text style={[$.bandText, { color: asymColor(advanced.asymmetry?.band) }]}>
-                                    {(advanced.asymmetry?.band || '').toUpperCase()}
-                                </Text>
-                            </View>
+                        <Fade delay={820} style={$.advSection}>
+                            <Card accent={asymColor(advanced.asymmetry?.band)}>
+                                <SectionHead title="SYMMETRY RADAR" right={
+                                    <Text style={[$.advBand, { color: asymColor(advanced.asymmetry?.band) }]}>
+                                        {(advanced.asymmetry?.band || '').toUpperCase()}
+                                    </Text>
+                                } />
+                                <View style={{ alignItems: 'center', marginTop: 8 }}>
+                                    <Radar
+                                        axes={[
+                                            { label: 'KNEE',  value: Math.max(0, 100 - (advanced.asymmetry?.knee || 0) * 5) },
+                                            { label: 'HIP',   value: Math.max(0, 100 - (advanced.asymmetry?.hip || 0) * 5) },
+                                            { label: 'SHLDR', value: Math.max(0, 100 - (advanced.asymmetry?.shoulder || 0) * 5) },
+                                            { label: 'FORM',  value: Math.min(100, advanced.aggregate?.avg_form_score || 0) },
+                                            { label: 'MOMTM', value: Math.max(0, Math.min(100, 50 + (advanced.momentum || 0) * 2)) },
+                                            { label: 'INTNS', value: Math.min(100, advanced.latest_intensity || 0) },
+                                        ]}
+                                        color={asymColor(advanced.asymmetry?.band)}
+                                        size={Math.min(240, W - 120)}
+                                    />
+                                </View>
+                            </Card>
                         </Fade>
 
-                        {/* Quality distribution bar */}
-                        <Fade delay={880} style={$.section}>
-                            <Text style={$.sectionLabel}>FORM QUALITY · MIX</Text>
-                            <ChartBar
-                                data={[
-                                    { label: 'ELITE', value: advanced.aggregate?.quality_distribution?.elite || 0, color: '#22c55e' },
-                                    { label: 'GOOD',  value: advanced.aggregate?.quality_distribution?.good || 0, color: '#06b6d4' },
-                                    { label: 'AVG',   value: advanced.aggregate?.quality_distribution?.average || 0, color: '#f97316' },
-                                    { label: 'POOR',  value: advanced.aggregate?.quality_distribution?.poor || 0, color: '#ef4444' },
-                                ]} width={W - 48} height={160} />
-                        </Fade>
-
-                        {/* Daily load bars */}
-                        {advanced.load_series?.length > 0 && (
-                            <Fade delay={940} style={$.section}>
-                                <Text style={$.sectionLabel}>DAILY LOAD · {Math.min(14, advanced.load_series.length)}D</Text>
+                        {/* Quality distribution */}
+                        <Fade delay={880} style={$.advSection}>
+                            <Card>
+                                <SectionHead title="FORM QUALITY · 60D" />
                                 <ChartBar
-                                    data={advanced.load_series.slice(-14).map(t => ({
-                                        label: t.date.slice(-2),
-                                        value: t.load,
-                                        color: '#f97316',
-                                    }))}
-                                    width={W - 48} height={140}
-                                />
+                                    data={[
+                                        { label: 'ELITE', value: advanced.aggregate?.quality_distribution?.elite || 0, color: C.good },
+                                        { label: 'GOOD',  value: advanced.aggregate?.quality_distribution?.good || 0, color: C.info },
+                                        { label: 'AVG',   value: advanced.aggregate?.quality_distribution?.average || 0, color: C.warn },
+                                        { label: 'POOR',  value: advanced.aggregate?.quality_distribution?.poor || 0, color: C.bad },
+                                    ]} width={W - 80} height={140} />
+                            </Card>
+                        </Fade>
+
+                        {/* Daily load */}
+                        {advanced.load_series?.length > 0 && (
+                            <Fade delay={940} style={$.advSection}>
+                                <Card>
+                                    <SectionHead title={`DAILY LOAD · ${Math.min(14, advanced.load_series.length)}D`} />
+                                    <ChartBar
+                                        data={advanced.load_series.slice(-14).map(t => ({
+                                            label: t.date.slice(-2),
+                                            value: t.load,
+                                            color: C.accent,
+                                        }))}
+                                        width={W - 80} height={140}
+                                    />
+                                </Card>
                             </Fade>
                         )}
 
-                        {/* 28-day heatmap */}
+                        {/* Heatmap */}
                         {advanced.load_series?.length > 0 && (
-                            <Fade delay={1000} style={$.section}>
-                                <Text style={$.sectionLabel}>28-DAY HEATMAP</Text>
-                                <Heatmap
-                                    cells={advanced.load_series.slice(-28).map(t => ({ date: t.date, value: t.load }))}
-                                    cols={7} width={W - 48}
-                                    colorHigh="#06b6d4"
-                                />
+                            <Fade delay={1000} style={$.advSection}>
+                                <Card>
+                                    <SectionHead title="28-DAY HEATMAP" />
+                                    <Heatmap
+                                        cells={advanced.load_series.slice(-28).map(t => ({ date: t.date, value: t.load }))}
+                                        cols={7} width={W - 80}
+                                        colorLow={C.bg2} colorHigh={C.accent}
+                                    />
+                                </Card>
                             </Fade>
                         )}
 
                         {/* Fatigue gauge */}
-                        <Fade delay={1060} style={$.section}>
-                            <Text style={$.sectionLabel}>FATIGUE INDEX</Text>
-                            <View style={{ alignItems: 'center', marginTop: 8 }}>
-                                <Gauge value={Math.max(0, Math.min(20, (advanced.fatigue?.index || 0) + 10))}
-                                    max={20} color={fatigueColor(advanced.fatigue?.band)} size={180} label="FATIGUE" />
-                                <Text style={[$.bandText, { color: fatigueColor(advanced.fatigue?.band) }]}>
-                                    {(advanced.fatigue?.band || '').toUpperCase()}
-                                </Text>
-                            </View>
+                        <Fade delay={1060} style={$.advSection}>
+                            <Card accent={fatigueColor(advanced.fatigue?.band)}>
+                                <SectionHead title="FATIGUE INDEX" right={
+                                    <Text style={[$.advBand, { color: fatigueColor(advanced.fatigue?.band) }]}>
+                                        {(advanced.fatigue?.band || '').toUpperCase()}
+                                    </Text>
+                                } />
+                                <View style={{ alignItems: 'center', marginTop: 8 }}>
+                                    <Gauge value={Math.max(0, Math.min(20, (advanced.fatigue?.index || 0) + 10))}
+                                        max={20} color={fatigueColor(advanced.fatigue?.band)} size={180} label="FATIGUE" />
+                                </View>
+                            </Card>
                         </Fade>
                     </>
                 )}
@@ -502,23 +510,23 @@ export default function ProgressScreen() {
 }
 
 function acwrColor(band) {
-    return band === 'sweet spot' ? '#22c55e'
-        : band === 'high' ? '#f97316'
-        : band?.startsWith('spike') ? '#ef4444'
-        : band === 'under-loaded' ? '#38bdf8'
-        : '#64748b';
+    return band === 'sweet spot' ? C.good
+        : band === 'high' ? C.warn
+        : band?.startsWith('spike') ? C.bad
+        : band === 'under-loaded' ? C.info
+        : C.textMid;
 }
 function asymColor(band) {
-    return band === 'symmetrical' ? '#22c55e'
-        : band === 'minor' ? '#38bdf8'
-        : band === 'watch' ? '#f97316'
-        : band?.startsWith('flag') ? '#ef4444' : '#64748b';
+    return band === 'symmetrical' ? C.good
+        : band === 'minor' ? C.info
+        : band === 'watch' ? C.warn
+        : band?.startsWith('flag') ? C.bad : C.textMid;
 }
 function fatigueColor(band) {
-    return band === 'fresh' ? '#22c55e'
-        : band === 'neutral' ? '#06b6d4'
-        : band === 'accumulating' ? '#f97316'
-        : band === 'fatigued' ? '#ef4444' : '#64748b';
+    return band === 'fresh' ? C.good
+        : band === 'neutral' ? C.info
+        : band === 'accumulating' ? C.warn
+        : band === 'fatigued' ? C.bad : C.textMid;
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────────
@@ -590,12 +598,11 @@ const $ = StyleSheet.create({
     compBarFill: { height: 3, borderRadius: 2 },
     compPct: { width: 28, fontSize: 13, fontWeight: '800', fontFamily: FONT_CONDENSED, textAlign: 'right' },
 
-    // Advanced chart helpers
-    bandText: { fontSize: 11, fontWeight: '800', letterSpacing: 3, marginTop: 10 },
-    monoRow: { flexDirection: 'row', marginTop: 18, width: '100%' },
-    monoCol: { flex: 1, alignItems: 'center' },
-    monoLabel: { fontSize: 9, color: '#4b5563', letterSpacing: 2, fontWeight: '800' },
-    monoValue: { fontSize: 18, color: '#fff', fontWeight: '800', fontFamily: FONT_CONDENSED, marginTop: 4 },
+    // Advanced-section card wrapper: matches Home's 20pt horizontal padding so
+    // the cards visually line up when navigating between tabs.
+    advSection: { paddingHorizontal: 20, marginBottom: 12 },
+    advBand: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' },
+    advTriad: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: C.border },
 
     // States
     loadingText: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginTop: 16 },
