@@ -157,6 +157,10 @@ export default function HomeScreen({ navigation }) {
                 {/* ═══ Minimal insight tiles — pure black, accent-colored numbers ═══ */}
                 {metrics && (
                     <>
+                        <Fade delay={180} style={$.sectionDivider}>
+                            <GradientDivider color="#1f2937" />
+                            <Text style={$.sectionDividerLabel}>PERFORMANCE SNAPSHOT</Text>
+                        </Fade>
                         <Fade delay={200} style={$.insightGrid}>
                             {/* Readiness */}
                             <View style={$.insightTile}>
@@ -303,7 +307,7 @@ const $ = StyleSheet.create({
     scoreUnit: { fontSize: 9, fontWeight: '700', color: '#4b5563', letterSpacing: 3, marginTop: -4 },
     // (name moved to greeting section)
 
-    statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 36 },
+    statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
     stat: { alignItems: 'center', paddingHorizontal: 24 },
     statNum: { fontSize: 26, fontWeight: '800', fontFamily: Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold' },
     statKey: { fontSize: 9, fontWeight: '600', color: '#4b5563', letterSpacing: 2, marginTop: 4 },
@@ -319,6 +323,15 @@ const $ = StyleSheet.create({
 
     actions: { paddingHorizontal: 24, marginBottom: 36 },
 
+    // Section divider to group the insight grid below the stats — removes
+    // the "floating numbers" feel where BPI/sessions/streak previously sat
+    // alone above the chart tiles on pure black.
+    sectionDivider: { paddingHorizontal: 24, marginTop: 4, marginBottom: 20 },
+    sectionDividerLabel: {
+        fontSize: 10, fontWeight: '800', color: '#4b5563',
+        letterSpacing: 3, marginTop: 16,
+    },
+
     // Minimal insight tiles — pure black, type-driven, no cards/borders.
     // Mirrors the Nike/Adidas vibe from the rest of the app: colored numbers
     // against black space, labels in tiny muted caps.
@@ -326,7 +339,7 @@ const $ = StyleSheet.create({
         flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 24, marginBottom: 24,
     },
     insightTile: {
-        width: '50%', paddingVertical: 14, paddingRight: 8,
+        width: '50%', paddingVertical: 10, paddingRight: 8,
     },
     insightLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 2.5 },
     insightBig: {
