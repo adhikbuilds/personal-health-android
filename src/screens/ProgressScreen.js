@@ -12,6 +12,9 @@ import Svg, { Polyline, Circle, Line, Text as SvgText, Defs, LinearGradient as S
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
 import { Tap, Fade } from '../ui';
+import { Ring, Bar as ChartBar, Radar, Gauge, Heatmap, Sparkline, MultiLine } from '../components/charts';
+import { GRADIENTS } from '../styles/colors';
+import { LinearGradient as RNLinear } from 'expo-linear-gradient';
 
 const { width: W } = Dimensions.get('window');
 const FONT_CONDENSED = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
@@ -134,23 +137,26 @@ export default function ProgressScreen() {
     const [injuryRisk, setInjuryRisk] = useState(null);
     const [readiness, setReadiness] = useState(null);
     const [summary, setSummary] = useState(null);
+    const [advanced, setAdvanced] = useState(null);
 
     const load = useCallback(async () => {
         setLoading(true);
         setError(false);
         try {
-            const [prog, wj, ir, rd, ws] = await Promise.all([
+            const [prog, wj, ir, rd, ws, adv] = await Promise.all([
                 api.getProgress(athleteId, days),
                 api.getWeakJoints(athleteId, days),
                 api.getInjuryRisk(athleteId, Math.min(days, 14)),
                 api.getReadiness(athleteId, Math.min(days, 14)),
                 api.getWeeklySummary(athleteId, Math.min(days, 7)),
+                api.getAdvancedMetrics(athleteId, days),
             ]);
             setProgress(prog);
             setWeakJoints(wj);
             setInjuryRisk(ir);
             setReadiness(rd);
             setSummary(ws);
+            setAdvanced(adv);
         } catch (e) {
             setError(true);
         } finally {
@@ -378,10 +384,141 @@ export default function ProgressScreen() {
                     </Fade>
                 )}
 
+                {/* ═══ Advanced charts ═══ */}
+                {advanced && (
+                    <>
+                        {/* ACWR Gauge with zones */}
+                        <Fade delay={760} style={$.section}>
+                            <Text style={$.sectionLabel}>TRAINING LOAD · ACWR</Text>
+                            <View style={{ alignItems: 'center', marginTop: 12 }}>
+                                <Gauge value={Math.min(2.5, advanced.acwr?.acwr || 0)} max={2.5}
+                                    color={acwrColor(advanced.acwr?.band)} size={200}
+                                    label="ACWR"
+                                    zones={[
+                                        { from: 0, to: 0.8, color: '#38bdf8' },
+                                        { from: 0.8, to: 1.3, color: '#22c55e' },
+                                        { from: 1.3, to: 1.5, color: '#f97316' },
+                                        { from: 1.5, to: 2.5, color: '#ef4444' },
+                                    ]} />
+                                <Text style={[$.bandText, { color: acwrColor(advanced.acwr?.band) }]}>{(advanced.acwr?.band || '').toUpperCase()}</Text>
+                                <View style={$.monoRow}>
+                                    <View style={$.monoCol}>
+                                        <Text style={$.monoLabel}>MONOTONY</Text>
+                                        <Text style={$.monoValue}>{(advanced.monotony?.monotony || 0).toFixed(2)}</Text>
+                                    </View>
+                                    <View style={$.monoCol}>
+                                        <Text style={$.monoLabel}>STRAIN</Text>
+                                        <Text style={$.monoValue}>{Math.round(advanced.monotony?.strain || 0)}</Text>
+                                    </View>
+                                    <View style={$.monoCol}>
+                                        <Text style={$.monoLabel}>MOMENTUM</Text>
+                                        <Text style={[$.monoValue, { color: (advanced.momentum || 0) >= 0 ? '#22c55e' : '#ef4444' }]}>
+                                            {(advanced.momentum || 0).toFixed(1)}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </Fade>
+
+                        {/* Symmetry radar */}
+                        <Fade delay={820} style={$.section}>
+                            <Text style={$.sectionLabel}>SYMMETRY RADAR</Text>
+                            <View style={{ alignItems: 'center', marginTop: 8 }}>
+                                <Radar
+                                    axes={[
+                                        { label: 'KNEE',  value: Math.max(0, 100 - (advanced.asymmetry?.knee || 0) * 5) },
+                                        { label: 'HIP',   value: Math.max(0, 100 - (advanced.asymmetry?.hip || 0) * 5) },
+                                        { label: 'SHLDR', value: Math.max(0, 100 - (advanced.asymmetry?.shoulder || 0) * 5) },
+                                        { label: 'FORM',  value: Math.min(100, advanced.aggregate?.avg_form_score || 0) },
+                                        { label: 'MOMTM', value: Math.max(0, Math.min(100, 50 + (advanced.momentum || 0) * 2)) },
+                                        { label: 'INTNS', value: Math.min(100, advanced.latest_intensity || 0) },
+                                    ]}
+                                    color={asymColor(advanced.asymmetry?.band)}
+                                    size={240}
+                                />
+                                <Text style={[$.bandText, { color: asymColor(advanced.asymmetry?.band) }]}>
+                                    {(advanced.asymmetry?.band || '').toUpperCase()}
+                                </Text>
+                            </View>
+                        </Fade>
+
+                        {/* Quality distribution bar */}
+                        <Fade delay={880} style={$.section}>
+                            <Text style={$.sectionLabel}>FORM QUALITY · MIX</Text>
+                            <ChartBar
+                                data={[
+                                    { label: 'ELITE', value: advanced.aggregate?.quality_distribution?.elite || 0, color: '#22c55e' },
+                                    { label: 'GOOD',  value: advanced.aggregate?.quality_distribution?.good || 0, color: '#06b6d4' },
+                                    { label: 'AVG',   value: advanced.aggregate?.quality_distribution?.average || 0, color: '#f97316' },
+                                    { label: 'POOR',  value: advanced.aggregate?.quality_distribution?.poor || 0, color: '#ef4444' },
+                                ]} width={W - 48} height={160} />
+                        </Fade>
+
+                        {/* Daily load bars */}
+                        {advanced.load_series?.length > 0 && (
+                            <Fade delay={940} style={$.section}>
+                                <Text style={$.sectionLabel}>DAILY LOAD · {Math.min(14, advanced.load_series.length)}D</Text>
+                                <ChartBar
+                                    data={advanced.load_series.slice(-14).map(t => ({
+                                        label: t.date.slice(-2),
+                                        value: t.load,
+                                        color: '#f97316',
+                                    }))}
+                                    width={W - 48} height={140}
+                                />
+                            </Fade>
+                        )}
+
+                        {/* 28-day heatmap */}
+                        {advanced.load_series?.length > 0 && (
+                            <Fade delay={1000} style={$.section}>
+                                <Text style={$.sectionLabel}>28-DAY HEATMAP</Text>
+                                <Heatmap
+                                    cells={advanced.load_series.slice(-28).map(t => ({ date: t.date, value: t.load }))}
+                                    cols={7} width={W - 48}
+                                    colorHigh="#06b6d4"
+                                />
+                            </Fade>
+                        )}
+
+                        {/* Fatigue gauge */}
+                        <Fade delay={1060} style={$.section}>
+                            <Text style={$.sectionLabel}>FATIGUE INDEX</Text>
+                            <View style={{ alignItems: 'center', marginTop: 8 }}>
+                                <Gauge value={Math.max(0, Math.min(20, (advanced.fatigue?.index || 0) + 10))}
+                                    max={20} color={fatigueColor(advanced.fatigue?.band)} size={180} label="FATIGUE" />
+                                <Text style={[$.bandText, { color: fatigueColor(advanced.fatigue?.band) }]}>
+                                    {(advanced.fatigue?.band || '').toUpperCase()}
+                                </Text>
+                            </View>
+                        </Fade>
+                    </>
+                )}
+
                 <View style={{ height: 40 }} />
             </ScrollView>
         </View>
     );
+}
+
+function acwrColor(band) {
+    return band === 'sweet spot' ? '#22c55e'
+        : band === 'high' ? '#f97316'
+        : band?.startsWith('spike') ? '#ef4444'
+        : band === 'under-loaded' ? '#38bdf8'
+        : '#64748b';
+}
+function asymColor(band) {
+    return band === 'symmetrical' ? '#22c55e'
+        : band === 'minor' ? '#38bdf8'
+        : band === 'watch' ? '#f97316'
+        : band?.startsWith('flag') ? '#ef4444' : '#64748b';
+}
+function fatigueColor(band) {
+    return band === 'fresh' ? '#22c55e'
+        : band === 'neutral' ? '#06b6d4'
+        : band === 'accumulating' ? '#f97316'
+        : band === 'fatigued' ? '#ef4444' : '#64748b';
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────────
@@ -452,6 +589,13 @@ const $ = StyleSheet.create({
     compBarBg: { flex: 1, height: 3, backgroundColor: '#111', borderRadius: 2, overflow: 'hidden', marginHorizontal: 10 },
     compBarFill: { height: 3, borderRadius: 2 },
     compPct: { width: 28, fontSize: 13, fontWeight: '800', fontFamily: FONT_CONDENSED, textAlign: 'right' },
+
+    // Advanced chart helpers
+    bandText: { fontSize: 11, fontWeight: '800', letterSpacing: 3, marginTop: 10 },
+    monoRow: { flexDirection: 'row', marginTop: 18, width: '100%' },
+    monoCol: { flex: 1, alignItems: 'center' },
+    monoLabel: { fontSize: 9, color: '#4b5563', letterSpacing: 2, fontWeight: '800' },
+    monoValue: { fontSize: 18, color: '#fff', fontWeight: '800', fontFamily: FONT_CONDENSED, marginTop: 4 },
 
     // States
     loadingText: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginTop: 16 },

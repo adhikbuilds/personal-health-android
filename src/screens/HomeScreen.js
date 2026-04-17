@@ -12,6 +12,9 @@ import { useUser } from '../context/UserContext';
 import api from '../services/api';
 import { DAILY_TRACKER_DEFAULTS } from '../data/constants';
 import { Tap, Fade, CountUp, ActionRow, Divider, GradientDivider, PulsingDot, ProgressRing, CONDENSED, MONO } from '../ui';
+import { Sparkline, Ring, Bar as ChartBar, Gauge, Heatmap } from '../components/charts';
+import { GRADIENTS, ZONES } from '../styles/colors';
+import { sportColor } from '../config/sports';
 
 const { width: W } = Dimensions.get('window');
 
@@ -52,9 +55,14 @@ export default function HomeScreen({ navigation }) {
     const [tracker, setTracker] = useState(DAILY_TRACKER_DEFAULTS);
     const TK = `@dt_${new Date().toISOString().slice(0,10)}`;
 
+    const [metrics, setMetrics] = useState(null);
+    const accent = sportColor(userData.sport || 'vertical_jump');
+    const heroGradient = GRADIENTS.cyan;
+
     const load = () => {
         AsyncStorage.getItem(TK).then(r => { if(r) try{setTracker(JSON.parse(r))}catch(_){} });
         api.ping().then(ok => setOnline(!!ok));
+        api.getAdvancedMetrics(userData.avatarId || 'athlete_01', 60).then(m => { if (m) setMetrics(m); });
     };
     useEffect(load, []);
     useEffect(() => { AsyncStorage.setItem(TK, JSON.stringify(tracker)).catch(()=>{}); }, [tracker]);
@@ -132,6 +140,66 @@ export default function HomeScreen({ navigation }) {
                     </View>
                 </Fade>
 
+                {/* ═══ Insight cards with charts ═══ */}
+                {metrics && (
+                    <Fade delay={200} style={$.insightGrid}>
+                        {/* Readiness ring */}
+                        <LinearGradient colors={GRADIENTS.ocean} start={{x:0,y:0}} end={{x:1,y:1}} style={$.insightCard}>
+                            <Text style={$.insightLabel}>READINESS</Text>
+                            <View style={{ alignItems: 'center', marginTop: 6 }}>
+                                <Ring pct={metrics.readiness?.score || 0} color="#fff" size={80} stroke={6}
+                                    value={Math.round(metrics.readiness?.score || 0)} />
+                            </View>
+                            <Text style={$.insightBand}>{(metrics.readiness?.band || '').toUpperCase()}</Text>
+                        </LinearGradient>
+
+                        {/* Form trend sparkline */}
+                        <LinearGradient colors={GRADIENTS.forest} start={{x:0,y:0}} end={{x:1,y:1}} style={$.insightCard}>
+                            <Text style={$.insightLabel}>FORM · 14D</Text>
+                            <Text style={$.insightBig}>{Math.round(metrics.aggregate?.avg_form_score || 0)}</Text>
+                            <Sparkline data={(metrics.form_trend_series || []).map(t => t.score)} width={W/2 - 56} height={36} color="#fff" stroke={2.5} />
+                            <Text style={$.insightBand}>TREND {metrics.trend_pct >= 0 ? '▲' : '▼'} {Math.abs(metrics.trend_pct || 0).toFixed(1)}%</Text>
+                        </LinearGradient>
+
+                        {/* ACWR mini */}
+                        <LinearGradient colors={GRADIENTS.amber} start={{x:0,y:0}} end={{x:1,y:1}} style={$.insightCard}>
+                            <Text style={$.insightLabel}>ACWR LOAD</Text>
+                            <View style={{ alignItems: 'center', marginTop: 4 }}>
+                                <Gauge value={Math.min(2.5, metrics.acwr?.acwr || 0)} max={2.5} color="#fff" size={120}
+                                    zones={[
+                                        { from: 0, to: 0.8, color: 'rgba(255,255,255,0.25)' },
+                                        { from: 0.8, to: 1.3, color: 'rgba(255,255,255,0.6)' },
+                                        { from: 1.3, to: 2.5, color: 'rgba(255,255,255,0.25)' },
+                                    ]} />
+                            </View>
+                            <Text style={$.insightBand}>{(metrics.acwr?.band || '').toUpperCase()}</Text>
+                        </LinearGradient>
+
+                        {/* Intensity */}
+                        <LinearGradient colors={GRADIENTS.flame} start={{x:0,y:0}} end={{x:1,y:1}} style={$.insightCard}>
+                            <Text style={$.insightLabel}>INTENSITY</Text>
+                            <Text style={$.insightBig}>{Math.round(metrics.latest_intensity || 0)}</Text>
+                            <ChartBar data={[
+                                { label: '', value: Math.round(metrics.latest_intensity || 0), color: '#fff' },
+                                { label: '', value: 50, color: 'rgba(255,255,255,0.3)' },
+                                { label: '', value: Math.round((metrics.fatigue?.index || 0) + 10), color: 'rgba(255,255,255,0.45)' },
+                            ]} width={W/2 - 56} height={40} padding={6} barGap={4} />
+                            <Text style={$.insightBand}>LAST SESSION</Text>
+                        </LinearGradient>
+                    </Fade>
+                )}
+
+                {/* ═══ 28-day load heatmap ═══ */}
+                {metrics?.load_series?.length > 0 && (
+                    <Fade delay={240} style={$.loadBandCard}>
+                        <Text style={$.loadBandTitle}>28-DAY LOAD</Text>
+                        <Heatmap
+                            cells={metrics.load_series.slice(-28).map(t => ({ date: t.date, value: t.load }))}
+                            cols={7} width={W - 56}
+                            colorLow="#101a32" colorHigh={accent} />
+                    </Fade>
+                )}
+
                 {/* ═══ CTA ═══ */}
                 <Fade delay={240}>
                     <Animated.View style={{ transform: [{ scale: ctaBounce }] }}>
@@ -147,8 +215,6 @@ export default function HomeScreen({ navigation }) {
 
                 {/* ═══ Actions ═══ */}
                 <Fade delay={320} style={$.actions}>
-                    <ActionRow label="METRICS LAB" color="#8b5cf6" onPress={() => navigation.navigate('Metrics')} />
-                    <GradientDivider color="#8b5cf6" />
                     <ActionRow label="HEART RATE" color="#ef4444" onPress={() => navigation.navigate('HeartRate', { sessionId: 'rppg_'+Date.now() })} />
                     <GradientDivider color="#ef4444" />
                     <ActionRow label="WEEKLY PLAN" color="#22c55e" onPress={() => navigation.navigate('TrainingPlan')} />
@@ -221,6 +287,26 @@ const $ = StyleSheet.create({
     ctaBtnText: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: 1 },
 
     actions: { paddingHorizontal: 24, marginBottom: 36 },
+
+    insightGrid: {
+        flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, marginBottom: 16,
+    },
+    insightCard: {
+        width: '47%', margin: '1.5%', padding: 14, borderRadius: 14, minHeight: 160,
+        ...Platform.select({
+            android: { elevation: 6 },
+            ios: { shadowColor: '#000', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 4 }, shadowRadius: 8 },
+        }),
+    },
+    insightLabel: { fontSize: 9, fontWeight: '800', color: 'rgba(255,255,255,0.85)', letterSpacing: 2 },
+    insightBig: { fontSize: 32, fontWeight: '900', color: '#fff', marginTop: 4, fontFamily: Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold' },
+    insightBand: { fontSize: 9, color: 'rgba(255,255,255,0.85)', letterSpacing: 2, fontWeight: '700', marginTop: 6 },
+
+    loadBandCard: {
+        marginHorizontal: 16, marginBottom: 24, padding: 16, borderRadius: 14,
+        backgroundColor: 'rgba(14, 23, 42, 0.85)',
+    },
+    loadBandTitle: { fontSize: 10, color: '#94a3b8', letterSpacing: 3, fontWeight: '800', marginBottom: 10 },
 
     today: { paddingHorizontal: 24 },
     todayHead: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginBottom: 20 },
