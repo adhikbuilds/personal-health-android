@@ -217,7 +217,7 @@ export default function RPPGScreen({ navigation, route }) {
     const [framesIn, setFrames] = useState(0);
     const [errMsg, setErr] = useState('');
     const [history, setHistory] = useState([]);
-    const [frameFlash, setFrameFlash] = useState(0);
+    const [frameFlash, setFrameFlash] = useState(false);
     const wsRef = useRef(null);
     const lastUpdateRef = useRef(0);
 
@@ -251,7 +251,8 @@ export default function RPPGScreen({ navigation, route }) {
                         image_b64: photo.base64,
                         ts: Date.now() / 1000.0,
                     }));
-                    setFrameFlash(Date.now());
+                    setFrameFlash(true);
+                    setTimeout(() => setFrameFlash(false), 150);
                     setFrames(prev => prev + 1);
                 }
             } catch (_) {

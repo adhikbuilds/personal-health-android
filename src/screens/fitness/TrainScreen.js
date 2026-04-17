@@ -71,10 +71,11 @@ function simulateFrame(sport) {
 
 const Q_COLORS = { elite: '#22c55e', good: '#06b6d4', average: '#f97316', poor: '#ef4444' };
 
-export default function TrainScreen({ showToast, navigation }) {
+export default function TrainScreen({ showToast, navigation, route }) {
     const { addXp } = useUser();
     const [permission, setPermission] = useState(null);
-    const [sport, setSport] = useState('vertical_jump');
+    const initialSport = route?.params?.sport || 'vertical_jump';
+    const [sport, setSport] = useState(initialSport);
     const [isActive, setIsActive] = useState(false);
     const [metrics, setMetrics] = useState(null);
     const [sessionId, setSessionId] = useState(null);
@@ -85,10 +86,12 @@ export default function TrainScreen({ showToast, navigation }) {
     const [summary, setSummary] = useState(null);
     const [analysisMode, setAnalysisMode] = useState('sim'); // 'real' | 'sim' | 'no_pose'
     const intervalRef = useRef(null);
+    const simIntervalRef = useRef(null);
     const sessionRef = useRef(null);
     const cameraRef = useRef(null);       // CameraView ref for takePictureAsync
     const isCapturingRef = useRef(false); // prevents overlapping captures
     const lastPhaseRef = useRef(null);
+    const analysisModeRef = useRef('sim');
     const [repCount, setRepCount] = useState(0);
 
     // Request camera permission on mount
@@ -96,8 +99,21 @@ export default function TrainScreen({ showToast, navigation }) {
         Camera.requestCameraPermissionsAsync().then(({ status }) => {
             setPermission({ granted: status === 'granted' });
         });
-        return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+        return () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+        };
     }, []);
+
+    const requestPermission = async () => {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        setPermission({ granted: status === 'granted' });
+    };
+
+    // Update sport when navigated to with params (e.g., from GhostSkeleton)
+    useEffect(() => {
+        if (route?.params?.sport) setSport(route.params.sport);
+    }, [route?.params?.sport]);
 
     // Separate ref for the result polling interval
     const resultIntervalRef = useRef(null);
@@ -112,6 +128,11 @@ export default function TrainScreen({ showToast, navigation }) {
     };
 
     const startSession = async () => {
+        // Clear any existing intervals from a previous session
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+        if (resultIntervalRef.current) clearInterval(resultIntervalRef.current);
+
         const sData = await api.startSession('athlete_01', sport);
         const sid = sData?.session_id || null;
         setSessionId(sid);
@@ -122,6 +143,7 @@ export default function TrainScreen({ showToast, navigation }) {
         setShowSummary(false);
         setSummary(null);
         setAnalysisMode('sim');
+        analysisModeRef.current = 'sim';
         setRepCount(0);
         lastPhaseRef.current = null;
 
@@ -156,10 +178,10 @@ export default function TrainScreen({ showToast, navigation }) {
         // ── SIMULATED FRAME LOOP (every 2s) ─────────────────────────────────
         // Keeps UI ticking with simulated data while real analysis is in flight.
         // When real results arrive (poll below), they override the simulated values.
-        const simIntervalRef = setInterval(() => {
+        simIntervalRef.current = setInterval(() => {
             setMetrics(prev => {
                 // Only use simulation if we haven't received real data yet
-                if (analysisMode === 'real') return prev;
+                if (analysisModeRef.current === 'real') return prev;
                 const frame = simulateFrame(sport);
                 setFrameNum(n => n + 1);
                 setScoreHistory(h => {
@@ -195,6 +217,7 @@ export default function TrainScreen({ showToast, navigation }) {
                     };
                     setMetrics(frame);
                     setAnalysisMode('real');
+                    analysisModeRef.current = 'real';
                     setFrameNum(n => n + 1);
                     setScoreHistory(h => {
                         const next = [...h, result.form_score];
@@ -203,20 +226,18 @@ export default function TrainScreen({ showToast, navigation }) {
                         return next;
                     });
                 } else if (result?.data_source === 'none') {
-                    setAnalysisMode('sim'); // no AI result yet
+                    setAnalysisMode('sim');
+                    analysisModeRef.current = 'sim'; // no AI result yet
                 }
             } catch { }
         }, 3000);
 
-        // Store simInterval in a ref for cleanup
-        if (!intervalRef._simRef) intervalRef._simRef = {};
-        intervalRef._simRef.current = simIntervalRef;
     };
 
     const endSession = async () => {
         if (intervalRef.current) clearInterval(intervalRef.current);
         if (resultIntervalRef.current) clearInterval(resultIntervalRef.current);
-        if (intervalRef._simRef?.current) clearInterval(intervalRef._simRef.current);
+        if (simIntervalRef.current) clearInterval(simIntervalRef.current);
         setIsActive(false);
         setMetrics(null);
 
