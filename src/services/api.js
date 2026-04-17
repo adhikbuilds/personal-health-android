@@ -280,6 +280,11 @@ export const api = {
     getReadiness: (id, days = 14) =>
         fetchJSON(`/readiness/${id}?days=${days}`),
 
+    /** Full advanced-metrics bundle — ACWR, monotony, momentum, asymmetry,
+     *  readiness, intensity, fatigue, daily load, form trend series. */
+    getAdvancedMetrics: (id, days = 60) =>
+        fetchJSON(`/athlete/${id}/advanced-metrics?days=${days}`),
+
     // ─── Weekly Summary ────────────────────────────────────────────────
     /** Structured weekly recap with coaching note */
     getWeeklySummary: (athleteId, days = 7) =>

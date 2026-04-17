@@ -25,6 +25,7 @@ import TrainingPlanScreen from './src/screens/TrainingPlanScreen';
 import ScoreCardScreen from './src/screens/ScoreCardScreen';
 import FitnessTestScreen from './src/screens/FitnessTestScreen';
 import NutritionScreen from './src/screens/NutritionScreen';
+import MetricsScreen from './src/screens/MetricsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -112,6 +113,11 @@ function AppNavigator({ showToast }) {
             <Stack.Screen
                 name="Nutrition"
                 component={NutritionScreen}
+                options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+                name="Metrics"
+                component={MetricsScreen}
                 options={{ animation: 'slide_from_right' }}
             />
         </Stack.Navigator>

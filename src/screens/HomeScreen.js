@@ -147,6 +147,8 @@ export default function HomeScreen({ navigation }) {
 
                 {/* ═══ Actions ═══ */}
                 <Fade delay={320} style={$.actions}>
+                    <ActionRow label="METRICS LAB" color="#8b5cf6" onPress={() => navigation.navigate('Metrics')} />
+                    <GradientDivider color="#8b5cf6" />
                     <ActionRow label="HEART RATE" color="#ef4444" onPress={() => navigation.navigate('HeartRate', { sessionId: 'rppg_'+Date.now() })} />
                     <GradientDivider color="#ef4444" />
                     <ActionRow label="WEEKLY PLAN" color="#22c55e" onPress={() => navigation.navigate('TrainingPlan')} />
