@@ -17,31 +17,103 @@ export const API_BASE = BASE_URL;
 // WebSocket direct to FastAPI (no proxy — proxy causes issues with WS paths)
 const WS_BASE_RESOLVED = `ws://${BACKEND_HOST}:${FASTAPI_PORT}`;
 
-// ─── Core fetch helper ───────────────────────────────────────────────────────
-async function fetchJSON(path, options = {}) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), API_TIMEOUT);
-    try {
-        const res = await fetch(`${API_BASE}${path}`, {
-            headers: { 'Content-Type': 'application/json', ...options.headers },
-            signal: controller.signal,
-            ...options,
-        });
-        clearTimeout(timer);
-        if (!res.ok) {
-            const text = await res.text().catch(() => '');
-            throw new Error(`HTTP ${res.status}: ${text}`);
+// ─── Request dedup + tiny response cache ────────────────────────────────────
+//
+// In-flight GET requests are deduped so a screen that calls the same endpoint
+// from two places in parallel only hits the network once. Responses are
+// cached briefly so pull-to-refresh after an immediate fetch doesn't re-fire.
+
+const _inFlight = new Map();          // cacheKey -> Promise
+const _recentCache = new Map();       // cacheKey -> { ts, data }
+const RECENT_CACHE_MS = 2000;
+
+function _cacheKey(path, options) {
+    const method = (options && options.method) || 'GET';
+    const body = options && options.body ? options.body : '';
+    return `${method} ${path} ${body}`;
+}
+
+function _shouldCache(options) {
+    const method = ((options && options.method) || 'GET').toUpperCase();
+    return method === 'GET';
+}
+
+// Minimal schema validator — checks a response against a shape
+// { field: 'string|number|boolean|object|array', required: true/false }.
+// Returns the data if valid, null if required fields are missing or wrong
+// type. Keeps us from blowing up on HTML error pages that sneak through.
+function _validate(data, schema) {
+    if (!schema) return data;
+    if (data == null) return null;
+    for (const [key, rule] of Object.entries(schema)) {
+        const value = data[key];
+        const required = rule?.required !== false;
+        if (value === undefined) {
+            if (required) return null;
+            continue;
         }
-        return await res.json();
-    } catch (err) {
-        clearTimeout(timer);
-        if (err.name === 'AbortError') {
-            console.warn(`[API] Timeout: ${path}`);
-        } else {
-            console.warn(`[API] ${path} ->`, err.message);
-        }
-        return null;
+        const expected = typeof rule === 'string' ? rule : rule?.type;
+        if (!expected) continue;
+        const actual = Array.isArray(value) ? 'array' : typeof value;
+        if (actual !== expected) return null;
     }
+    return data;
+}
+
+// ─── Core fetch helper ───────────────────────────────────────────────────────
+async function fetchJSON(path, options = {}, { schema } = {}) {
+    const cacheable = _shouldCache(options);
+    const key = _cacheKey(path, options);
+
+    if (cacheable) {
+        const cached = _recentCache.get(key);
+        if (cached && Date.now() - cached.ts < RECENT_CACHE_MS) {
+            return cached.data;
+        }
+        if (_inFlight.has(key)) {
+            return _inFlight.get(key);
+        }
+    }
+
+    const promise = (async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), API_TIMEOUT);
+        try {
+            const res = await fetch(`${API_BASE}${path}`, {
+                headers: { 'Content-Type': 'application/json', ...options.headers },
+                signal: controller.signal,
+                ...options,
+            });
+            clearTimeout(timer);
+            if (!res.ok) {
+                const text = await res.text().catch(() => '');
+                throw new Error(`HTTP ${res.status}: ${text}`);
+            }
+            const json = await res.json();
+            const validated = _validate(json, schema);
+            if (cacheable) _recentCache.set(key, { ts: Date.now(), data: validated });
+            return validated;
+        } catch (err) {
+            clearTimeout(timer);
+            if (err.name === 'AbortError') {
+                console.warn(`[API] Timeout: ${path}`);
+            } else {
+                console.warn(`[API] ${path} ->`, err.message);
+            }
+            return null;
+        } finally {
+            _inFlight.delete(key);
+        }
+    })();
+
+    if (cacheable) _inFlight.set(key, promise);
+    return promise;
+}
+
+// Exposed for tests / manual cache busting (rarely needed).
+export function _resetApiCache() {
+    _inFlight.clear();
+    _recentCache.clear();
 }
 
 // ─── Session API ─────────────────────────────────────────────────────────────
@@ -115,17 +187,23 @@ export const api = {
         fetchJSON(`/sessions?athlete_id=${athleteId}&status=completed&limit=${limit}`),
 
     /** Fetch a single athlete's profile */
-    getAthlete: (id) => fetchJSON(`/athlete/${id}`),
+    getAthlete: (id) => fetchJSON(`/athlete/${id}`, {}, {
+        schema: { id: 'string', name: 'string', sport: 'string' },
+    }),
 
     /** Fetch all athletes */
     getAthletes: () => fetchJSON('/athletes'),
 
     /** Leaderboard — sport is optional */
     getLeaderboard: (sport = '') =>
-        fetchJSON(`/leaderboard${sport ? `?sport=${encodeURIComponent(sport)}` : ''}`),
+        fetchJSON(`/leaderboard${sport ? `?sport=${encodeURIComponent(sport)}` : ''}`, {}, {
+            schema: { leaderboard: 'array' },
+        }),
 
     /** Banner check for HomeScreen connectivity widget */
-    getBanner: () => fetchJSON('/banner'),
+    getBanner: () => fetchJSON('/banner', {}, {
+        schema: { connected: 'boolean' },
+    }),
 
     // ─── Daily Tracker ───────────────────────────────────────────────────
     getDailyTracker: (athleteId) =>

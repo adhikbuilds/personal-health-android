@@ -10,42 +10,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
 import { Tap, Fade, ProgressRing, CONDENSED, MONO } from '../ui';
+import { SPORTS as SPORTS_MAP, SPORT_RANGES, repTransition } from '../config/sports';
 
 const { width: W } = Dimensions.get('window');
 
+// Keep the TrainScreen picker order intact — general first, then the rest
+// in the original display order.
 const SPORTS = [
-    { key: 'general',       label: 'GENERAL' },
-    { key: 'vertical_jump', label: 'VJ' },
-    { key: 'squat',         label: 'SQUAT' },
-    { key: 'push_up',       label: 'PUSH UP' },
-    { key: 'pull_up',       label: 'PULL UP' },
-    { key: 'sprint',        label: 'SPRINT' },
-    { key: 'snatch',        label: 'SNATCH' },
-    { key: 'javelin',       label: 'JAVELIN' },
-    { key: 'cricket_bat',   label: 'CRICKET' },
-];
-
-const SPORT_RANGES = {
-    vertical_jump: { knee: [85, 110],  hip: [80, 110],  trunk: [8, 18],  sym: 0.94, jh: [32, 65] },
-    snatch:        { knee: [95, 125],  hip: [85, 100],  trunk: [18, 30], sym: 0.95, jh: [0, 0]  },
-    sprint:        { knee: [85, 115],  hip: [42, 62],   trunk: [12, 22], sym: 0.88, jh: [0, 0]  },
-    javelin:       { knee: [140, 165], hip: [105, 125], trunk: [28, 45], sym: 0.76, jh: [0, 0]  },
-    cricket_bat:   { knee: [132, 158], hip: [118, 145], trunk: [18, 30], sym: 0.82, jh: [0, 0]  },
-    squat:         { knee: [75, 110],  hip: [75, 105],  trunk: [0, 25],  sym: 0.92, jh: [0, 0]  },
-    push_up:       { knee: [165, 180], hip: [165, 180], trunk: [0, 8],   sym: 0.92, jh: [0, 0]  },
-    pull_up:       { knee: [140, 180], hip: [140, 180], trunk: [0, 15],  sym: 0.90, jh: [0, 0]  },
-};
-
-const REP_TRANSITIONS = {
-    vertical_jump: ['descent', 'takeoff'],
-    squat:         ['descent', 'setup'],
-    push_up:       ['descent', 'setup'],
-    pull_up:       ['descent', 'setup'],
-    snatch:        ['descent', 'catch'],
-    sprint:        ['drive', 'flight'],
-    javelin:       ['wind_up', 'release'],
-    cricket_bat:   ['backswing', 'contact'],
-};
+    SPORTS_MAP.general, SPORTS_MAP.vertical_jump, SPORTS_MAP.squat,
+    SPORTS_MAP.push_up, SPORTS_MAP.pull_up, SPORTS_MAP.sprint,
+    SPORTS_MAP.snatch, SPORTS_MAP.javelin, SPORTS_MAP.cricket_bat,
+].map(s => ({ key: s.key, label: s.label }));
 
 function rng(lo, hi) { return lo + Math.random() * (hi - lo); }
 
@@ -130,7 +105,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
 
     const checkRep = (phase) => {
         if (!phase) return;
-        const [fromPhase, toPhase] = REP_TRANSITIONS[sport] || [];
+        const [fromPhase, toPhase] = repTransition(sport);
         if (fromPhase && toPhase && lastPhaseRef.current === fromPhase && phase === toPhase) {
             setRepCount(c => c + 1);
         }

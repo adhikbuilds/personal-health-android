@@ -15,15 +15,9 @@ export const INITIAL_USER_DATA = {
   sport: 'vertical_jump',
 };
 
-// Sports supported by the AI engine
-export const SPORTS = ['vertical_jump', 'snatch', 'sprint', 'javelin', 'cricket_bat'];
-export const SPORT_LABELS = {
-  vertical_jump: 'Vertical Jump',
-  snatch: 'Olympic Snatch',
-  sprint: '20m Sprint',
-  javelin: 'Javelin',
-  cricket_bat: 'Cricket',
-};
+// Sports catalog lives in src/config/sports.js — re-exported here so the
+// handful of screens that still import from data/constants keep working.
+export { SPORT_KEYS as SPORTS, SPORT_LABELS } from '../config/sports';
 
 // ─── Fitness Test (L1–L7 Fit India bands) ───────────────────────────────────
 
