@@ -28,12 +28,13 @@ import api from '../services/api';
 
 const { width: W, height: H } = Dimensions.get('window');
 
-// ─── Colors ──────────────────────────────────────────────────────────────────
+// ─── Colors (terminal palette, local alias to preserve SVG overlay logic) ────
 const C = {
-    bg: '#0f172a', cyan: '#06b6d4', green: '#22c55e',
-    orange: '#f97316', red: '#ef4444', text: '#f1f5f9', muted: '#64748b',
-    yellow: '#facc15',
+    bg: '#000000', cyan: '#FFAA00', green: '#00E676',
+    orange: '#FFB300', red: '#FF3B30', text: '#E8E8E8', muted: '#5C4600',
+    yellow: '#FFAA00', amber: '#FFAA00', border: '#262B31',
 };
+const MONO = require('react-native').Platform.OS === 'android' ? 'monospace' : 'Menlo';
 
 // ─── MediaPipe Pose Connections ───────────────────────────────────────────────
 const CONNECTIONS = [
@@ -465,37 +466,37 @@ export default function GhostSkeletonScreen({ navigation, route }) {
 
 const s = StyleSheet.create({
     fill: { flex: 1, backgroundColor: '#000' },
-    safeBg: { flex: 1, backgroundColor: C.bg },
+    safeBg: { flex: 1, backgroundColor: '#000' },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 28 },
-    permTitle: { color: C.cyan, fontSize: 22, fontWeight: '900', marginBottom: 12 },
-    permText: { color: C.muted, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
-    grantBtn: { backgroundColor: C.cyan, borderRadius: 12, paddingHorizontal: 28, paddingVertical: 13 },
+    permTitle: { color: C.text, fontSize: 22, fontWeight: '700', marginBottom: 12, fontFamily: MONO, letterSpacing: 1 },
+    permText: { color: '#8A929C', fontSize: 12, textAlign: 'center', lineHeight: 18, marginBottom: 24, fontFamily: MONO },
+    grantBtn: { borderWidth: 1, borderColor: C.amber, paddingHorizontal: 20, paddingVertical: 12 },
     hud: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-    hudRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 8 },
-    backBtn: { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, paddingHorizontal: 13, paddingVertical: 8 },
-    backTxt: { color: C.text, fontWeight: '700', fontSize: 13 },
-    sportChip: { flex: 1, backgroundColor: 'rgba(6,182,212,0.12)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, alignItems: 'center' },
-    sportTxt: { color: C.cyan, fontWeight: '800', fontSize: 11, letterSpacing: 0.5 },
-    scoreChip: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5, alignItems: 'center', borderWidth: 1 },
-    scoreNum: { fontSize: 22, fontWeight: '900' },
-    scoreLabel: { fontSize: 8, color: C.muted, fontWeight: '700', textTransform: 'uppercase' },
-    legend: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, marginTop: 8, flexWrap: 'wrap' },
+    hudRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8, backgroundColor: 'rgba(0,0,0,0.7)', borderBottomWidth: 1, borderBottomColor: C.border },
+    backBtn: { borderWidth: 1, borderColor: C.border, paddingHorizontal: 10, paddingVertical: 6 },
+    backTxt: { color: C.text, fontWeight: '700', fontSize: 10, fontFamily: MONO, letterSpacing: 1 },
+    sportChip: { flex: 1, borderWidth: 1, borderColor: C.border, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center' },
+    sportTxt: { color: C.amber, fontWeight: '700', fontSize: 10, letterSpacing: 1, fontFamily: MONO },
+    scoreChip: { borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, alignItems: 'center' },
+    scoreNum: { fontSize: 20, fontWeight: '700', fontFamily: MONO, letterSpacing: -0.5 },
+    scoreLabel: { fontSize: 8, color: '#5C4600', fontWeight: '700', letterSpacing: 1, fontFamily: MONO },
+    legend: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, flexWrap: 'wrap', backgroundColor: 'rgba(0,0,0,0.5)', borderBottomWidth: 1, borderBottomColor: C.border },
     legendPill: { flexDirection: 'row', alignItems: 'center' },
-    legendDot: { width: 9, height: 9, borderRadius: 5, marginRight: 4 },
-    legendTxt: { color: C.text, fontSize: 10, fontWeight: '700' },
-    labelToggle: { marginLeft: 'auto', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-    labelToggleTxt: { color: C.muted, fontSize: 9, fontWeight: '700' },
+    legendDot: { width: 8, height: 8, marginRight: 4 },
+    legendTxt: { color: C.text, fontSize: 10, fontWeight: '700', fontFamily: MONO, letterSpacing: 0.5 },
+    labelToggle: { marginLeft: 'auto', borderWidth: 1, borderColor: C.border, paddingHorizontal: 8, paddingVertical: 3 },
+    labelToggleTxt: { color: '#8A929C', fontSize: 9, fontWeight: '700', fontFamily: MONO, letterSpacing: 1 },
     bottom: {
         position: 'absolute', bottom: 0, left: 0, right: 0,
-        backgroundColor: 'rgba(15,23,42,0.90)',
-        borderTopLeftRadius: 22, borderTopRightRadius: 22,
-        padding: 20,
+        backgroundColor: 'rgba(0,0,0,0.92)',
+        borderTopWidth: 1, borderTopColor: C.border,
+        padding: 16,
     },
     calibRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-    calibDot: { width: 13, height: 13, borderRadius: 7, marginRight: 9 },
-    calibHint: { color: C.text, fontSize: 12, fontWeight: '700', flex: 1 },
-    feedbackTxt: { color: C.muted, fontSize: 12, lineHeight: 18, marginBottom: 14 },
-    startBtn: { backgroundColor: C.cyan, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
-    startBtnOff: { backgroundColor: 'rgba(6,182,212,0.18)' },
-    btnText: { color: '#000', fontWeight: '900', fontSize: 14 },
+    calibDot: { width: 12, height: 12, marginRight: 8 },
+    calibHint: { color: C.text, fontSize: 11, fontWeight: '700', flex: 1, fontFamily: MONO, letterSpacing: 0.5 },
+    feedbackTxt: { color: '#8A929C', fontSize: 11, lineHeight: 16, marginBottom: 12, fontFamily: MONO },
+    startBtn: { borderWidth: 1, borderColor: C.amber, paddingVertical: 12, alignItems: 'center' },
+    startBtnOff: { borderColor: C.border },
+    btnText: { color: C.amber, fontWeight: '700', fontSize: 12, fontFamily: MONO, letterSpacing: 1.5 },
 });

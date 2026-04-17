@@ -1,43 +1,46 @@
-// NutritionScreen — AI Food Analysis (Nike Design Language)
-// Photo your meal -> Claude vision -> nutrient breakdown + coaching
+// NutritionScreen — Bloomberg terminal.
+// Capture meal photo → POST to vision backend → render macros as terminal
+// distribution bars.
 
 import React, { useState, useRef, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView, Animated, Easing,
-    Dimensions, Platform, StatusBar,
+    View, Text, StyleSheet, ScrollView, Animated,
+    StatusBar, Pressable,
 } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
-import { Tap, Fade, ProgressRing, CONDENSED, MONO } from '../ui';
 
-const { width: W } = Dimensions.get('window');
+import { C, T } from '../styles/colors';
+import {
+    Panel, Header, HdrMeta, Rule, FieldRow, Triad, SysBar, DistBar,
+    TerminalScreen, Footer, useLiveClock,
+    fmt, fmtInt, nowISO,
+} from '../components/terminal';
 
-// ── Nutrient bar colors ─────────────────────────────────────────────────────
 const NUTRIENT_COLORS = {
-    calories:  '#f97316',
-    protein_g: '#22c55e',
-    carbs_g:   '#06b6d4',
-    fat_g:     '#eab308',
-    fiber_g:   '#a855f7',
+    calories:  C.warn,
+    protein_g: C.good,
+    carbs_g:   C.info,
+    fat_g:     C.amber,
+    fiber_g:   C.mauve || C.info,
 };
 
 const NUTRIENT_LABELS = {
-    calories:  'Calories',
-    protein_g: 'Protein',
-    carbs_g:   'Carbs',
-    fat_g:     'Fat',
-    fiber_g:   'Fiber',
+    calories:  'CAL',
+    protein_g: 'PROTEIN',
+    carbs_g:   'CARBS',
+    fat_g:     'FAT',
+    fiber_g:   'FIBER',
 };
 
 const NUTRIENT_UNITS = {
-    calories:  'kcal',
-    protein_g: 'g',
-    carbs_g:   'g',
-    fat_g:     'g',
-    fiber_g:   'g',
+    calories:  'KCAL',
+    protein_g: 'G',
+    carbs_g:   'G',
+    fat_g:     'G',
+    fiber_g:   'G',
 };
 
 const NUTRIENT_MAX = {
@@ -48,383 +51,262 @@ const NUTRIENT_MAX = {
     fiber_g:   20,
 };
 
-// ── Pulsing loader ──────────────────────────────────────────────────────────
-function PulsingLoader() {
-    const scale = useRef(new Animated.Value(0.85)).current;
-    const opacity = useRef(new Animated.Value(0.4)).current;
+const ORDER = ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g'];
 
-    React.useEffect(() => {
-        const anim = Animated.loop(
-            Animated.sequence([
-                Animated.parallel([
-                    Animated.timing(scale, { toValue: 1.1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-                    Animated.timing(opacity, { toValue: 1, duration: 800, useNativeDriver: true }),
-                ]),
-                Animated.parallel([
-                    Animated.timing(scale, { toValue: 0.85, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-                    Animated.timing(opacity, { toValue: 0.4, duration: 800, useNativeDriver: true }),
-                ]),
-            ])
-        );
-        anim.start();
-        return () => anim.stop();
-    }, []);
-
-    return (
-        <View style={s.loaderWrap}>
-            <Animated.View style={[s.loaderRing, { transform: [{ scale }], opacity }]} />
-            <Text style={s.loaderText}>ANALYZING</Text>
-            <Text style={s.loaderSub}>Claude is scanning your meal...</Text>
-        </View>
-    );
-}
-
-// ── Nutrient bar ────────────────────────────────────────────────────────────
-function NutrientBar({ nutrientKey, value }) {
-    const barAnim = useRef(new Animated.Value(0)).current;
-    const color = NUTRIENT_COLORS[nutrientKey] || '#06b6d4';
-    const label = NUTRIENT_LABELS[nutrientKey] || nutrientKey;
-    const unit = NUTRIENT_UNITS[nutrientKey] || '';
-    const max = NUTRIENT_MAX[nutrientKey] || 100;
-    const pct = Math.min(1, value / max);
-
-    React.useEffect(() => {
-        Animated.timing(barAnim, { toValue: pct, duration: 900, delay: 200, useNativeDriver: false }).start();
-    }, [pct]);
-
-    return (
-        <View style={s.nutrientRow}>
-            <View style={s.nutrientLabelRow}>
-                <View style={[s.nutrientDot, { backgroundColor: color }]} />
-                <Text style={s.nutrientLabel}>{label}</Text>
-                <Text style={s.nutrientValue}>{Math.round(value)} {unit}</Text>
-            </View>
-            <View style={s.nutrientTrack}>
-                <Animated.View style={[s.nutrientFill, {
-                    backgroundColor: color,
-                    width: barAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-                }]} />
-            </View>
-        </View>
-    );
-}
-
-// ── Meal score ring ─────────────────────────────────────────────────────────
-function MealScoreRing({ score }) {
-    const color = score >= 80 ? '#22c55e' : score >= 50 ? '#f97316' : '#ef4444';
-    return (
-        <View style={s.scoreRingWrap}>
-            <ProgressRing pct={score} color={color} size={80} stroke={5} />
-            <View style={s.scoreRingInner}>
-                <Text style={[s.scoreRingNum, { color, fontFamily: CONDENSED }]}>{score}</Text>
-                <Text style={s.scoreRingLabel}>SCORE</Text>
-            </View>
-        </View>
-    );
-}
-
-// ── Main ────────────────────────────────────────────────────────────────────
 export default function NutritionScreen({ navigation }) {
     const ins = useSafeAreaInsets();
+    const clock = useLiveClock();
     const { userData } = useUser();
+    const userTag = (userData?.avatarId || 'ath').toUpperCase();
+
+    const [permission, requestPermission] = Camera.useCameraPermissions();
     const cameraRef = useRef(null);
 
-    const [permission, setPermission] = useState(null);
-    const [phase, setPhase] = useState('idle'); // idle | camera | analyzing | results
+    const [screen, setScreen] = useState('camera'); // camera | analyzing | result
     const [result, setResult] = useState(null);
+    const [err, setErr] = useState('');
 
-    // Request permission
-    React.useEffect(() => {
-        Camera.requestCameraPermissionsAsync().then(({ status }) => {
-            setPermission({ granted: status === 'granted' });
-        });
-    }, []);
-
-    const openCamera = useCallback(() => {
-        setPhase('camera');
-        setResult(null);
-    }, []);
-
-    const captureAndAnalyze = useCallback(async () => {
+    const capture = useCallback(async () => {
         if (!cameraRef.current) return;
         try {
+            setScreen('analyzing');
+            setErr('');
             const photo = await cameraRef.current.takePictureAsync({
-                base64: true,
-                quality: 0.5,
-                exif: false,
+                base64: true, quality: 0.6, skipProcessing: true, shutterSound: false,
             });
-            if (!photo?.base64) return;
-
-            setPhase('analyzing');
-
-            const res = await api.analyzeFood(userData.avatarId || 'athlete_01', photo.base64);
-            if (res) {
-                setResult(res);
-                setPhase('results');
-            } else {
-                setResult({
-                    food_items: ['Analysis failed'],
-                    nutrients: { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 },
-                    meal_score: 0,
-                    recommendation: 'Could not reach the server. Check your connection.',
-                });
-                setPhase('results');
-            }
+            if (!photo?.base64) { setErr('CAPTURE FAILED'); setScreen('camera'); return; }
+            const res = await api.analyzeFood(userData?.avatarId || 'athlete_01', photo.base64);
+            if (!res) { setErr('ANALYSIS FAILED'); setScreen('camera'); return; }
+            setResult(res);
+            setScreen('result');
         } catch (e) {
-            setPhase('idle');
+            setErr('CAPTURE ERROR: ' + (e.message || 'UNKNOWN').toUpperCase());
+            setScreen('camera');
         }
     }, [userData]);
 
-    // ── No permission ────────────────────────────────────────────────────
-    if (!permission) return <View style={s.root} />;
-
+    // No permission
+    if (!permission) {
+        return <View style={{ flex: 1, backgroundColor: '#000' }} />;
+    }
     if (!permission.granted) {
         return (
-            <View style={[s.root, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" />
-                <View style={s.permWrap}>
-                    <Text style={s.permIcon}>🍽</Text>
-                    <Text style={s.permTitle}>Camera Access Needed</Text>
-                    <Text style={s.permBody}>
-                        Take a photo of your meal and our AI will break down the nutrients instantly.
-                    </Text>
-                    <Tap style={s.permBtn} onPress={() => Camera.requestCameraPermissionsAsync().then(({ status }) => setPermission({ granted: status === 'granted' }))}>
-                        <Text style={s.permBtnText}>Grant Camera Access</Text>
-                    </Tap>
+            <TerminalScreen style={{ paddingTop: ins.top }}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <SysBar online={null} identity={`${userTag}.NUTR-AI`} clock={clock} />
+                <View style={{ padding: 16 }}>
+                    <Text style={s.prompt}>{'> nutrition --init'}</Text>
+                    <Text style={s.title}>CAMERA PERMISSION REQUIRED</Text>
                 </View>
-            </View>
+                <Pressable onPress={requestPermission} style={({ pressed }) => [s.btn, pressed && { backgroundColor: '#111' }]}>
+                    <Text style={s.btnText}>[A] ALLOW CAMERA  ▸</Text>
+                </Pressable>
+                <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.btnSecondary, pressed && { backgroundColor: '#111' }]}>
+                    <Text style={s.btnSecondaryText}>[ESC] RETURN</Text>
+                </Pressable>
+            </TerminalScreen>
         );
     }
 
-    // ── Camera phase ─────────────────────────────────────────────────────
-    if (phase === 'camera') {
+    // ═══ CAMERA ═══
+    if (screen === 'camera') {
         return (
-            <View style={s.root}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" />
-                <CameraView
-                    ref={cameraRef}
-                    style={StyleSheet.absoluteFill}
-                    facing="back"
-                />
-                {/* Top bar */}
-                <View style={[s.camTop, { paddingTop: ins.top + 12 }]}>
-                    <Tap style={s.camBackBtn} onPress={() => setPhase('idle')}>
-                        <Text style={s.camBackTxt}>← Back</Text>
-                    </Tap>
-                    <Text style={s.camTitle}>POINT AT YOUR MEAL</Text>
-                    <View style={{ width: 60 }} />
+            <TerminalScreen style={{ paddingTop: ins.top }}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <SysBar online={null} identity={`${userTag}.NUTR-AI`} clock={clock} />
+
+                <View style={{ padding: 16 }}>
+                    <Text style={s.prompt}>{'> nutrition --capture'}</Text>
+                    <Text style={s.title}>MEAL CAPTURE</Text>
+                    <Text style={s.subtitle}>POINT CAMERA AT MEAL · TRIGGER TO ANALYSE</Text>
                 </View>
-                {/* Capture button */}
-                <View style={[s.camBottom, { paddingBottom: ins.bottom + 30 }]}>
-                    <Tap onPress={captureAndAnalyze}>
-                        <View style={s.captureBtn}>
-                            <View style={s.captureBtnInner} />
+
+                <View style={s.camWrap}>
+                    <View style={s.camBorder}>
+                        <CameraView
+                            ref={cameraRef}
+                            style={{ flex: 1 }}
+                            facing="back"
+                            shutterSound={false}
+                            animateShutter={false}
+                        />
+                        {/* Crosshair overlay */}
+                        <View style={s.crosshair} pointerEvents="none">
+                            <View style={[s.cornerTL]} />
+                            <View style={[s.cornerTR]} />
+                            <View style={[s.cornerBL]} />
+                            <View style={[s.cornerBR]} />
                         </View>
-                    </Tap>
+                    </View>
                 </View>
-            </View>
+
+                {!!err && (
+                    <View style={{ paddingHorizontal: 16 }}>
+                        <Text style={s.errText}>[ERR] {err}</Text>
+                    </View>
+                )}
+
+                <Pressable onPress={capture} style={({ pressed }) => [s.btn, pressed && { backgroundColor: '#111' }]}>
+                    <Text style={s.btnText}>[SPACE] CAPTURE & ANALYSE  ▸</Text>
+                </Pressable>
+                <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.btnSecondary, pressed && { backgroundColor: '#111' }]}>
+                    <Text style={s.btnSecondaryText}>[ESC] RETURN</Text>
+                </Pressable>
+            </TerminalScreen>
         );
     }
 
-    // ── Analyzing phase ──────────────────────────────────────────────────
-    if (phase === 'analyzing') {
+    // ═══ ANALYSING ═══
+    if (screen === 'analyzing') {
         return (
-            <View style={[s.root, { paddingTop: ins.top }]}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" />
-                <View style={s.topBar}>
-                    <Text style={[s.header, { fontFamily: CONDENSED }]}>NUTRITION</Text>
+            <TerminalScreen style={{ paddingTop: ins.top }}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <SysBar online={true} identity={`${userTag}.NUTR-AI`} clock={clock} />
+                <View style={{ padding: 16 }}>
+                    <Text style={s.prompt}>{'> nutrition --analyse'}</Text>
+                    <Text style={s.title}>PROCESSING</Text>
                 </View>
-                <PulsingLoader />
-            </View>
+                <Panel>
+                    <Header title="PIPELINE" />
+                    <FieldRow label="01............ CAPTURE"       value="[OK]"       color={C.good} />
+                    <FieldRow label="02............ COMPRESS"      value="[OK]"       color={C.good} />
+                    <FieldRow label="03............ POST TO VISION" value="[RUNNING]" color={C.text} />
+                    <FieldRow label="04............ PARSE MACROS"  value="[PENDING]"  color={C.muted} dim />
+                    <FieldRow label="05............ COACHING"      value="[PENDING]"  color={C.muted} dim />
+                </Panel>
+                <View style={s.analysingBox}>
+                    <Text style={s.analysingTxt}>SCANNING MEAL VIA VISION MODEL.....</Text>
+                </View>
+            </TerminalScreen>
         );
     }
 
-    // ── Results phase ────────────────────────────────────────────────────
-    if (phase === 'results' && result) {
-        const nutrients = result.nutrients || {};
-        return (
-            <View style={[s.root, { paddingTop: ins.top }]}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" />
-                <View style={s.topBar}>
-                    <Tap onPress={() => navigation.goBack()}>
-                        <Text style={s.backTxt}>← Back</Text>
-                    </Tap>
-                    <Text style={[s.header, { fontFamily: CONDENSED }]}>NUTRITION</Text>
-                    <View style={{ width: 50 }} />
-                </View>
-                <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: ins.bottom + 30 }}
-                >
-                    {/* Food items */}
-                    <Fade delay={0}>
-                        <Text style={s.sectionTitle}>DETECTED FOODS</Text>
-                        <View style={s.foodList}>
-                            {(result.food_items || []).map((item, i) => (
-                                <View key={i} style={s.foodItem}>
-                                    <View style={s.foodDot} />
-                                    <Text style={s.foodText}>{item}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    </Fade>
+    // ═══ RESULT ═══
+    const nutrients = result?.nutrients || {};
+    const foodItems = result?.food_items || [];
+    const mealScore = result?.meal_score || 0;
+    const coaching = result?.coaching || result?.recommendation || '';
 
-                    {/* Score + Nutrients */}
-                    <Fade delay={100}>
-                        <View style={s.scoreAndNutrients}>
-                            <MealScoreRing score={result.meal_score || 0} />
-                            <View style={s.nutrientsCol}>
-                                {Object.keys(NUTRIENT_LABELS).map((key) => (
-                                    <NutrientBar key={key} nutrientKey={key} value={nutrients[key] || 0} />
-                                ))}
-                            </View>
-                        </View>
-                    </Fade>
-
-                    {/* Recommendation */}
-                    <Fade delay={200}>
-                        <View style={s.recCard}>
-                            <Text style={s.recLabel}>COACHING TIP</Text>
-                            <Text style={s.recText}>{result.recommendation}</Text>
-                        </View>
-                    </Fade>
-
-                    {/* Scan Again */}
-                    <Fade delay={300}>
-                        <Tap onPress={openCamera}>
-                            <LinearGradient
-                                colors={['#0c4a6e', '#0891b2', '#06b6d4']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={s.scanAgainBtn}
-                            >
-                                <Text style={s.scanAgainText}>SCAN AGAIN</Text>
-                            </LinearGradient>
-                        </Tap>
-                    </Fade>
-                </ScrollView>
-            </View>
-        );
-    }
-
-    // ── Idle phase (landing) ─────────────────────────────────────────────
     return (
-        <View style={[s.root, { paddingTop: ins.top }]}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" />
-            <View style={s.topBar}>
-                <Tap onPress={() => navigation.goBack()}>
-                    <Text style={s.backTxt}>← Back</Text>
-                </Tap>
-                <Text style={[s.header, { fontFamily: CONDENSED }]}>NUTRITION</Text>
-                <View style={{ width: 50 }} />
-            </View>
+        <TerminalScreen style={{ paddingTop: ins.top }}>
+            <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+            <SysBar online={true} identity={`${userTag}.NUTR-AI`} clock={clock} />
 
-            <View style={s.idleContent}>
-                <Fade delay={0}>
-                    <Text style={s.idleEmoji}>🍽</Text>
-                    <Text style={[s.idleTitle, { fontFamily: CONDENSED }]}>SCAN YOUR MEAL</Text>
-                    <Text style={s.idleDesc}>
-                        Take a photo of your food and our AI will instantly break down calories, protein, carbs, fat, and fiber.
-                    </Text>
-                </Fade>
+            <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+                <View style={{ padding: 16 }}>
+                    <Text style={s.prompt}>{'> nutrition --result'}</Text>
+                    <Text style={s.title}>MEAL ANALYSIS</Text>
+                </View>
 
-                <Fade delay={150}>
-                    <Tap onPress={openCamera}>
-                        <LinearGradient
-                            colors={['#0c4a6e', '#0891b2', '#06b6d4']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={s.ctaBtn}
-                        >
-                            <Text style={s.ctaEyebrow}>AI-POWERED</Text>
-                            <Text style={[s.ctaTitle, { fontFamily: CONDENSED }]}>SCAN YOUR{'\n'}MEAL</Text>
-                            <View style={s.ctaCircle}>
-                                <Text style={s.ctaCircleText}>GO</Text>
-                            </View>
-                        </LinearGradient>
-                    </Tap>
-                </Fade>
-            </View>
-        </View>
+                {/* Meal score */}
+                <Panel>
+                    <Header title="MEAL SCORE" right={<HdrMeta color={mealScore >= 70 ? C.good : mealScore >= 50 ? C.warn : C.bad}>
+                        [{mealScore >= 70 ? 'GOOD' : mealScore >= 50 ? 'OK' : 'LOW'}]
+                    </HdrMeta>} />
+                    <View style={s.scoreBody}>
+                        <Text style={[s.scoreBig, { color: mealScore >= 70 ? C.good : mealScore >= 50 ? C.warn : C.bad }]}>
+                            {String(Math.round(mealScore)).padStart(3, '0')}
+                        </Text>
+                        <View style={s.scoreRight}>
+                            <Text style={s.scoreMax}>/ 100</Text>
+                            <Text style={[s.scoreCaption, { color: C.muted }]}>NUTRIENT DENSITY</Text>
+                        </View>
+                    </View>
+                </Panel>
+
+                {/* Macros */}
+                <Panel>
+                    <Header title="MACROS · AGGREGATE" />
+                    {ORDER.map(key => {
+                        const v = Number(nutrients[key] || 0);
+                        const max = NUTRIENT_MAX[key] || 100;
+                        const pct = Math.min(100, (v / max) * 100);
+                        return (
+                            <DistBar
+                                key={key}
+                                label={`${NUTRIENT_LABELS[key]} (${NUTRIENT_UNITS[key]})`}
+                                value={Math.round(v)}
+                                total={max}
+                                color={NUTRIENT_COLORS[key] || C.text}
+                                pct={pct}
+                            />
+                        );
+                    })}
+                </Panel>
+
+                {/* Food items */}
+                {foodItems.length > 0 && (
+                    <Panel>
+                        <Header title="DETECTED ITEMS" right={<HdrMeta>N={fmtInt(foodItems.length)}</HdrMeta>} />
+                        {foodItems.slice(0, 10).map((item, i) => {
+                            const name = (item.name || item.item || '').toUpperCase();
+                            const confidence = item.confidence ?? item.score ?? 1;
+                            return (
+                                <FieldRow
+                                    key={i}
+                                    label={`I${String(i + 1).padStart(2, '0')}.......... ${name.slice(0, 18)}`}
+                                    value={fmt(confidence * 100, 0) + '%'}
+                                    color={confidence > 0.7 ? C.good : confidence > 0.5 ? C.warn : C.muted}
+                                    size="sm"
+                                />
+                            );
+                        })}
+                    </Panel>
+                )}
+
+                {/* Coaching */}
+                {coaching && (
+                    <Panel>
+                        <Header title="COACH NOTE" />
+                        <View style={{ padding: 12 }}>
+                            <Text style={s.body}>{String(coaching).toUpperCase()}</Text>
+                        </View>
+                    </Panel>
+                )}
+
+                <Pressable onPress={() => { setResult(null); setScreen('camera'); }} style={({ pressed }) => [s.btn, pressed && { backgroundColor: '#111' }]}>
+                    <Text style={s.btnText}>[N] NEW CAPTURE  ▸</Text>
+                </Pressable>
+                <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.btnSecondary, pressed && { backgroundColor: '#111' }]}>
+                    <Text style={s.btnSecondaryText}>[ESC] RETURN</Text>
+                </Pressable>
+
+                <Footer lines={[
+                    { text: `END OF ANALYSIS · ${nowISO()}` },
+                    { text: `VISION MODEL · CLAUDE · ${fmtInt(Object.values(nutrients).reduce((a, b) => a + b, 0))} G AGG` },
+                ]} />
+            </ScrollView>
+        </TerminalScreen>
     );
 }
 
-// ── Styles ───────────────────────────────────────────────────────────────────
-
 const s = StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#000' },
+    prompt:    { fontSize: 11, color: C.textMid, fontFamily: T.MONO, fontWeight: '600' },
+    title:     { fontSize: 22, fontWeight: '700', color: '#E8E8E8', fontFamily: T.MONO, letterSpacing: 1, marginTop: 8 },
+    subtitle:  { fontSize: 10, color: C.textMid, fontFamily: T.MONO, marginTop: 8, letterSpacing: 1 },
+    body:      { fontSize: 11, color: C.textSub, fontFamily: T.MONO, lineHeight: 17, letterSpacing: 0.3 },
 
-    // Permission
-    permWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-    permIcon: { fontSize: 52, marginBottom: 16 },
-    permTitle: { fontSize: 22, fontWeight: '900', color: '#f1f5f9', marginBottom: 10 },
-    permBody: { fontSize: 13, color: '#64748b', textAlign: 'center', lineHeight: 20, marginBottom: 28 },
-    permBtn: { backgroundColor: '#06b6d4', borderRadius: 14, paddingHorizontal: 30, paddingVertical: 13 },
-    permBtnText: { color: '#000', fontWeight: '900', fontSize: 14 },
+    camWrap:   { marginHorizontal: 16, marginTop: 14, height: 360 },
+    camBorder: { flex: 1, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
+    crosshair: { ...StyleSheet.absoluteFillObject },
+    cornerTL:  { position: 'absolute', top: 12, left: 12,  width: 20, height: 20, borderLeftWidth: 2, borderTopWidth: 2,    borderColor: C.text },
+    cornerTR:  { position: 'absolute', top: 12, right: 12, width: 20, height: 20, borderRightWidth: 2, borderTopWidth: 2,   borderColor: C.text },
+    cornerBL:  { position: 'absolute', bottom: 12, left: 12,  width: 20, height: 20, borderLeftWidth: 2, borderBottomWidth: 2,  borderColor: C.text },
+    cornerBR:  { position: 'absolute', bottom: 12, right: 12, width: 20, height: 20, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.text },
 
-    // Top bar
-    topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 14 },
-    header: { fontSize: 18, fontWeight: '900', color: '#fff', letterSpacing: 3 },
-    backTxt: { color: '#06b6d4', fontSize: 14, fontWeight: '700' },
+    errText:   { color: C.bad, fontFamily: T.MONO, fontSize: 11, fontWeight: '700', letterSpacing: 1, marginTop: 10 },
 
-    // Camera
-    camTop: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, zIndex: 10 },
-    camBackBtn: { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, paddingHorizontal: 13, paddingVertical: 8 },
-    camBackTxt: { color: '#f1f5f9', fontWeight: '700', fontSize: 13 },
-    camTitle: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
-    camBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center' },
-    captureBtn: { width: 76, height: 76, borderRadius: 38, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-    captureBtnInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#fff' },
+    analysingBox: { padding: 16, alignItems: 'center' },
+    analysingTxt: { color: C.text, fontFamily: T.MONO, fontSize: 11, letterSpacing: 1.5, fontWeight: '700' },
 
-    // Loader
-    loaderWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    loaderRing: { width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#06b6d4', marginBottom: 24 },
-    loaderText: { fontSize: 16, fontWeight: '900', color: '#06b6d4', letterSpacing: 4 },
-    loaderSub: { fontSize: 12, color: '#64748b', marginTop: 8 },
+    scoreBody:   { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 14 },
+    scoreBig:    { fontSize: 72, fontWeight: '700', fontFamily: T.MONO, letterSpacing: -3, lineHeight: 66 },
+    scoreRight:  { marginLeft: 12, marginBottom: 4, flex: 1 },
+    scoreMax:    { fontSize: 13, color: C.muted, fontFamily: T.MONO, fontWeight: '600' },
+    scoreCaption:{ fontSize: 10, fontFamily: T.MONO, fontWeight: '700', marginTop: 4, letterSpacing: 1 },
 
-    // Idle
-    idleContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-    idleEmoji: { fontSize: 64, textAlign: 'center', marginBottom: 16 },
-    idleTitle: { fontSize: 28, fontWeight: '900', color: '#fff', letterSpacing: 2, textAlign: 'center', marginBottom: 8 },
-    idleDesc: { fontSize: 13, color: '#64748b', textAlign: 'center', lineHeight: 20, marginBottom: 40 },
-
-    // CTA
-    ctaBtn: { borderRadius: 6, paddingVertical: 32, paddingHorizontal: 28, width: W - 64, position: 'relative',
-        ...Platform.select({ android: { elevation: 12 }, ios: { shadowColor: '#06b6d4', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 12 }, shadowRadius: 28 } }),
-    },
-    ctaEyebrow: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 3, marginBottom: 8 },
-    ctaTitle: { fontSize: 36, fontWeight: '900', color: '#fff', lineHeight: 40, letterSpacing: -1 },
-    ctaCircle: { position: 'absolute', bottom: 24, right: 24, width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-    ctaCircleText: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: 1 },
-
-    // Results — food items
-    sectionTitle: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, marginTop: 16, marginBottom: 12 },
-    foodList: { backgroundColor: '#111a2e', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
-    foodItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
-    foodDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#06b6d4', marginRight: 12 },
-    foodText: { fontSize: 14, color: '#f1f5f9', fontWeight: '600' },
-
-    // Score + Nutrients
-    scoreAndNutrients: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20 },
-    scoreRingWrap: { marginRight: 20, alignItems: 'center' },
-    scoreRingInner: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-    scoreRingNum: { fontSize: 26, fontWeight: '900' },
-    scoreRingLabel: { fontSize: 7, fontWeight: '700', color: '#4b5563', letterSpacing: 2, marginTop: -2 },
-    nutrientsCol: { flex: 1 },
-    nutrientRow: { marginBottom: 10 },
-    nutrientLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-    nutrientDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-    nutrientLabel: { fontSize: 11, color: '#9ca3af', fontWeight: '700', flex: 1 },
-    nutrientValue: { fontSize: 12, color: '#f1f5f9', fontWeight: '800', fontFamily: Platform.OS === 'android' ? 'monospace' : 'Courier' },
-    nutrientTrack: { height: 4, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' },
-    nutrientFill: { height: '100%', borderRadius: 2 },
-
-    // Recommendation
-    recCard: { backgroundColor: '#111a2e', borderRadius: 16, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
-    recLabel: { fontSize: 10, fontWeight: '800', color: '#4b5563', letterSpacing: 2, marginBottom: 8 },
-    recText: { fontSize: 13, color: '#f1f5f9', fontStyle: 'italic', lineHeight: 20 },
-
-    // Scan Again
-    scanAgainBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-    scanAgainText: { color: '#fff', fontWeight: '900', fontSize: 15, letterSpacing: 2 },
+    btn:          { margin: 16, marginTop: 20, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: C.text },
+    btnText:      { color: C.text, fontFamily: T.MONO, fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
+    btnSecondary: { marginHorizontal: 16, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: C.border },
+    btnSecondaryText: { color: C.textMid, fontFamily: T.MONO, fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
 });

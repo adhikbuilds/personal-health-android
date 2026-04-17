@@ -1,46 +1,56 @@
-/**
- * Heart Rate — Finger-on-Lens PPG
- *
- * How real heart rate apps work:
- * 1. User places finger over BACK camera
- * 2. Flash/torch illuminates fingertip
- * 3. Camera sees red light pulsing with blood flow
- * 4. Extract red channel intensity → send to backend → compute BPM
- *
- * No face detection needed. No shutter sound (uses video not photos).
- * Way more accurate than face-based rPPG.
- */
+// RPPGScreen — Bloomberg terminal.
+// Heart rate via finger-on-lens PPG. Camera hidden, torch on, frames →
+// backend WS. UI shows terminal-style live telemetry: BPM, HRV, signal
+// quality, frames captured.
 
 import React, { useRef, useState, useEffect } from 'react';
 import {
-    View, Text, StyleSheet, StatusBar, Platform, Animated,
+    View, Text, StyleSheet, StatusBar, Animated, Pressable,
 } from 'react-native';
-import { Tap, Fade, CONDENSED, MONO } from '../ui';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
 
+import { C, T } from '../styles/colors';
+import {
+    Panel, Header, HdrMeta, Rule, FieldRow, Triad, SysBar, TerminalScreen, Footer, useLiveClock,
+    fmt, fmtInt, nowISO,
+} from '../components/terminal';
+
 function bpmColor(b) {
-    if (b <= 0) return '#333';
-    if (b < 60) return '#a855f7';
-    if (b < 100) return '#22c55e';
-    if (b < 130) return '#f97316';
-    return '#ef4444';
+    if (b <= 0) return C.muted;
+    if (b < 60) return C.info;
+    if (b < 100) return C.good;
+    if (b < 130) return C.warn;
+    return C.bad;
 }
 
-function zoneLabel(bpm) {
-    if (bpm <= 0) return '';
-    if (bpm < 60) return 'Resting (low)';
-    if (bpm < 80) return 'Resting';
-    if (bpm < 100) return 'Normal';
-    if (bpm < 130) return 'Elevated';
-    if (bpm < 160) return 'Cardio';
-    return 'Peak';
+function zoneCode(bpm) {
+    if (bpm <= 0) return '--';
+    if (bpm < 60) return 'LOW';
+    if (bpm < 80) return 'REST';
+    if (bpm < 100) return 'NORMAL';
+    if (bpm < 130) return 'ELEV';
+    if (bpm < 160) return 'CARDIO';
+    return 'PEAK';
+}
+
+function qualityCode(q) {
+    const c = String(q || '').toUpperCase();
+    if (c === 'EXCELLENT') return { label: 'EXCELLENT', color: C.good };
+    if (c === 'GOOD')      return { label: 'GOOD',      color: C.good };
+    if (c === 'FAIR')      return { label: 'FAIR',      color: C.warn };
+    if (c === 'POOR')      return { label: 'POOR',      color: C.bad };
+    if (c === 'WARMUP')    return { label: 'WARMUP',    color: C.info };
+    if (c === 'NO_PULSE')  return { label: 'NO PULSE',  color: C.bad };
+    if (c === 'INVALID')   return { label: 'INVALID',   color: C.bad };
+    if (c === 'NO_FACE')   return { label: 'NO FACE',   color: C.warn };
+    return { label: q ? c : 'IDLE', color: C.textMid };
 }
 
 export default function RPPGScreen({ navigation, route }) {
     const ins = useSafeAreaInsets();
+    const clock = useLiveClock();
     const sid = route?.params?.sessionId || `rppg_${Date.now()}`;
     const [perm, askPerm] = useCameraPermissions();
     const camRef = useRef(null);
@@ -56,15 +66,16 @@ export default function RPPGScreen({ navigation, route }) {
     const [samples, setSamples] = useState(0);
     const [fingerOn, setFingerOn] = useState(false);
     const [err, setErr] = useState('');
+    const [startedAt, setStartedAt] = useState(0);
 
-    // Pulse animation synced to BPM
+    // Pulse animation on the BPM cell
     const pulse = useRef(new Animated.Value(1)).current;
     useEffect(() => {
         if (bpm <= 0) return;
         const ms = Math.max(250, Math.round(60000 / bpm));
         const a = Animated.loop(Animated.sequence([
-            Animated.timing(pulse, { toValue: 1.08, duration: 100, useNativeDriver: true }),
-            Animated.timing(pulse, { toValue: 1, duration: ms - 130, useNativeDriver: true }),
+            Animated.timing(pulse, { toValue: 1.05, duration: 90, useNativeDriver: true }),
+            Animated.timing(pulse, { toValue: 1, duration: ms - 120, useNativeDriver: true }),
         ]));
         a.start();
         return () => a.stop();
@@ -97,6 +108,7 @@ export default function RPPGScreen({ navigation, route }) {
         setHrv(0);
         setFingerOn(false);
         setQuality('warmup');
+        setStartedAt(Date.now());
 
         const w = api.connectRPPGLiveStream(sid,
             (r) => {
@@ -104,26 +116,19 @@ export default function RPPGScreen({ navigation, route }) {
                 if (r.bpm > 0 && r.status !== 'warmup') setBpm(r.bpm);
                 setHrv(r.hrv_ms ?? 0);
                 setQuality(r.signal_quality || '');
-                // Detect if finger is on lens (high red, low variance = finger covering camera)
                 if (r.face_detected !== undefined) setFingerOn(true);
             },
-            () => { setErr('Server not connected'); stop(); },
-            () => { if (scanRef.current) { setErr('Connection lost'); stop(); } },
+            () => { setErr('WS CONNECT FAILED'); stop(); },
+            () => { if (scanRef.current) { setErr('WS DROPPED'); stop(); } },
         );
         wsRef.current = w;
 
-        // Take small photos at 2fps — with torch ON and back camera
-        // The finger blocks the lens so the entire image is red-tinted skin
-        // No shutter sound with quality 0.01 + skipProcessing
         const t = setInterval(async () => {
             if (!scanRef.current || !camRef.current) return;
             try {
                 const p = await camRef.current.takePictureAsync({
-                    base64: true,
-                    quality: 0.01,
-                    shutterSound: false,
-                    animateShutter: false,
-                    skipProcessing: true,
+                    base64: true, quality: 0.01,
+                    shutterSound: false, animateShutter: false, skipProcessing: true,
                 });
                 if (!scanRef.current || !wsRef.current) return;
                 if (wsRef.current.readyState === 1 && p?.base64) {
@@ -144,31 +149,52 @@ export default function RPPGScreen({ navigation, route }) {
         setTimeout(() => navigation?.canGoBack() && navigation.goBack(), 80);
     }
 
-    if (!perm) return <View style={$.bg} />;
-    if (!perm.granted) return (
-        <View style={[$.bg, { paddingTop: ins.top, justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" />
-            <Text style={$.title}>HEART RATE</Text>
-            <Text style={$.sub}>Place your finger over the back camera. The flash lights up your fingertip and the camera detects your pulse.</Text>
-            <Tap onPress={askPerm}><LinearGradient colors={['#7f1d1d', '#dc2626']} style={$.permBtn}><Text style={$.permBtnT}>ALLOW CAMERA</Text></LinearGradient></Tap>
-        </View>
-    );
-
     const col = bpmColor(bpm);
-    const zone = zoneLabel(bpm);
+    const zone = zoneCode(bpm);
+    const q = qualityCode(quality);
+    const elapsed = scanning && startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
+
+    if (!perm) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
+    if (!perm.granted) {
+        return (
+            <TerminalScreen style={{ paddingTop: ins.top }}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <SysBar online={null} identity="RPPG.DEVICE" clock={clock} />
+                <View style={{ padding: 16 }}>
+                    <Text style={s.prompt}>{'> rppg --init'}</Text>
+                    <Text style={s.title}>CAMERA PERMISSION REQUIRED</Text>
+                </View>
+                <Panel>
+                    <Header title="SENSOR ACCESS" />
+                    <View style={{ padding: 14 }}>
+                        <Text style={s.body}>
+                            Place finger over back camera lens. Torch illuminates the fingertip;
+                            camera captures red-channel intensity pulsing with blood flow at ~2 Hz.
+                            Frames stream to backend for CHROM rPPG analysis.
+                        </Text>
+                    </View>
+                </Panel>
+                <Pressable onPress={askPerm} style={({ pressed }) => [s.btn, pressed && { backgroundColor: '#111' }]}>
+                    <Text style={[s.btnText, { color: C.bad }]}>[A] ALLOW CAMERA</Text>
+                </Pressable>
+                <Pressable onPress={handleBack} style={({ pressed }) => [s.btnSecondary, pressed && { backgroundColor: '#111' }]}>
+                    <Text style={s.btnSecondaryText}>[ESC] RETURN</Text>
+                </Pressable>
+            </TerminalScreen>
+        );
+    }
 
     return (
-        <View style={[$.bg, { paddingTop: ins.top }]}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" />
+        <TerminalScreen style={{ paddingTop: ins.top }}>
+            <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
 
-            {/* Back button */}
-            <View style={$.topRow}>
-                <Tap onPress={handleBack} style={$.backBtn}><Text style={$.backIcon}>{'‹'}</Text></Tap>
-                <Text style={$.topTitle}>HEART RATE</Text>
-                <View style={{ width: 38 }} />
-            </View>
+            <SysBar
+                online={scanning ? true : null}
+                identity={`RPPG.${String(sid).slice(0, 10).toUpperCase()}`}
+                clock={clock}
+            />
 
-            {/* Camera hidden offscreen — no visible flash */}
+            {/* Hidden camera (torch on when scanning) */}
             <View style={{ position: 'absolute', top: -9999, left: -9999, width: 1, height: 1 }}>
                 <CameraView
                     ref={camRef}
@@ -179,123 +205,85 @@ export default function RPPGScreen({ navigation, route }) {
                 />
             </View>
 
-            {/* Main content */}
-            <View style={$.body}>
-
-                {/* Instructions or BPM */}
-                {!scanning ? (
-                    <Fade style={$.instructions}>
-                        <View style={$.pulseRing}>
-                            <View style={$.pulseInner}>
-                                <Text style={$.heartIcon}>{'♥'}</Text>
-                            </View>
-                        </View>
-                        <Text style={$.instrTitle}>Measure your pulse</Text>
-                        <Text style={$.instrSub}>Place one fingertip flat on the back of{'\n'}your phone, covering the camera and flash{'\n'}at the same time. Tap START, then hold{'\n'}still for 10 seconds.</Text>
-                        <View style={$.stepsRow}>
-                            <View style={$.step}><Text style={$.stepNum}>1</Text><Text style={$.stepText}>Tap{'\n'}START</Text></View>
-                            <View style={$.stepLine} />
-                            <View style={$.step}><Text style={$.stepNum}>2</Text><Text style={$.stepText}>Place finger{'\n'}on camera</Text></View>
-                            <View style={$.stepLine} />
-                            <View style={$.step}><Text style={$.stepNum}>3</Text><Text style={$.stepText}>Hold still{'\n'}10 sec</Text></View>
-                        </View>
-                        <Text style={$.tip}>Your finger should glow red from the flash</Text>
-                    </Fade>
-                ) : (
-                    <Fade>
-                        <Animated.View style={{ transform: [{ scale: pulse }], alignItems: 'center' }}>
-                            <Text style={[$.bpmNum, { color: col }]}>{bpm > 0 ? Math.round(bpm) : '——'}</Text>
-                        </Animated.View>
-                        <Text style={$.bpmLabel}>BPM</Text>
-                        {zone ? <Text style={[$.zone, { color: col }]}>{zone}</Text> : null}
-
-                        <View style={$.statsRow}>
-                            <View style={$.stat}>
-                                <Text style={[$.statVal, { color: '#a855f7' }]}>{hrv > 0 ? hrv.toFixed(0) : '—'}</Text>
-                                <Text style={$.statKey}>HRV ms</Text>
-                            </View>
-                            <View style={$.statDiv} />
-                            <View style={$.stat}>
-                                <Text style={[$.statVal, { color: hrv > 60 ? '#22c55e' : hrv > 30 ? '#f97316' : hrv > 0 ? '#ef4444' : '#333' }]}>
-                                    {hrv > 60 ? 'LOW' : hrv > 30 ? 'MED' : hrv > 0 ? 'HIGH' : '—'}
-                                </Text>
-                                <Text style={$.statKey}>STRESS</Text>
-                            </View>
-                            <View style={$.statDiv} />
-                            <View style={$.stat}>
-                                <Text style={$.statVal}>{samples}</Text>
-                                <Text style={$.statKey}>SAMPLES</Text>
-                            </View>
-                        </View>
-
-                        {quality === 'warmup' && <Text style={$.hint}>Keep your finger on the camera... warming up</Text>}
-                        {quality === 'poor' && <Text style={[$.hint, { color: '#f97316' }]}>Press your finger a bit more firmly — cover the whole lens</Text>}
-                        {quality === '' && scanning && samples < 5 && <Text style={$.hint}>Place your finger over the camera + flash now</Text>}
-                    </Fade>
-                )}
-
-                {err ? <Text style={$.errText}>{err}</Text> : null}
+            <View style={{ padding: 16 }}>
+                <Text style={s.prompt}>{'> rppg --live --session='}{String(sid).slice(0, 10)}</Text>
+                <Text style={s.title}>HEART RATE MONITOR</Text>
             </View>
 
-            {/* Button */}
-            <View style={[$.bar, { paddingBottom: ins.bottom + 16 }]}>
-                <Tap onPress={scanning ? stop : start}>
-                    <LinearGradient
-                        colors={scanning ? ['#7f1d1d', '#dc2626'] : ['#0c4a6e', '#0891b2']}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={$.barBtn}>
-                        <Text style={$.barBtnT}>{scanning ? 'STOP' : 'START'}</Text>
-                    </LinearGradient>
-                </Tap>
-            </View>
-        </View>
+            {/* Primary BPM readout */}
+            <Panel>
+                <Header
+                    title="BPM"
+                    right={<HdrMeta color={col}>[{zone}]</HdrMeta>}
+                />
+                <View style={s.bpmBody}>
+                    <Animated.Text style={[s.bpmBig, { color: col, transform: [{ scale: pulse }] }]}>
+                        {bpm > 0 ? String(Math.round(bpm)).padStart(3, '0') : '---'}
+                    </Animated.Text>
+                    <View style={s.bpmRight}>
+                        <Text style={s.bpmUnit}>BPM</Text>
+                        <Text style={[s.bpmQuality, { color: q.color }]}>{q.label}</Text>
+                        {err ? <Text style={[s.bpmQuality, { color: C.bad }]}>{err.toUpperCase()}</Text> : null}
+                    </View>
+                </View>
+            </Panel>
+
+            {/* Vitals */}
+            <Panel>
+                <Header title="VITALS · LIVE" right={<HdrMeta>{scanning ? 'CAPTURING' : 'IDLE'}</HdrMeta>} />
+                <FieldRow label="BPM........... BEATS PER MINUTE" value={bpm > 0 ? fmt(bpm, 1) : '--'} color={col} />
+                <FieldRow label="HRV........... RMSSD (MS)" value={hrv > 0 ? fmt(hrv, 1) : '--'} color={C.info} />
+                <FieldRow label="SIG........... SIGNAL QUALITY" value={`[${q.label}]`} color={q.color} />
+                <FieldRow label="FNG........... FINGER DETECTED" value={fingerOn ? 'YES' : 'NO'} color={fingerOn ? C.good : C.muted} />
+                <FieldRow label="FRM........... FRAMES SENT" value={fmtInt(samples)} color={C.text} />
+                <FieldRow label="ELP........... ELAPSED (SEC)" value={fmtInt(elapsed)} color={C.textSub} size="sm" dim />
+            </Panel>
+
+            {/* Instructions */}
+            <Panel>
+                <Header title="INSTRUCTIONS" />
+                <FieldRow label="01............ COVER BACK CAMERA" value="▸ FINGER"  color={C.textMid} size="sm" />
+                <FieldRow label="02............ HOLD STILL"           value="▸ 10 SEC"  color={C.textMid} size="sm" />
+                <FieldRow label="03............ TORCH WILL ACTIVATE"  value="▸ AUTO"    color={C.textMid} size="sm" />
+                <FieldRow label="04............ WARMUP"               value="▸ 2.5 SEC" color={C.textMid} size="sm" />
+            </Panel>
+
+            {/* Action */}
+            {scanning ? (
+                <Pressable onPress={stop} style={({ pressed }) => [s.btn, { borderColor: C.bad }, pressed && { backgroundColor: '#111' }]}>
+                    <Text style={[s.btnText, { color: C.bad }]}>[SPACE] STOP MEASUREMENT</Text>
+                </Pressable>
+            ) : (
+                <Pressable onPress={start} style={({ pressed }) => [s.btn, pressed && { backgroundColor: '#111' }]}>
+                    <Text style={[s.btnText, { color: C.text }]}>[SPACE] START MEASUREMENT  ▸</Text>
+                </Pressable>
+            )}
+
+            <Pressable onPress={handleBack} style={({ pressed }) => [s.btnSecondary, pressed && { backgroundColor: '#111' }]}>
+                <Text style={s.btnSecondaryText}>[ESC] RETURN</Text>
+            </Pressable>
+
+            <Footer lines={[
+                { text: `RPPG SESSION ${String(sid).slice(0, 10).toUpperCase()}` },
+                { text: `CHROM ALGO · De Haan & Jeanne 2013 · FS 2 HZ` },
+            ]} />
+        </TerminalScreen>
     );
 }
 
-const $ = StyleSheet.create({
-    bg: { flex: 1, backgroundColor: '#000' },
+const s = StyleSheet.create({
+    prompt: { fontSize: 11, color: C.textMid, fontFamily: T.MONO, fontWeight: '600' },
+    title:  { fontSize: 22, fontWeight: '700', color: '#E8E8E8', fontFamily: T.MONO, letterSpacing: 1, marginTop: 8 },
+    body:   { fontSize: 11, color: C.textSub, fontFamily: T.MONO, lineHeight: 17 },
 
-    title: { fontSize: 28, fontWeight: '900', color: '#fff', fontFamily: CONDENSED, letterSpacing: 2, marginBottom: 12 },
-    sub: { fontSize: 14, color: '#555', textAlign: 'center', marginBottom: 32, lineHeight: 22 },
-    permBtn: { borderRadius: 6, paddingVertical: 16, paddingHorizontal: 40 },
-    permBtnT: { color: '#fff', fontWeight: '900', fontSize: 14, letterSpacing: 3, fontFamily: CONDENSED },
+    bpmBody:   { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 14 },
+    bpmBig:    { fontSize: 88, fontWeight: '700', fontFamily: T.MONO, letterSpacing: -5, lineHeight: 78 },
+    bpmRight:  { marginLeft: 16, marginBottom: 8, flex: 1 },
+    bpmUnit:   { fontSize: 14, color: C.muted, fontFamily: T.MONO, fontWeight: '600' },
+    bpmQuality:{ fontSize: 11, fontFamily: T.MONO, fontWeight: '700', marginTop: 4, letterSpacing: 1 },
 
-    topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8 },
-    topTitle: { fontSize: 13, fontWeight: '800', color: '#555', letterSpacing: 3 },
-    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
-    backIcon: { color: '#fff', fontSize: 22, fontWeight: '300', marginTop: -2 },
-
-    camHidden: { position: 'absolute', width: 1, height: 1, opacity: 0 },
-
-    body: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
-
-    instructions: { alignItems: 'center' },
-    pulseRing: { width: 120, height: 120, borderRadius: 60, borderWidth: 2, borderColor: 'rgba(239,68,68,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 28 },
-    pulseInner: { width: 90, height: 90, borderRadius: 45, backgroundColor: 'rgba(239,68,68,0.08)', alignItems: 'center', justifyContent: 'center' },
-    heartIcon: { fontSize: 36, color: '#ef4444' },
-    instrTitle: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 10, fontFamily: CONDENSED, letterSpacing: 1 },
-    instrSub: { fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 22, marginBottom: 32 },
-    tip: { fontSize: 12, color: '#ef4444', marginTop: 20, fontStyle: 'italic' },
-    stepsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-    step: { alignItems: 'center', width: 64 },
-    stepNum: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#111', color: '#06b6d4', fontSize: 13, fontWeight: '800', textAlign: 'center', lineHeight: 28, overflow: 'hidden', marginBottom: 6 },
-    stepText: { fontSize: 10, color: '#555', textAlign: 'center', lineHeight: 14 },
-    stepLine: { width: 24, height: 1, backgroundColor: '#1a1a1a', marginBottom: 14 },
-
-    bpmNum: { fontSize: 96, fontWeight: '900', fontFamily: CONDENSED },
-    bpmLabel: { fontSize: 12, fontWeight: '700', color: '#444', letterSpacing: 4, marginTop: -10, marginBottom: 8 },
-    zone: { fontSize: 14, fontWeight: '600', marginBottom: 32 },
-
-    statsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 24 },
-    stat: { alignItems: 'center', paddingHorizontal: 24 },
-    statVal: { fontSize: 20, fontWeight: '800', color: '#fff', fontFamily: MONO },
-    statKey: { fontSize: 9, fontWeight: '600', color: '#444', letterSpacing: 2, marginTop: 4 },
-    statDiv: { width: 1, height: 28, backgroundColor: '#1a1a1a' },
-
-    hint: { color: '#555', fontSize: 12, marginTop: 20 },
-    errText: { color: '#ef4444', fontSize: 12, marginTop: 16 },
-
-    bar: { paddingHorizontal: 24, paddingTop: 12 },
-    barBtn: { borderRadius: 8, paddingVertical: 18, alignItems: 'center',
-        ...Platform.select({ android: { elevation: 8 }, ios: { shadowColor: '#06b6d4', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 8 }, shadowRadius: 20 } }) },
-    barBtnT: { color: '#fff', fontWeight: '900', fontSize: 16, letterSpacing: 3, fontFamily: CONDENSED },
+    btn:          { margin: 16, marginTop: 20, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: C.text },
+    btnText:      { fontFamily: T.MONO, fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
+    btnSecondary: { marginHorizontal: 16, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: C.border },
+    btnSecondaryText: { color: C.textMid, fontFamily: T.MONO, fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
 });
