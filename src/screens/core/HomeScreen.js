@@ -153,8 +153,16 @@ export default function HomeScreen({ navigation, showToast }) {
             if (raw) { try { setTracker(JSON.parse(raw)); } catch (_) {} }
         });
         api.ping().then(ok => setApiStatus(ok ? 'online' : 'offline'));
-        api.getTrendingCreators().then(data => { if (data?.length) setCreators(data); });
+        api.getTrendingCreators().then(data => {
+            const arr = Array.isArray(data) ? data : data?.creators;
+            if (arr?.length) setCreators(arr);
+        });
     }, []);
+
+    // Persist tracker changes to AsyncStorage
+    useEffect(() => {
+        AsyncStorage.setItem(TODAY_KEY, JSON.stringify(tracker)).catch(() => {});
+    }, [tracker]);
 
     const handleTilePress = useCallback((item) => {
         if (!item.route) {
@@ -201,7 +209,7 @@ export default function HomeScreen({ navigation, showToast }) {
                             <TouchableOpacity style={sc.headerIcon} onPress={() => navigation.navigate('FitnessTest')}>
                                 <Text style={{ fontSize: 18 }}>🏆</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={sc.headerIcon} onPress={() => navigation.navigate('Camera')}>
+                            <TouchableOpacity style={sc.headerIcon} onPress={() => navigation.jumpTo('Camera')}>
                                 <Text style={{ fontSize: 18 }}>🎙️</Text>
                             </TouchableOpacity>
                         </View>
@@ -274,7 +282,7 @@ export default function HomeScreen({ navigation, showToast }) {
                 <View style={sc.section}>
                     <View style={sc.sectionHeader}>
                         <Text style={sc.sectionTitle}>MY DAILY TRACKER</Text>
-                        <TouchableOpacity>
+                        <TouchableOpacity onPress={() => showToast('Customise Plan coming soon!')}>
                             <Text style={sc.customiseBtn}>Customise Plan ›</Text>
                         </TouchableOpacity>
                     </View>

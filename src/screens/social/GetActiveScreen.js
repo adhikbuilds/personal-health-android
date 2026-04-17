@@ -71,7 +71,10 @@ export default function GetActiveScreen({ navigation, showToast }) {
                         </TouchableOpacity>
                     )}
 
-                    <TouchableOpacity style={s.startBtn} onPress={() => showToast?.('Starting session…')}>
+                    <TouchableOpacity style={s.startBtn} onPress={() => {
+                        showToast?.(`Starting ${selected.label} session…`);
+                        navigation.navigate('Tabs', { screen: 'Camera' });
+                    }}>
                         <Text style={s.startBtnText}>Start Session →</Text>
                     </TouchableOpacity>
                 </ScrollView>
