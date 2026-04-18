@@ -40,10 +40,9 @@ import GetActiveScreen     from './src/screens/social/GetActiveScreen';
 import ClassesScreen       from './src/screens/social/ClassesScreen';
 import SocialFeedScreen    from './src/screens/social/SocialFeedScreen';
 import CoachInboxScreen    from './src/screens/social/CoachInboxScreen';
-import InviteAcceptScreen  from './src/screens/social/InviteAcceptScreen';
+import InviteJoinScreen    from './src/screens/core/InviteJoinScreen';
 
 // Wellness domain
-import WellnessPlaceholderScreen from './src/screens/wellness/WellnessPlaceholderScreen';
 import WellnessScreen            from './src/screens/wellness/WellnessScreen';
 import WellnessLogFormScreen     from './src/screens/wellness/WellnessLogFormScreen';
 
@@ -273,9 +272,9 @@ function AppNavigator({ showToast }) {
 
             {/* Invite deep-link — personalhealth://invite/:token */}
             <Stack.Screen
-                name="InviteAccept"
-                component={InviteAcceptScreen}
-                options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
+                name="InviteJoin"
+                component={InviteJoinScreen}
+                options={{ animation: 'slide_from_bottom', presentation: 'modal', gestureEnabled: false }}
             />
         </Stack.Navigator>
     );

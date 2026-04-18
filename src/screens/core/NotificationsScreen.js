@@ -13,7 +13,7 @@ const TEXT    = '#f9fafb';
 const MUTED   = '#9ca3af';
 const ACCENT  = '#06b6d4';
 const WARNING = '#f59e0b';
-const SUCCESS = '#10b981';
+const SUCCESS = '#22c55e';
 const RED     = '#ef4444';
 const BORDER  = 'rgba(255,255,255,0.08)';
 
