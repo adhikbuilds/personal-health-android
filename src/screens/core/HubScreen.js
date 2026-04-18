@@ -4,6 +4,7 @@ import {
     View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView,
     Modal, Pressable, FlatList, Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../../context/UserContext';
 import { NUTRITION_PLANS, PLAYFIELDS } from '../../data/constants';
 import api from '../../services/api';
@@ -268,7 +269,23 @@ export default function HubScreen({ showToast, navigation }) {
 
                 {activeSection === 'Arena' && (
                     <>
-                        <Text style={s.sectionLabel}>AVAILABLE CHALLENGES</Text>
+                        {/* Coach Inbox entry point */}
+                        <TouchableOpacity
+                            style={s.coachInboxRow}
+                            onPress={() => navigation?.navigate('CoachInbox')}
+                            activeOpacity={0.8}
+                        >
+                            <View style={s.coachInboxIcon}>
+                                <Ionicons name="chatbubble-outline" size={20} color={C.cyan} />
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={s.coachInboxTitle}>Coach Inbox</Text>
+                                <Text style={s.coachInboxSub}>Coach notes &amp; messages</Text>
+                            </View>
+                            <Ionicons name="chevron-forward-outline" size={16} color={C.muted} />
+                        </TouchableOpacity>
+
+                        <Text style={[s.sectionLabel, { marginTop: 4 }]}>AVAILABLE CHALLENGES</Text>
                         {ARENA_CHALLENGES.map(c => (
                             <ArenaCard key={c.id} challenge={c} onPress={() => {
                                 showToast(`⚡ ${c.title} starting…`);
@@ -448,4 +465,9 @@ const s = StyleSheet.create({
     menuItemIcon: { fontSize: 22, marginRight: 14 },
     menuItemText: { color: C.text, fontSize: 14, fontWeight: '800' },
     menuDivider: { height: 1, backgroundColor: C.border, marginVertical: 8 },
+    // Coach Inbox
+    coachInboxRow:  { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surf, borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(6,182,212,0.25)' },
+    coachInboxIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(6,182,212,0.12)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(6,182,212,0.3)' },
+    coachInboxTitle:{ fontSize: 14, fontWeight: '800', color: C.text },
+    coachInboxSub:  { fontSize: 11, color: C.muted, marginTop: 2 },
 });
