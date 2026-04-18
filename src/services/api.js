@@ -271,6 +271,12 @@ export const api = {
 
     generateNotification: (athleteId) =>
         fetchJSON(`/notifications/generate/${encodeURIComponent(athleteId)}`, { method: 'POST' }),
+
+    // ─── Generic REST helpers ────────────────────────────────────────────
+    get:   (path)         => fetchJSON(path),
+    post:  (path, body)   => fetchJSON(path, { method: 'POST',  body: JSON.stringify(body) }),
+    patch: (path, body)   => fetchJSON(path, { method: 'PATCH', body: JSON.stringify(body) }),
+    del:   (path)         => fetchJSON(path, { method: 'DELETE' }),
 };
 
 export default api;
