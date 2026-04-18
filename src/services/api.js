@@ -51,6 +51,23 @@ async function fetchJSON(path, options = {}) {
     }
 }
 
+async function fetchRaw(path, options = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), API_TIMEOUT);
+    try {
+        const res = await fetch(`${API_BASE}${path}`, {
+            headers: { 'Content-Type': 'application/json', ...options.headers },
+            signal: controller.signal,
+            ...options,
+        });
+        clearTimeout(timer);
+        return res;
+    } catch (err) {
+        clearTimeout(timer);
+        return null;
+    }
+}
+
 // ─── Session API ─────────────────────────────────────────────────────────────
 export const api = {
     /** Check if API is reachable */
@@ -60,6 +77,11 @@ export const api = {
     startSession: (athlete_id, sport) => fetchJSON('/session/start', {
         method: 'POST',
         body: JSON.stringify({ athlete_id, sport }),
+    }),
+
+    createAthlete: (payload) => fetchJSON('/athlete', {
+        method: 'POST',
+        body: JSON.stringify(payload),
     }),
 
     /**
@@ -116,6 +138,18 @@ export const api = {
     /** End session, returns summary with avg_form_score, xp_earned, etc. */
     endSession: (sessionId) =>
         fetchJSON(`/session/${sessionId}/end`, { method: 'POST' }),
+
+    getShareCard: (sessionId) =>
+        fetchJSON(`/session/${sessionId}/share-card`),
+
+    getWeeklyPlan: (athleteId) =>
+        fetchJSON(`/plan/${athleteId}/weekly`),
+
+    poseCheck: (imageB64) =>
+        fetchJSON('/pose/check', {
+            method: 'POST',
+            body: JSON.stringify({ image_b64: imageB64 }),
+        }),
 
     /** Fetch session history for an athlete */
     getSessions: (athleteId, limit = 10) =>
@@ -195,6 +229,54 @@ export const api = {
         };
         return ws;
     },
+
+    connectMetricsLive: (sessionId, onMessage, onError, onClose) => {
+        const wsUrl = `${WS_BASE_RESOLVED}/metrics/live/${sessionId}`;
+        const ws = new WebSocket(wsUrl);
+        ws.onmessage = (e) => {
+            try { onMessage(JSON.parse(e.data)); } catch (_) {}
+        };
+        ws.onerror = (e) => {
+            if (onError) onError(e);
+        };
+        ws.onclose = () => {
+            if (onClose) onClose();
+        };
+        return ws;
+    },
+
+    // ─── Notifications ───────────────────────────────────────────────────
+    getNotifications: (athleteId, unreadOnly = false) =>
+        fetchJSON(`/athlete/${athleteId}/notifications${unreadOnly ? '?unread_only=true' : ''}`),
+
+    markNotificationsRead: (athleteId) =>
+        fetchJSON(`/athlete/${athleteId}/notifications/read`, { method: 'POST' }),
+
+    // ─── Drill Assignments ───────────────────────────────────────────────
+    getDrillAssignments: (athleteId) =>
+        fetchJSON(`/athlete/${athleteId}/drill-assignments`),
+
+    prefetchImage: async (path) => {
+        const response = await fetchRaw(path);
+        if (!response) return null;
+        return response.url || `${API_BASE}${path}`;
+    },
+
+    // ─── Injury Risk (Flow 13) ───────────────────────────────────────────
+    getInjuryRisk: (athleteId, days = 14) =>
+        fetchJSON(`/injury-risk/${encodeURIComponent(athleteId)}?days=${days}`),
+
+    getWeakJoints: (athleteId, days = 30) =>
+        fetchJSON(`/weak-joints/${encodeURIComponent(athleteId)}?days=${days}`),
+
+    generateNotification: (athleteId) =>
+        fetchJSON(`/notifications/generate/${encodeURIComponent(athleteId)}`, { method: 'POST' }),
+
+    // ─── Generic REST helpers ────────────────────────────────────────────
+    get:   (path)         => fetchJSON(path),
+    post:  (path, body)   => fetchJSON(path, { method: 'POST',  body: JSON.stringify(body) }),
+    patch: (path, body)   => fetchJSON(path, { method: 'PATCH', body: JSON.stringify(body) }),
+    del:   (path)         => fetchJSON(path, { method: 'DELETE' }),
 };
 
 export default api;

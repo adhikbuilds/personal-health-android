@@ -2,6 +2,7 @@
 // Fixes: gap→margin in flex layouts, useUser() hook
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../../context/UserContext';
 import { METRICS_DB } from '../../data/constants';
 import Svg, { Polygon, Circle, Line, Text as SvgText } from 'react-native-svg';
@@ -112,7 +113,7 @@ function SpiderChart({ data, size = 220 }) {
     );
 }
 
-export default function MetricsScreen() {
+export default function MetricsScreen({ navigation }) {
     const { userData, dataMode } = useUser();
     const [activeTab, setActiveTab] = useState('physical');
     const bpi = userData.bpi ?? 12450;
@@ -148,6 +149,23 @@ export default function MetricsScreen() {
                 
                 <Text style={[s.sectionLabel, { marginTop: 16 }]}>DETAILED TRENDS</Text>
                 {(METRICS_DB[activeTab] || []).map(m => <MetricCard key={m.id} metric={m} isLive={isLive} />)}
+
+                {/* Flow 13 entry point — private injury risk analysis */}
+                <Text style={[s.sectionLabel, { marginTop: 16 }]}>RISK ANALYSIS</Text>
+                <TouchableOpacity
+                    style={s.injuryRiskCard}
+                    onPress={() => navigation?.navigate('InjuryRisk')}
+                    accessibilityLabel="Open Injury Risk Analysis"
+                >
+                    <View style={s.injuryRiskLeft}>
+                        <Ionicons name="shield-half-outline" size={22} color={C.cyan} style={{ marginRight: 12 }} />
+                        <View>
+                            <Text style={s.injuryRiskTitle}>Injury Risk Analysis</Text>
+                            <Text style={s.injuryRiskSub}>Private — only visible to you</Text>
+                        </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={C.muted} />
+                </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
     );
@@ -185,4 +203,18 @@ const s = StyleSheet.create({
     sparkVal: { fontSize: 9, color: C.muted, fontWeight: '600', marginTop: 4 },
     chartContainer: { backgroundColor: C.surf, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
     sectionLabel: { fontSize: 10, fontWeight: '800', color: C.muted, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8, marginLeft: 4 },
+    injuryRiskCard: {
+        backgroundColor: C.surf,
+        borderRadius: 14,
+        padding: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: C.border,
+        marginBottom: 12,
+    },
+    injuryRiskLeft:  { flexDirection: 'row', alignItems: 'center', flex: 1 },
+    injuryRiskTitle: { fontSize: 14, fontWeight: '800', color: C.text },
+    injuryRiskSub:   { fontSize: 11, color: C.muted, marginTop: 2 },
 });

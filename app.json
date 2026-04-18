@@ -29,16 +29,47 @@
         "android.permission.CAMERA",
         "android.permission.INTERNET",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "personalhealth" },
+            { "scheme": "https", "host": "personalhealth.app", "pathPrefix": "/invite" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
+    "scheme": "personalhealth",
     "plugins": [
       [
         "expo-camera",
         {
           "cameraPermission": "Allow Personal Health to use camera for AI biomechanics analysis."
         }
-      ]
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow Personal Health to record voice notes for your coach."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#06b6d4",
+          "sounds": []
+        }
+      ],
+      "expo-asset",
+      "expo-font"
     ],
     "extra": {
       "backendHost": ""
