@@ -4,15 +4,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
     View, Text, ScrollView, StyleSheet, TouchableOpacity,
-    SafeAreaView, ActivityIndicator, Dimensions,
+    SafeAreaView, ActivityIndicator, Dimensions, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../../context/UserContext';
 import api from '../../services/api';
 import { C } from '../../styles/colors';
 import StatCard from '../../components/StatCard';
 import InsightCard from '../../components/InsightCard';
+import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 import {
     DAILY_TRACKER_DEFAULTS,
     HOME_CONTENT_GRID,
@@ -146,6 +149,18 @@ export default function HomeScreen({ navigation, showToast }) {
     const [tracker, setTracker]       = useState(DAILY_TRACKER_DEFAULTS);
     const [followed, setFollowed]     = useState({});
     const [creators, setCreators]     = useState(TRENDING_CREATORS);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [wellnessScore, setWellnessScore] = useState(null);  // WN-24
+    const [waterModalVisible, setWaterModalVisible] = useState(false);  // WN-25
+
+    // WN-24: Load wellness score on mount
+    useEffect(() => {
+        getOrCreateAnonymousAthleteId().then(id => {
+            api.get(`/athlete/${id}/wellness/score`).then(data => {
+                if (data) setWellnessScore(data);
+            }).catch(() => {});
+        }).catch(() => {});
+    }, []);
 
     // Load daily tracker from cache
     useEffect(() => {
@@ -158,6 +173,16 @@ export default function HomeScreen({ navigation, showToast }) {
             if (arr?.length) setCreators(arr);
         });
     }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            getOrCreateAnonymousAthleteId().then(id => {
+                api.getNotifications(id, true).then(data => {
+                    if (data) setUnreadCount(data.unread_count || 0);
+                });
+            }).catch(() => {});
+        }, [])
+    );
 
     // Persist tracker changes to AsyncStorage
     useEffect(() => {
@@ -212,11 +237,50 @@ export default function HomeScreen({ navigation, showToast }) {
                             <TouchableOpacity style={sc.headerIcon} onPress={() => navigation.jumpTo('Camera')}>
                                 <Text style={{ fontSize: 18 }}>🎙️</Text>
                             </TouchableOpacity>
+                            <TouchableOpacity
+                                style={sc.headerIcon}
+                                onPress={() => navigation.navigate('Notifications')}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="notifications-outline" size={24} color={C.muted} />
+                                {unreadCount > 0 && <View style={sc.notifBadge} />}
+                            </TouchableOpacity>
                         </View>
                     </View>
 
                     {/* Fitness Score Card */}
                     <FitnessScoreCard fitnessScore={fitnessScore} streak={streak} />
+
+                    {/* WN-24: Wellness Score Widget */}
+                    <TouchableOpacity
+                        style={sc.wellnessWidget}
+                        onPress={async () => {
+                            const id = await getOrCreateAnonymousAthleteId().catch(() => 'athlete_01');
+                            navigation.navigate('Wellness', { athleteId: id });
+                        }}
+                        activeOpacity={0.82}
+                    >
+                        {wellnessScore?.wellness_score != null ? (
+                            <View style={sc.wellnessWidgetInner}>
+                                <View style={[sc.wellnessCircle, {
+                                    borderColor: wellnessScore.wellness_score >= 70 ? C.green : (wellnessScore.wellness_score >= 50 ? C.yellow : C.red),
+                                }]}>
+                                    <Text style={[sc.wellnessNum, {
+                                        color: wellnessScore.wellness_score >= 70 ? C.green : (wellnessScore.wellness_score >= 50 ? C.yellow : C.red),
+                                    }]}>{wellnessScore.wellness_score}</Text>
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 12 }}>
+                                    <Text style={sc.wellnessTitle}>Wellness Score</Text>
+                                    <Text style={sc.wellnessSub}>{wellnessScore.recovery_ready ? 'Ready to Train' : 'Recovery Needed'}</Text>
+                                </View>
+                                <Text style={sc.wellnessChevron}>›</Text>
+                            </View>
+                        ) : (
+                            <View style={sc.wellnessWidgetInner}>
+                                <Text style={sc.wellnessEmpty}>Log your morning check-in →</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
                 </LinearGradient>
 
                 {/* PH-V2-A-05: Premium 2x2 KPI grid using StatCard */}
@@ -287,17 +351,52 @@ export default function HomeScreen({ navigation, showToast }) {
                         </TouchableOpacity>
                     </View>
                     <View style={sc.trackerCard}>
-                        {trackerItems.map((item, i) => (
-                            <TrackerRow
-                                key={i}
-                                icon={item.icon}
-                                label={item.label}
-                                current={item.current}
-                                goal={item.goal}
-                                unit={item.unit}
-                            />
-                        ))}
+                        {trackerItems.map((item, i) => {
+                            const isWater = item.label?.toLowerCase().includes('water') || item.label?.toLowerCase().includes('hydra');
+                            return isWater ? (
+                                <TouchableOpacity key={i} onPress={() => setWaterModalVisible(true)} activeOpacity={0.8}>
+                                    <TrackerRow icon={item.icon} label={item.label} current={item.current} goal={item.goal} unit={item.unit} />
+                                </TouchableOpacity>
+                            ) : (
+                                <TrackerRow key={i} icon={item.icon} label={item.label} current={item.current} goal={item.goal} unit={item.unit} />
+                            );
+                        })}
                     </View>
+
+                    {/* WN-25: Hydration Quick-Log bottom sheet */}
+                    <Modal visible={waterModalVisible} transparent animationType="slide" onRequestClose={() => setWaterModalVisible(false)}>
+                        <TouchableOpacity style={sc.modalOverlay} activeOpacity={1} onPress={() => setWaterModalVisible(false)}>
+                            <View style={sc.bottomSheet}>
+                                <Text style={sc.bsTitle}>Log Water Intake</Text>
+                                <Text style={sc.bsSub}>Tap to add to today's intake</Text>
+                                <View style={sc.bsRow}>
+                                    {[250, 500, 1000].map(ml => (
+                                        <TouchableOpacity key={ml} style={sc.bsBtn} onPress={async () => {
+                                            const waterItem = trackerItems.find(it => it.label?.toLowerCase().includes('water') || it.label?.toLowerCase().includes('hydra'));
+                                            const current = waterItem?.current || 0;
+                                            const updated = current + ml;
+                                            setTracker(t => {
+                                                const keys = Object.keys(t);
+                                                const waterKey = keys.find(k => t[k].label?.toLowerCase().includes('water') || t[k].label?.toLowerCase().includes('hydra'));
+                                                if (!waterKey) return t;
+                                                return { ...t, [waterKey]: { ...t[waterKey], current: updated } };
+                                            });
+                                            setWaterModalVisible(false);
+                                            try {
+                                                const id = await getOrCreateAnonymousAthleteId();
+                                                await api.post(`/athlete/${id}/wellness`, { hydration: { water_ml: updated } });
+                                            } catch (_) {}
+                                        }}>
+                                            <Text style={sc.bsBtnText}>+{ml >= 1000 ? `${ml / 1000}L` : `${ml}ml`}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                                <TouchableOpacity style={sc.bsClose} onPress={() => setWaterModalVisible(false)}>
+                                    <Text style={{ color: C.muted }}>Done</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </TouchableOpacity>
+                    </Modal>
                 </View>
 
                 {/* ── Content Grid ── */}
@@ -312,7 +411,7 @@ export default function HomeScreen({ navigation, showToast }) {
 
                 {/* ── AI Trainer Banner ── */}
                 <View style={[sc.section, { paddingBottom: 0 }]}>
-                    <TouchableOpacity activeOpacity={0.88} onPress={() => navigation.navigate('Camera')}>
+                    <TouchableOpacity activeOpacity={0.88} onPress={() => navigation.navigate('DrillPicker')}>
                         <LinearGradient
                             colors={['#312e81', '#0e7490']}
                             style={sc.aiTrainerBanner}
@@ -387,6 +486,7 @@ const sc = StyleSheet.create({
     greeting:      { fontSize: 22, fontWeight: '900', color: C.text },
     greetSub:      { fontSize: 11, color: C.muted, marginTop: 2, fontWeight: '600' },
     headerIcon:    { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+    notifBadge:    { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: '#06b6d4', borderWidth: 1.5, borderColor: '#1a1040' },
 
     // Fitness Score Card
     scoreCard:     { backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 18, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: C.border2 },
@@ -464,4 +564,22 @@ const sc = StyleSheet.create({
         paddingHorizontal: 6,
         paddingBottom: 12,
     },
+    // WN-24: Wellness widget
+    wellnessWidget: { marginHorizontal: 16, marginTop: 10, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+    wellnessWidgetInner: { flexDirection: 'row', alignItems: 'center' },
+    wellnessCircle: { width: 42, height: 42, borderRadius: 21, borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
+    wellnessNum: { fontSize: 14, fontWeight: '800' },
+    wellnessTitle: { color: '#f1f5f9', fontSize: 13, fontWeight: '600' },
+    wellnessSub: { color: '#64748b', fontSize: 11, marginTop: 1 },
+    wellnessChevron: { color: '#64748b', fontSize: 22, marginLeft: 8 },
+    wellnessEmpty: { color: '#06b6d4', fontSize: 13, fontWeight: '500' },
+    // WN-25: Hydration modal
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+    bottomSheet: { backgroundColor: C.surf, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 },
+    bsTitle: { color: C.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
+    bsSub: { color: C.muted, fontSize: 12, marginBottom: 16 },
+    bsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+    bsBtn: { flex: 1, backgroundColor: 'rgba(6,182,212,0.15)', borderRadius: 10, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(6,182,212,0.3)' },
+    bsBtnText: { color: C.cyan, fontSize: 15, fontWeight: '700' },
+    bsClose: { alignItems: 'center', padding: 8 },
 });

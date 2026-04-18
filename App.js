@@ -1,6 +1,6 @@
 // Personal Health — Root App with Navigation
 // 6 tabs + stack screens organised by domain: core/, fitness/, social/, wellness/
-import React, { useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -11,6 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { UserProvider } from './src/context/UserContext';
+import { registerForPushNotifications, addNotificationTapListener } from './src/services/pushNotifications';
+import { getOrCreateAnonymousAthleteId } from './src/services/deviceIdentity';
 
 // Core tabs
 import HomeScreen         from './src/screens/core/HomeScreen';
@@ -23,6 +25,12 @@ import TrainScreen         from './src/screens/fitness/TrainScreen';
 import GhostSkeletonScreen from './src/screens/fitness/GhostSkeletonScreen';
 import RPPGScreen          from './src/screens/fitness/RPPGScreen';
 import FitnessTestScreen   from './src/screens/fitness/FitnessTestScreen';
+import OnboardingScreen    from './src/screens/fitness/OnboardingScreen';
+import PlacementWizardScreen from './src/screens/fitness/PlacementWizardScreen';
+import DrillPickerScreen   from './src/screens/fitness/DrillPickerScreen';
+import ShareCardScreen     from './src/screens/fitness/ShareCardScreen';
+import InjuryRiskScreen    from './src/screens/fitness/InjuryRiskScreen';
+import ParentConsentScreen from './src/screens/fitness/ParentConsentScreen';
 
 // Social domain
 import MapScreen           from './src/screens/social/MapScreen';
@@ -31,9 +39,20 @@ import LearnSportsScreen   from './src/screens/social/LearnSportsScreen';
 import GetActiveScreen     from './src/screens/social/GetActiveScreen';
 import ClassesScreen       from './src/screens/social/ClassesScreen';
 import SocialFeedScreen    from './src/screens/social/SocialFeedScreen';
+import CoachInboxScreen    from './src/screens/social/CoachInboxScreen';
+import InviteAcceptScreen  from './src/screens/social/InviteAcceptScreen';
 
-// Wellness domain (AN-05: placeholder until interns ship the real screens)
+// Wellness domain
 import WellnessPlaceholderScreen from './src/screens/wellness/WellnessPlaceholderScreen';
+import WellnessScreen            from './src/screens/wellness/WellnessScreen';
+import WellnessLogFormScreen     from './src/screens/wellness/WellnessLogFormScreen';
+
+// Nutrition domain
+import NutritionScreen     from './src/screens/nutrition/NutritionScreen';
+import MealLogScreen       from './src/screens/nutrition/MealLogScreen';
+import NutritionGoalsScreen from './src/screens/nutrition/NutritionGoalsScreen';
+import NotificationsScreen from './src/screens/core/NotificationsScreen';
+import { hasCompletedOnboarding } from './src/services/deviceIdentity';
 
 const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -112,13 +131,48 @@ function TabNavigator({ showToast }) {
     );
 }
 
+function LaunchScreen({ navigation }) {
+    useEffect(() => {
+        let alive = true;
+        hasCompletedOnboarding().then((done) => {
+            if (!alive) return;
+            navigation.reset({ index: 0, routes: [{ name: done ? 'Tabs' : 'Onboarding' }] });
+        });
+        return () => { alive = false; };
+    }, [navigation]);
+
+    return (
+        <View style={[styles.launch, { backgroundColor: BG }]}>
+            <Text style={{ color: '#f9fafb', fontSize: 18, fontWeight: '800' }}>Personal Health</Text>
+        </View>
+    );
+}
+
 // ─── Root Stack Navigator ─────────────────────────────────────────────────────
 function AppNavigator({ showToast }) {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Launch" component={LaunchScreen} />
+            <Stack.Screen name="Onboarding">
+                {(props) => <OnboardingScreen {...props} showToast={showToast} />}
+            </Stack.Screen>
             {/* Main tab flow */}
             <Stack.Screen name="Tabs">
                 {(props) => <TabNavigator {...props} showToast={showToast} />}
+            </Stack.Screen>
+            <Stack.Screen
+                name="DrillPicker"
+                component={DrillPickerScreen}
+                options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen name="PlacementWizard">
+                {(props) => <PlacementWizardScreen {...props} showToast={showToast} />}
+            </Stack.Screen>
+            <Stack.Screen name="CameraSession">
+                {(props) => <TrainScreen {...props} showToast={showToast} />}
+            </Stack.Screen>
+            <Stack.Screen name="ShareCard">
+                {(props) => <ShareCardScreen {...props} showToast={showToast} />}
             </Stack.Screen>
 
             {/* Existing modal flows */}
@@ -162,31 +216,107 @@ function AppNavigator({ showToast }) {
                 component={SocialFeedScreen}
                 options={{ animation: 'slide_from_right' }}
             />
+            <Stack.Screen
+                name="CoachInbox"
+                component={CoachInboxScreen}
+                options={{ animation: 'slide_from_right' }}
+            />
 
-            {/* AN-05: Wellness placeholder until interns ship the real screens */}
+            {/* Wellness domain — WN-20/21 */}
             <Stack.Screen
                 name="Wellness"
-                component={WellnessPlaceholderScreen}
+                component={WellnessScreen}
                 options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+                name="WellnessLogForm"
+                component={WellnessLogFormScreen}
+                options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
+            />
+            {/* Nutrition domain — WN-15/16/19 */}
+            <Stack.Screen
+                name="Nutrition"
+                component={NutritionScreen}
+                options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+                name="MealLog"
+                component={MealLogScreen}
+                options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
+            />
+            <Stack.Screen
+                name="NutritionGoals"
+                component={NutritionGoalsScreen}
+                options={{ animation: 'slide_from_right' }}
+            />
+
+            {/* Flow 13: Injury Risk — private, no share */}
+            <Stack.Screen
+                name="InjuryRisk"
+                component={InjuryRiskScreen}
+                options={{ animation: 'slide_from_right' }}
+            />
+
+            {/* Flow 14: Re-engagement Push UI */}
+            <Stack.Screen
+                name="Notifications"
+                component={NotificationsScreen}
+                options={{ animation: 'slide_from_right' }}
+            />
+
+            {/* Flow 15: Parent Access — athlete manages parent consent */}
+            <Stack.Screen
+                name="ParentConsent"
+                component={ParentConsentScreen}
+                options={{ animation: 'slide_from_right' }}
+            />
+
+            {/* Invite deep-link — personalhealth://invite/:token */}
+            <Stack.Screen
+                name="InviteAccept"
+                component={InviteAcceptScreen}
+                options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
             />
         </Stack.Navigator>
     );
 }
 
+// ─── Deep linking config ───────────────────────────────────────────────────────
+const linking = {
+    prefixes: ['personalhealth://', 'https://personalhealth.app'],
+    config: {
+        screens: {
+            InviteAccept: 'invite/:token',
+            Tabs: 'home',
+        },
+    },
+};
+
 // ─── Root App ─────────────────────────────────────────────────────────────────
 export default function App() {
     const [toastMsg, setToastMsg] = useState('');
+    const navigationRef = useRef(null);
 
     const showToast = useCallback((msg) => {
         setToastMsg(msg);
         setTimeout(() => setToastMsg(''), 3500);
     }, []);
 
+    useEffect(() => {
+        // Register push token once athlete ID is known
+        getOrCreateAnonymousAthleteId().then(athleteId => {
+            registerForPushNotifications(athleteId);
+        });
+        // Navigate to correct screen on notification tap
+        const sub = addNotificationTapListener(navigationRef);
+        return () => sub.remove();
+    }, []);
+
     return (
         <SafeAreaProvider>
             <StatusBar style="light" backgroundColor={BG} />
             <UserProvider>
-                <NavigationContainer>
+                <NavigationContainer ref={navigationRef} linking={linking}>
                     <AppNavigator showToast={showToast} />
                 </NavigationContainer>
                 <ToastOverlay message={toastMsg} />
@@ -196,6 +326,7 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+    launch: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     tabBar: {
         backgroundColor: BG,
         borderTopColor:  'rgba(255,255,255,0.08)',
