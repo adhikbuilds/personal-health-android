@@ -18,6 +18,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { Camera, CameraView } from 'expo-camera';
 import { C } from '../../styles/colors';
+import { markOnboardingComplete } from '../../services/deviceIdentity';
 
 const SIM_STATES = [
     { band: 'red',    msg: 'no full body visible — prop your phone 2m away' },
@@ -133,9 +134,21 @@ export default function PlacementWizardScreen({ navigation, route }) {
                     </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={s.tipsBtn} onPress={() => navigation.goBack()}>
-                    <Text style={s.tipsText}>back</Text>
-                </TouchableOpacity>
+                <View style={s.tipsRow}>
+                    <TouchableOpacity style={s.tipsBtn} onPress={() => navigation.goBack()}>
+                        <Text style={s.tipsText}>back</Text>
+                    </TouchableOpacity>
+                    <Text style={[s.tipsText, { opacity: 0.3 }]}>·</Text>
+                    <TouchableOpacity
+                        style={s.tipsBtn}
+                        onPress={async () => {
+                            try { await markOnboardingComplete(); } catch {}
+                            navigation.reset({ index: 0, routes: [{ name: 'Tabs' }] });
+                        }}
+                    >
+                        <Text style={s.tipsText}>skip to dashboard</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </SafeAreaView>
     );
@@ -176,6 +189,7 @@ const s = StyleSheet.create({
     btnDisabled: { backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
     btnText: { fontSize: 16, fontWeight: '700' },
 
-    tipsBtn: { paddingVertical: 8 },
+    tipsRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+    tipsBtn: { paddingVertical: 8, paddingHorizontal: 8 },
     tipsText: { color: C.muted, fontSize: 13 },
 });
