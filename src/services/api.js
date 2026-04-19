@@ -25,12 +25,25 @@ const WS_BASE_RESOLVED = Platform.OS === 'android'
     : `ws://localhost:${FASTAPI_PORT}`;
 
 // ─── Core fetch helper ───────────────────────────────────────────────────────
+// Lazy import to avoid a circular dep: deviceIdentity → api → deviceIdentity.
+// getAccessToken() reads AsyncStorage; ensureDeviceAuth() is called from App.js
+// on launch so by the time any fetch happens we usually already have a token.
+async function _authHeaders(extra = {}) {
+    try {
+        const { getAccessToken } = require('./deviceIdentity');
+        const token = await getAccessToken();
+        if (token) return { Authorization: `Bearer ${token}`, ...extra };
+    } catch {}
+    return { ...extra };
+}
+
 async function fetchJSON(path, options = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), API_TIMEOUT);
     try {
+        const authHeaders = await _authHeaders(options.headers || {});
         const res = await fetch(`${API_BASE}${path}`, {
-            headers: { 'Content-Type': 'application/json', ...options.headers },
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
             signal: controller.signal,
             ...options,
         });
@@ -55,8 +68,9 @@ async function fetchRaw(path, options = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), API_TIMEOUT);
     try {
+        const authHeaders = await _authHeaders(options.headers || {});
         const res = await fetch(`${API_BASE}${path}`, {
-            headers: { 'Content-Type': 'application/json', ...options.headers },
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
             signal: controller.signal,
             ...options,
         });

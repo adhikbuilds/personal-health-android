@@ -16,9 +16,12 @@
 // across for analytics continuity).
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE } from '../constants';
 
 const KEY_ATHLETE_ID = '@ph_v1_anon_athlete_id';
 const KEY_ONBOARDED  = '@ph_v1_onboarded';
+const KEY_ACCESS_TOKEN  = '@ph_v1_access_token';
+const KEY_REFRESH_TOKEN = '@ph_v1_refresh_token';
 
 /**
  * UUID v4-ish. We don't need crypto-strength — this is a local identifier
@@ -86,8 +89,87 @@ export async function markOnboardingComplete() {
  */
 export async function clearDeviceIdentity() {
     try {
-        await AsyncStorage.multiRemove([KEY_ATHLETE_ID, KEY_ONBOARDED]);
+        await AsyncStorage.multiRemove([
+            KEY_ATHLETE_ID, KEY_ONBOARDED, KEY_ACCESS_TOKEN, KEY_REFRESH_TOKEN,
+        ]);
     } catch (e) {
         console.warn('[deviceIdentity] reset failed', e);
+    }
+}
+
+// ─── Auth token helpers ──────────────────────────────────────────────────────
+//
+// The backend now enforces auth on all athlete/session/coach endpoints. The
+// Android app runs anonymously, so on first launch we POST /auth/register
+// with a random email+password bound to the device's athlete_id, then cache
+// the access+refresh tokens. Every API request reads getAccessToken().
+
+export async function getAccessToken() {
+    try {
+        return await AsyncStorage.getItem(KEY_ACCESS_TOKEN);
+    } catch {
+        return null;
+    }
+}
+
+export async function getRefreshToken() {
+    try {
+        return await AsyncStorage.getItem(KEY_REFRESH_TOKEN);
+    } catch {
+        return null;
+    }
+}
+
+async function _storeTokens(access, refresh) {
+    const ops = [];
+    if (access)  ops.push(AsyncStorage.setItem(KEY_ACCESS_TOKEN,  access));
+    if (refresh) ops.push(AsyncStorage.setItem(KEY_REFRESH_TOKEN, refresh));
+    await Promise.all(ops);
+}
+
+/**
+ * Ensure this device has a valid backend session. If no token is cached,
+ * register a new anonymous account tied to the device's athlete_id.
+ * Returns the current access token (or null on unrecoverable error).
+ *
+ * Call this on app startup, before any authenticated API call.
+ */
+export async function ensureDeviceAuth() {
+    try {
+        const existing = await getAccessToken();
+        if (existing) return existing;
+
+        const athleteId = await getOrCreateAnonymousAthleteId();
+        const email = `${athleteId}@device.personal-health.local`;
+        // Password is stored on-device too, so the app can re-login if tokens
+        // expire without user friction.
+        const password = `dev-${athleteId.slice(-8)}-${Math.random().toString(36).slice(2, 10)}-Aa9`;
+
+        let resp = await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, name: athleteId, password, athlete_id: athleteId }),
+        });
+
+        if (resp.status === 409) {
+            // Device already registered previously — log in instead.
+            resp = await fetch(`${API_BASE}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
+            });
+        }
+
+        if (!resp.ok) {
+            console.warn('[deviceIdentity] device auth failed', resp.status);
+            return null;
+        }
+
+        const data = await resp.json();
+        await _storeTokens(data.access_token, data.refresh_token);
+        return data.access_token;
+    } catch (e) {
+        console.warn('[deviceIdentity] ensureDeviceAuth error', e?.message);
+        return null;
     }
 }

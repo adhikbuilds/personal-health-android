@@ -12,7 +12,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { UserProvider } from './src/context/UserContext';
 import { registerForPushNotifications, addNotificationTapListener } from './src/services/pushNotifications';
-import { getOrCreateAnonymousAthleteId } from './src/services/deviceIdentity';
+import { getOrCreateAnonymousAthleteId, ensureDeviceAuth } from './src/services/deviceIdentity';
 
 // Core tabs
 import HomeScreen         from './src/screens/core/HomeScreen';
@@ -302,11 +302,14 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-        // Register push token once athlete ID is known
-        getOrCreateAnonymousAthleteId().then(athleteId => {
-            registerForPushNotifications(athleteId);
-        });
-        // Navigate to correct screen on notification tap
+        // 1. Make sure the device has a backend JWT before any authed API call
+        // 2. Register Expo push token (does its own internal athlete_id fetch)
+        // 3. Wire notification-tap → navigation
+        ensureDeviceAuth()
+            .then(() => getOrCreateAnonymousAthleteId())
+            .then(athleteId => registerForPushNotifications(athleteId))
+            .catch((e) => console.warn('[App] device auth/push bootstrap failed', e?.message));
+
         const sub = addNotificationTapListener(navigationRef);
         return () => sub.remove();
     }, []);
