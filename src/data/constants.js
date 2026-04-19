@@ -280,7 +280,7 @@ export const DAILY_TRACKER_DEFAULTS = {
 // ─── Home Content Grid (8 tiles) ─────────────────────────────────────────────
 export const HOME_CONTENT_GRID = [
   { id: 'learn_sports',  label: 'Learn Sports',    emoji: '⚽', color: '#22c55e', route: 'LearnSports' },
-  { id: 'playfields',    label: 'Find Playfields',  emoji: '📍', color: '#06b6d4', route: 'Playfields' },
+  { id: 'playfields',    label: 'Find Playfields',  emoji: '📍', color: '#06b6d4', route: 'Map' },
   { id: 'yoga',          label: 'Yoga Centres',     emoji: '🧘', color: '#8b5cf6', route: null },
   { id: 'nutrition',     label: 'Nutrition',        emoji: '🥗', color: '#f97316', route: 'Hub', routeParams: { section: 'nutrition' } },
   { id: 'pe_lessons',    label: 'PE Lessons',       emoji: '📚', color: '#eab308', route: 'Classes' },
