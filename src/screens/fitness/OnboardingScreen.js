@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, SafeAreaView, StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
+import { getOrCreateAnonymousAthleteId, markOnboardingComplete } from '../../services/deviceIdentity';
 import { scheduleDailyReminder } from '../../services/notifications';
 import api from '../../services/api';
 import { C } from '../../styles/colors';
@@ -118,6 +118,15 @@ export default function OnboardingScreen({ navigation }) {
         setTimeout(() => setStep(nextStep), 150);
     };
 
+    // Jump straight to the main dashboard. Used by "Skip setup" on both steps.
+    // We mark onboarding as complete so the LaunchScreen doesn't send the
+    // user back here on the next app open.
+    const skipToDashboard = async () => {
+        try { await markOnboardingComplete(); } catch {}
+        try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+        navigation.reset({ index: 0, routes: [{ name: 'Tabs' }] });
+    };
+
     const handleSportContinue = async () => {
         if (!selectedSport) return;
         setSaving(true);
@@ -190,8 +199,8 @@ export default function OnboardingScreen({ navigation }) {
                             )}
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={s.skipLink} onPress={() => transitionTo(1)}>
-                            <Text style={s.skipText}>Skip for now</Text>
+                        <TouchableOpacity style={s.skipLink} onPress={skipToDashboard}>
+                            <Text style={s.skipText}>Skip setup — take me to the dashboard</Text>
                         </TouchableOpacity>
                     </ScrollView>
                 ) : (
@@ -214,6 +223,10 @@ export default function OnboardingScreen({ navigation }) {
                         </View>
 
                         <Text style={s.foot}>No email. No paywall. First score first.</Text>
+
+                        <TouchableOpacity style={s.skipLink} onPress={skipToDashboard}>
+                            <Text style={s.skipText}>Skip — take me to the dashboard</Text>
+                        </TouchableOpacity>
                     </ScrollView>
                 )}
             </Animated.View>
