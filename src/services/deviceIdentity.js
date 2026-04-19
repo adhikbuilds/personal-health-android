@@ -140,7 +140,10 @@ export async function ensureDeviceAuth() {
         if (existing) return existing;
 
         const athleteId = await getOrCreateAnonymousAthleteId();
-        const email = `${athleteId}@device.personal-health.local`;
+        // email-validator rejects reserved TLDs like .local, so use a real one.
+        // This isn't a real inbox — it's just a stable, unique identifier for
+        // the device-bound account row.
+        const email = `${athleteId}@device.personalhealth.app`;
         // Password is stored on-device too, so the app can re-login if tokens
         // expire without user friction.
         const password = `dev-${athleteId.slice(-8)}-${Math.random().toString(36).slice(2, 10)}-Aa9`;
