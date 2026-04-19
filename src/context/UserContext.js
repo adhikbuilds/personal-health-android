@@ -7,7 +7,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { INITIAL_USER_DATA } from '../data/constants';
 import api from '../services/api';
-import { ensureDeviceAuth } from '../services/deviceIdentity';
+import { ensureDeviceAuth, getOrCreateAnonymousAthleteId } from '../services/deviceIdentity';
 
 const FITNESS_SCORE_KEY = '@fitness_test_latest';
 const STREAK_KEY = '@streak_data';
@@ -42,12 +42,13 @@ export function UserProvider({ children }) {
             } catch (_) {}
         });
 
-        // Wait for the device-bound JWT to exist before touching any authed
-        // endpoint — otherwise the first boot hits /athlete/... with no
-        // Authorization header and gets 401 (backend enforces auth on all
-        // /athlete/{id}/* reads).
+        // Wait for the device-bound JWT to exist, then fetch THIS device's
+        // own athlete record (not the hardcoded athlete_01 seed, which
+        // would 403 under self-or-admin auth anyway).
         ensureDeviceAuth().then(() =>
-            api.getAthlete(INITIAL_USER_DATA.avatarId)
+            getOrCreateAnonymousAthleteId()
+        ).then((deviceAthleteId) =>
+            api.getAthlete(deviceAthleteId)
         ).then(athlete => {
             if (!athlete?.id) return;
             const realSessions = athlete.sessions || 0;
