@@ -10,12 +10,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useUser } from '../../context/UserContext';
 import api from '../../services/api';
 import { C } from '../../styles/colors';
 import StatCard from '../../components/StatCard';
 import InsightCard from '../../components/InsightCard';
 import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
+
+// One tap = one light haptic. Keeps the app feeling alive without overdoing it.
+const tap = () => { try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} };
 import {
     DAILY_TRACKER_DEFAULTS,
     HOME_CONTENT_GRID,
@@ -28,11 +32,30 @@ const TODAY_KEY = `@daily_tracker_${new Date().toISOString().slice(0, 10)}`;
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function FitnessScoreCard({ fitnessScore, streak }) {
+function FitnessScoreCard({ fitnessScore, streak, isFirstTime }) {
     const level     = fitnessScore?.level || 0;
     const score     = fitnessScore?.score || 0;
-    const label     = fitnessScore?.label || 'Not Tested';
+    const label     = fitnessScore?.label || 'Not tested yet';
     const bandColor = fitnessScore?.color || C.muted;
+
+    // First-time state: no session logged, no score, no streak. Show an inviting
+    // CTA instead of '0 pts / L0 / 0d' which reads as failure.
+    if (isFirstTime || (score === 0 && level === 0)) {
+        return (
+            <View style={sc.scoreCard}>
+                <View style={sc.scoreLeft}>
+                    <Text style={sc.scoreTitle}>Your first score</Text>
+                    <Text style={[sc.emptyLead, { color: C.text }]}>60 seconds away.</Text>
+                    <Text style={sc.emptyBody}>Pick a drill, prop your phone, do 3 reps. The AI grades your form.</Text>
+                </View>
+                <View style={sc.scoreRight}>
+                    <View style={[sc.ring, { borderColor: C.cyan + '60' }]}>
+                        <Text style={[sc.ringNum, { color: C.cyan }]}>—</Text>
+                    </View>
+                </View>
+            </View>
+        );
+    }
 
     return (
         <View style={sc.scoreCard}>
@@ -52,9 +75,11 @@ function FitnessScoreCard({ fitnessScore, streak }) {
                 <View style={[sc.ring, { borderColor: bandColor + '60' }]}>
                     <Text style={[sc.ringNum, { color: bandColor }]}>{level > 0 ? `L${level}` : '—'}</Text>
                 </View>
-                <View style={sc.streakPill}>
-                    <Text style={sc.streakText}>🔥 {streak}d</Text>
-                </View>
+                {streak > 0 ? (
+                    <View style={sc.streakPill}>
+                        <Text style={sc.streakText}>🔥 {streak}d</Text>
+                    </View>
+                ) : null}
             </View>
         </View>
     );
@@ -190,8 +215,9 @@ export default function HomeScreen({ navigation, showToast }) {
     }, [tracker]);
 
     const handleTilePress = useCallback((item) => {
+        tap();
         if (!item.route) {
-            showToast('Coming soon!');
+            showToast('Coming soon');
             return;
         }
         if (item.routeParams) {
@@ -202,6 +228,7 @@ export default function HomeScreen({ navigation, showToast }) {
     }, [navigation, showToast]);
 
     const handleFollow = useCallback((creatorId) => {
+        tap();
         setFollowed(prev => ({ ...prev, [creatorId]: !prev[creatorId] }));
     }, []);
 
@@ -220,7 +247,7 @@ export default function HomeScreen({ navigation, showToast }) {
                     }]}>
                         <View style={[sc.apiDot, { backgroundColor: apiStatus === 'online' ? C.green : apiStatus === 'checking' ? C.yellow : C.red }]} />
                         <Text style={[sc.apiText, { color: apiStatus === 'online' ? C.green : apiStatus === 'checking' ? C.yellow : C.red }]}>
-                            {apiStatus === 'checking' ? 'Connecting…' : apiStatus === 'online' ? 'AI Server Online' : 'Offline Mode'}
+                            {apiStatus === 'checking' ? 'Connecting…' : apiStatus === 'online' ? 'Online' : 'Offline'}
                         </Text>
                     </View>
 
@@ -249,7 +276,11 @@ export default function HomeScreen({ navigation, showToast }) {
                     </View>
 
                     {/* Fitness Score Card */}
-                    <FitnessScoreCard fitnessScore={fitnessScore} streak={streak} />
+                    <FitnessScoreCard
+                        fitnessScore={fitnessScore}
+                        streak={streak}
+                        isFirstTime={(userData?.sessions || 0) === 0}
+                    />
 
                     {/* WN-24: Wellness Score Widget */}
                     <TouchableOpacity
@@ -499,8 +530,10 @@ const sc = StyleSheet.create({
     scoreRight:    { alignItems: 'center', gap: 10 },
     ring:          { width: 64, height: 64, borderRadius: 32, borderWidth: 3, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.04)' },
     ringNum:       { fontSize: 18, fontWeight: '900' },
-    streakPill:    { backgroundColor: 'rgba(249,115,22,0.15)', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(249,115,22,0.3)' },
+    streakPill:    { backgroundColor: 'rgba(249,115,22,0.15)', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(249,115,22,0.3)', marginTop: 8 },
     streakText:    { color: C.orange, fontSize: 11, fontWeight: '800' },
+    emptyLead:     { fontSize: 22, fontWeight: '800', marginTop: 6, letterSpacing: -0.3 },
+    emptyBody:     { fontSize: 13, color: C.muted, marginTop: 4, lineHeight: 18 },
 
     // Sections
     section:       { padding: 20, paddingBottom: 0 },
