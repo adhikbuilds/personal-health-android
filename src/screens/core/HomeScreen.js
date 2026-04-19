@@ -290,7 +290,7 @@ export default function HomeScreen({ navigation, showToast }) {
                         <View style={sc.statGridItem}>
                             <StatCard
                                 label="BPI"
-                                value={user?.bpi?.toLocaleString() || '0'}
+                                value={userData?.bpi?.toLocaleString() || '0'}
                                 icon="trending-up"
                                 color="brand"
                             />
@@ -298,7 +298,7 @@ export default function HomeScreen({ navigation, showToast }) {
                         <View style={sc.statGridItem}>
                             <StatCard
                                 label="Sessions"
-                                value={user?.sessions || '0'}
+                                value={userData?.sessions || '0'}
                                 icon="calendar"
                                 color="info"
                             />
