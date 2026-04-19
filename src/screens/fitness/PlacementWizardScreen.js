@@ -30,7 +30,7 @@ const BAND_COLOR = { red: C.red, yellow: C.yellow, green: C.green };
 
 export default function PlacementWizardScreen({ navigation, route }) {
     const athleteId = route.params?.athleteId;
-    const nextScreen = route.params?.next || 'Train';
+    const nextScreen = route.params?.next || 'CameraSession';
     const drill = route.params?.drill;
 
     const [camPermission, setCamPermission] = useState(null);
