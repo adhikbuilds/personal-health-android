@@ -75,6 +75,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
     const lastPhaseRef = useRef(null);
     const analysisModeRef = useRef('sim');
     const lastGoodMetricsRef = useRef(null); // kept across connection drops
+    const wsStreamRef = useRef(null);     // Phase 2: WebSocket frame stream (opens on session start)
     const [repCount, setRepCount] = useState(0);
 
     // #3 Bouncy CTA on mount
@@ -91,6 +92,10 @@ export default function TrainScreen({ showToast, navigation, route }) {
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
             if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+            if (wsStreamRef.current) {
+                try { wsStreamRef.current.close(); } catch (_) {}
+                wsStreamRef.current = null;
+            }
         };
     }, []);
 
@@ -136,6 +141,46 @@ export default function TrainScreen({ showToast, navigation, route }) {
         setRepCount(0);
         lastPhaseRef.current = null;
 
+        // Phase 2: open a WebSocket frame stream. Falls back to HTTP /frame
+        // (handled inside captureAndSend) if the socket is closed or absent.
+        // The same backend analyzer queue serves both transports, so any
+        // results land in /latest-result regardless of transport.
+        try {
+            wsStreamRef.current = api.connectFrameStream(sid, {
+                onResult: (msg) => {
+                    if (msg.form_score == null || msg.form_score <= 0) return;
+                    checkRep(msg.phase);
+                    const frame = {
+                        form_score: msg.form_score,
+                        form_quality: msg.form_quality,
+                        primary_feedback: msg.primary_feedback,
+                        phase: msg.phase,
+                        knee_angle_l: msg.knee_angle_l ?? 0,
+                        knee_angle_r: 0,
+                        hip_angle_l: msg.hip_angle_l ?? 0,
+                        hip_angle_r: 0,
+                        trunk_lean: msg.trunk_lean ?? 0,
+                        limb_symmetry_idx: msg.limb_symmetry_idx ?? 1,
+                        estimated_jump_height: msg.estimated_jump_height ?? 0,
+                    };
+                    setMetrics(frame);
+                    lastGoodMetricsRef.current = frame;
+                    setAnalysisMode('real');
+                    analysisModeRef.current = 'real';
+                    setScoreHistory(prev => {
+                        const next = [...prev, msg.form_score];
+                        const sum = next.reduce((a, b) => a + b, 0);
+                        setAvgScore(Math.round(sum / next.length));
+                        return next;
+                    });
+                },
+                onClose: () => { wsStreamRef.current = null; },
+                onError: () => { /* HTTP fallback path remains active */ },
+            });
+        } catch (_) {
+            wsStreamRef.current = null;
+        }
+
         // ── FRAME CAPTURE ────────────────────────────────────────────────────
         const captureAndSend = async () => {
             try {
@@ -151,11 +196,18 @@ export default function TrainScreen({ showToast, navigation, route }) {
                     isCapturingRef.current = false;
                     if (photo?.base64) {
                         setFrameNum(n => n + 1);
-                        api.sendFrame(sessionRef.current, {
-                            image_b64: photo.base64,
-                            sport,
-                            form_score: 0, form_quality: 'unknown', primary_feedback: ''
-                        }).catch(() => {});
+                        // Prefer WebSocket if it's open — saves HTTP overhead per frame
+                        // and lets the server push results back without a poll cycle.
+                        const ws = wsStreamRef.current;
+                        if (ws && ws.isOpen()) {
+                            ws.send(photo.base64);
+                        } else {
+                            api.sendFrame(sessionRef.current, {
+                                image_b64: photo.base64,
+                                sport,
+                                form_score: 0, form_quality: 'unknown', primary_feedback: ''
+                            }).catch((e) => console.warn('[TrainScreen] sendFrame failed:', e?.message));
+                        }
                     }
                 }
             } catch {
@@ -230,6 +282,10 @@ export default function TrainScreen({ showToast, navigation, route }) {
         if (intervalRef.current) clearInterval(intervalRef.current);
         if (resultIntervalRef.current) clearInterval(resultIntervalRef.current);
         if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+        if (wsStreamRef.current) {
+            try { wsStreamRef.current.close(); } catch (_) {}
+            wsStreamRef.current = null;
+        }
         setIsActive(false);
         setMetrics(null);
 
