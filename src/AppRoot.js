@@ -1,6 +1,8 @@
 // ActiveBharat — App Root
-// 4 tabs: Home, Train, Progress, Profile
-// 6 stacks: GhostSkeleton, HeartRate, TrainingPlan, ScoreCard, FitnessTest, Nutrition
+// Auth gate decides which navigator to render:
+//   - status === 'loading'   → splash (token bootstrap in progress)
+//   - status === 'unauthed'  → AuthNavigator (Login + Register)
+//   - status === 'authed'    → AppNavigator (tabs + stacks)
 //
 // Required lazily by App.js AFTER the active theme has been applied so all
 // screen modules below capture the right token values in their StyleSheets.
@@ -9,10 +11,11 @@ import React, { useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { UserProvider } from './context/UserContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import ErrorBoundary from './ErrorBoundary';
 import { C, T, P } from './styles/colors';
 
@@ -28,8 +31,12 @@ import ScoreCardScreen from './screens/ScoreCardScreen';
 import FitnessTestScreen from './screens/FitnessTestScreen';
 import NutritionScreen from './screens/NutritionScreen';
 
+import LoginScreen from './screens/auth/LoginScreen';
+import RegisterScreen from './screens/auth/RegisterScreen';
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+const AuthStack = createNativeStackNavigator();
 
 const TAB_LABELS = { Home: 'HOME', Train: 'TRAIN', Progress: 'PROGRESS', Profile: 'YOU' };
 
@@ -99,6 +106,36 @@ function AppNavigator({ showToast }) {
     );
 }
 
+function AuthNavigator() {
+    return (
+        <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+            <AuthStack.Screen name="Login" component={LoginScreen} />
+            <AuthStack.Screen name="Register" component={RegisterScreen}
+                options={{ animation: 'slide_from_right' }} />
+        </AuthStack.Navigator>
+    );
+}
+
+function AuthGate({ showToast }) {
+    const { status } = useAuth();
+    if (status === 'loading') {
+        return (
+            <View style={styles.splash}>
+                <ActivityIndicator size="small" color={C.text} />
+                <Text style={styles.splashText}>BIO-PASSPORT · LOADING</Text>
+            </View>
+        );
+    }
+    if (status === 'authed') {
+        return (
+            <UserProvider>
+                <AppNavigator showToast={showToast} />
+            </UserProvider>
+        );
+    }
+    return <AuthNavigator />;
+}
+
 export default function AppRoot() {
     const [toastMsg, setToastMsg] = useState('');
     const showToast = useCallback((msg) => {
@@ -110,12 +147,12 @@ export default function AppRoot() {
         <SafeAreaProvider>
             <StatusBar style="light" backgroundColor="transparent" translucent />
             <ErrorBoundary>
-                <UserProvider>
+                <AuthProvider>
                     <NavigationContainer>
-                        <AppNavigator showToast={showToast} />
+                        <AuthGate showToast={showToast} />
                     </NavigationContainer>
                     <ToastOverlay message={toastMsg} />
-                </UserProvider>
+                </AuthProvider>
             </ErrorBoundary>
         </SafeAreaProvider>
     );
@@ -144,4 +181,7 @@ const styles = StyleSheet.create({
         elevation: 99,
     },
     toastText: { color: P.toastFg, fontWeight: '700', fontSize: 11, letterSpacing: 1.5, fontFamily: T.MONO },
+
+    splash:     { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: P.screenBg },
+    splashText: { color: C.text, fontFamily: T.MONO, fontSize: 11, letterSpacing: 2, fontWeight: '700', marginTop: 16 },
 });

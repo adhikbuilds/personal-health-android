@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useUser } from '../context/UserContext';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { Fade } from '../ui';
 import { Sparkline } from '../components/charts';
@@ -42,7 +43,23 @@ function fmtDate(iso) {
 export default function ProfileScreen({ navigation }) {
     const ins = useSafeAreaInsets();
     const { userData, fitnessScore, dataMode } = useUser();
-    const athleteId = userData?.avatarId || 'athlete_01';
+    const { user: authUser, logout } = useAuth();
+    const athleteId = userData?.avatarId || authUser?.athlete_id || 'athlete_01';
+
+    const handleLogout = useCallback(() => {
+        Alert.alert(
+            'Sign out?',
+            'You will need to sign in again with your email and password.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Sign out',
+                    style: 'destructive',
+                    onPress: () => { logout(); },
+                },
+            ],
+        );
+    }, [logout]);
     const userTag = athleteId.toUpperCase();
     const sportTag = (userData?.sport || 'general').toUpperCase().replace('_', '-');
     const clock = useLiveClock();
@@ -282,6 +299,35 @@ export default function ProfileScreen({ navigation }) {
                     </Panel>
                 </Fade>
 
+                {/* Account */}
+                <Fade delay={215}>
+                    <Panel>
+                        <Header title="ACCOUNT" right={<HdrMeta color={C.good}>SIGNED IN</HdrMeta>} />
+                        <FieldRow
+                            label="USR........... USER ID"
+                            value={(authUser?.id || '--').toUpperCase().slice(0, 18)}
+                            color={C.text}
+                        />
+                        <FieldRow
+                            label="EML........... EMAIL"
+                            value={(authUser?.email || '--').toLowerCase()}
+                            color={C.textSub}
+                            size="sm"
+                        />
+                        <FieldRow
+                            label="ROL........... ROLE"
+                            value={(authUser?.role || 'athlete').toUpperCase()}
+                            color={C.info}
+                        />
+                        <Pressable
+                            onPress={handleLogout}
+                            style={({ pressed }) => [s.logoutBtn, pressed && { backgroundColor: C.surf }]}
+                        >
+                            <Text style={s.logoutText}>[ESC] SIGN OUT</Text>
+                        </Pressable>
+                    </Panel>
+                </Fade>
+
                 {/* System */}
                 <Fade delay={220}>
                     <Panel>
@@ -297,9 +343,10 @@ export default function ProfileScreen({ navigation }) {
                             color={dataMode === 'real' ? C.good : dataMode === 'hybrid' ? C.warn : C.muted}
                         />
                         <FieldRow label="THEME......... ACTIVE" value={activeTheme.toUpperCase()} color={C.text} />
-                        <FieldRow label="VER........... BUILD" value="2.2.0" color={C.text} />
+                        <FieldRow label="VER........... BUILD" value="2.3.0" color={C.text} />
+                        <FieldRow label="AUTH.......... PROTOCOL" value="JWT BEARER" color={C.text} />
                         <FieldRow label="ENG........... POSE ENGINE" value="MEDIAPIPE" color={C.text} />
-                        <FieldRow label="PRTO.......... PROTOCOL" value="HTTP/WS" color={C.textSub} dim />
+                        <FieldRow label="PRTO.......... TRANSPORT" value="HTTP/WS" color={C.textSub} dim />
                     </Panel>
                 </Fade>
 
@@ -344,4 +391,7 @@ const s = StyleSheet.create({
     themeBlurb:      { fontSize: 10, color: C.textMid, fontFamily: T.MONO, marginTop: 2, letterSpacing: 0.3 },
     themeMark:       { fontSize: 10, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 1, marginLeft: 8 },
     themeNote:       { fontSize: 9, color: C.muted, fontFamily: T.MONO, paddingHorizontal: 12, paddingVertical: 8, letterSpacing: 0.3, textAlign: 'center' },
+
+    logoutBtn:  { paddingVertical: 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: C.border },
+    logoutText: { color: C.bad, fontFamily: T.MONO, fontSize: 11, fontWeight: '700', letterSpacing: 2 },
 });

@@ -7,6 +7,7 @@ import {
     StatusBar, ActivityIndicator, Alert, RefreshControl, Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
 import { Fade, useAsyncTap } from '../ui';
@@ -59,6 +60,9 @@ export default function TrainingPlanScreen({ navigation }) {
     }, [athleteId]);
 
     useEffect(() => { fetchPlan(); }, [fetchPlan]);
+    // Refresh on focus so completion marks made elsewhere (e.g., after a
+    // session) are picked up without needing pull-to-refresh.
+    useFocusEffect(useCallback(() => { fetchPlan(); }, [fetchPlan]));
 
     const [onRefresh] = useAsyncTap(async () => {
         setRefreshing(true);
@@ -146,8 +150,18 @@ export default function TrainingPlanScreen({ navigation }) {
                     <Text style={s.prompt}>{'> plan --week=current --sport='}{sportTag.toLowerCase()}</Text>
                     <View style={s.headerRow}>
                         <Text style={s.title}>WEEKLY PLAN</Text>
-                        <Pressable onPress={handleRegenerate} style={({ pressed }) => [s.actionBtn, pressed && { backgroundColor: '#111' }]}>
-                            <Text style={s.actionText}>[{regeneratePending ? 'WORKING' : 'REGEN'}]</Text>
+                        <Pressable
+                            onPress={handleRegenerate}
+                            disabled={regeneratePending}
+                            style={({ pressed }) => [
+                                s.actionBtn,
+                                regeneratePending && { borderColor: C.muted, opacity: 0.6 },
+                                pressed && !regeneratePending && { backgroundColor: '#111' },
+                            ]}
+                        >
+                            <Text style={[s.actionText, regeneratePending && { color: C.muted }]}>
+                                [{regeneratePending ? 'WORKING' : 'REGEN'}]
+                            </Text>
                         </Pressable>
                     </View>
                     <Text style={s.range}>
