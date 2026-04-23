@@ -5,14 +5,17 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
     View, Text, ScrollView, StyleSheet,
     Dimensions, StatusBar, ActivityIndicator, RefreshControl,
+    Pressable, Alert, DevSettings,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
 import { Fade } from '../ui';
 import { Sparkline } from '../components/charts';
-import { C, T, LEVEL_COLORS, LEVEL_LABELS } from '../styles/colors';
+import { C, T, LEVEL_COLORS, LEVEL_LABELS, getActiveTheme } from '../styles/colors';
+import { THEME_LIST, THEME_STORAGE_KEY } from '../styles/themes';
 import { sportLabel, SPORT_LABELS } from '../config/sports';
 import {
     Panel, Header, HdrMeta, Rule, FieldRow, Triad, SysBar, Ticker, DistBar, Table,
@@ -49,6 +52,23 @@ export default function ProfileScreen({ navigation }) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [advanced, setAdvanced] = useState(null);
+    const [activeTheme, setActiveThemeName] = useState(getActiveTheme());
+
+    const switchTheme = useCallback((id) => {
+        if (id === activeTheme) return;
+        AsyncStorage.setItem(THEME_STORAGE_KEY, id).then(() => {
+            setActiveThemeName(id);
+            try {
+                if (DevSettings && typeof DevSettings.reload === 'function') {
+                    DevSettings.reload();
+                    return;
+                }
+            } catch (_) { /* fall through */ }
+            Alert.alert('Theme saved', 'Restart the app to apply the new theme.');
+        }).catch(() => {
+            Alert.alert('Could not save theme', 'Try again.');
+        });
+    }, [activeTheme]);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -223,6 +243,45 @@ export default function ProfileScreen({ navigation }) {
                     </Panel>
                 </Fade>
 
+                {/* Appearance / Theme picker */}
+                <Fade delay={210}>
+                    <Panel>
+                        <Header title="APPEARANCE" right={<HdrMeta color={C.text}>{activeTheme.toUpperCase()}</HdrMeta>} />
+                        {THEME_LIST.map((th, idx) => {
+                            const sel = th.id === activeTheme;
+                            return (
+                                <Pressable
+                                    key={th.id}
+                                    onPress={() => switchTheme(th.id)}
+                                    style={({ pressed }) => [
+                                        s.themeRow,
+                                        idx < THEME_LIST.length - 1 && { borderBottomWidth: 1, borderBottomColor: C.border },
+                                        pressed && { backgroundColor: C.surf },
+                                    ]}
+                                >
+                                    <View style={s.themeRowL}>
+                                        <View style={s.themeSwatchWrap}>
+                                            <View style={[s.themeSwatch, { backgroundColor: th.P.screenBg, borderColor: th.C.border }]}>
+                                                <View style={[s.themeSwatchA, { backgroundColor: th.C.text }]} />
+                                                <View style={[s.themeSwatchB, { backgroundColor: th.C.good }]} />
+                                                <View style={[s.themeSwatchC, { backgroundColor: th.C.accent }]} />
+                                            </View>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={s.themeName}>{th.label.toUpperCase()}</Text>
+                                            <Text style={s.themeBlurb} numberOfLines={1}>{th.blurb}</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={[s.themeMark, { color: sel ? C.good : C.muted }]}>
+                                        {sel ? '[ACTIVE]' : '[ ]'}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                        <Text style={s.themeNote}>App reloads on switch · preference persists across launches</Text>
+                    </Panel>
+                </Fade>
+
                 {/* System */}
                 <Fade delay={220}>
                     <Panel>
@@ -237,7 +296,8 @@ export default function ProfileScreen({ navigation }) {
                             value={(dataMode || 'mock').toUpperCase()}
                             color={dataMode === 'real' ? C.good : dataMode === 'hybrid' ? C.warn : C.muted}
                         />
-                        <FieldRow label="VER........... BUILD" value="2.1.0" color={C.text} />
+                        <FieldRow label="THEME......... ACTIVE" value={activeTheme.toUpperCase()} color={C.text} />
+                        <FieldRow label="VER........... BUILD" value="2.2.0" color={C.text} />
                         <FieldRow label="ENG........... POSE ENGINE" value="MEDIAPIPE" color={C.text} />
                         <FieldRow label="PRTO.......... PROTOCOL" value="HTTP/WS" color={C.textSub} dim />
                     </Panel>
@@ -272,4 +332,16 @@ const s = StyleSheet.create({
 
     loadingWrap: { paddingVertical: 20, alignItems: 'center' },
     emptyText:   { paddingVertical: 14, textAlign: 'center', color: C.muted, fontFamily: T.MONO, fontSize: 11, letterSpacing: 1 },
+
+    themeRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 12 },
+    themeRowL:       { flexDirection: 'row', alignItems: 'center', flex: 1 },
+    themeSwatchWrap: { marginRight: 12 },
+    themeSwatch:     { width: 36, height: 36, borderWidth: 1, padding: 4, justifyContent: 'space-between' },
+    themeSwatchA:    { height: 4 },
+    themeSwatchB:    { height: 4, width: '70%' },
+    themeSwatchC:    { height: 4, width: '50%' },
+    themeName:       { fontSize: 12, color: C.white, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 1 },
+    themeBlurb:      { fontSize: 10, color: C.textMid, fontFamily: T.MONO, marginTop: 2, letterSpacing: 0.3 },
+    themeMark:       { fontSize: 10, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 1, marginLeft: 8 },
+    themeNote:       { fontSize: 9, color: C.muted, fontFamily: T.MONO, paddingHorizontal: 12, paddingVertical: 8, letterSpacing: 0.3, textAlign: 'center' },
 });
