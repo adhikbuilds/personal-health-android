@@ -10,6 +10,7 @@ import {
     WS_BASE as WS_URL,
     API_TIMEOUT,
 } from '../constants';
+import { getAccessToken, triggerRefresh, triggerLogout } from './auth-token';
 
 // Direct to FastAPI backend
 export const API_BASE = BASE_URL;
@@ -61,6 +62,43 @@ function _validate(data, schema) {
 }
 
 // ─── Core fetch helper ───────────────────────────────────────────────────────
+//
+// Authentication: every request injects the current access token from the
+// shared auth-token module. On 401 we try the refresh handler exactly once
+// per request; if it succeeds we retry the original call with the new token,
+// otherwise we trigger logout so the AuthGate sends the user to /login.
+
+async function _doFetch(path, options, attemptedRefresh) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), API_TIMEOUT);
+    const token = getAccessToken();
+    const baseHeaders = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+    if (token) baseHeaders.Authorization = `Bearer ${token}`;
+    try {
+        const res = await fetch(`${API_BASE}${path}`, {
+            ...options,
+            headers: baseHeaders,
+            signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (res.status === 401 && !attemptedRefresh) {
+            const refreshed = await triggerRefresh();
+            if (refreshed) {
+                return _doFetch(path, options, true);  // retry once
+            }
+            await triggerLogout();
+            throw new Error('HTTP 401: unauthenticated');
+        }
+        if (!res.ok) {
+            const text = await res.text().catch(() => '');
+            throw new Error(`HTTP ${res.status}: ${text}`);
+        }
+        return res.json();
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 async function fetchJSON(path, options = {}, { schema } = {}) {
     const cacheable = _shouldCache(options);
     const key = _cacheKey(path, options);
@@ -76,25 +114,12 @@ async function fetchJSON(path, options = {}, { schema } = {}) {
     }
 
     const promise = (async () => {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), API_TIMEOUT);
         try {
-            const res = await fetch(`${API_BASE}${path}`, {
-                headers: { 'Content-Type': 'application/json', ...options.headers },
-                signal: controller.signal,
-                ...options,
-            });
-            clearTimeout(timer);
-            if (!res.ok) {
-                const text = await res.text().catch(() => '');
-                throw new Error(`HTTP ${res.status}: ${text}`);
-            }
-            const json = await res.json();
+            const json = await _doFetch(path, options, false);
             const validated = _validate(json, schema);
             if (cacheable) _recentCache.set(key, { ts: Date.now(), data: validated });
             return validated;
         } catch (err) {
-            clearTimeout(timer);
             if (err.name === 'AbortError') {
                 console.warn(`[API] Timeout: ${path}`);
             } else {
@@ -317,6 +342,38 @@ export const api = {
      *  double-counting. Returns { target_id, count, you_clapped }. */
     sendClap: (athleteId, targetId) =>
         fetchJSON(`/athlete/${athleteId}/clap/${targetId}`, { method: 'POST' }),
+
+    // ─── Auth ────────────────────────────────────────────────────────────
+    /** Register a new account; returns user + access/refresh tokens. */
+    authRegister: (email, password, name, athlete_id = null) =>
+        fetchJSON('/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({ email, password, name, athlete_id }),
+        }),
+
+    /** Log in with email + password; returns user + access/refresh tokens. */
+    authLogin: (email, password) =>
+        fetchJSON('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password }),
+        }),
+
+    /** Trade a refresh token for a new access/refresh pair. */
+    authRefresh: (refresh_token) =>
+        fetchJSON('/auth/refresh', {
+            method: 'POST',
+            body: JSON.stringify({ refresh_token }),
+        }),
+
+    /** Revoke a refresh token (logout). 204 on success. */
+    authLogout: (refresh_token) =>
+        fetchJSON('/auth/logout', {
+            method: 'POST',
+            body: JSON.stringify({ refresh_token }),
+        }),
+
+    /** Returns the current authenticated user; null/401 if no valid token. */
+    authMe: () => fetchJSON('/auth/me'),
 
     // ─── Huddle Mode ─────────────────────────────────────────────────────
     /** Create a group training huddle */

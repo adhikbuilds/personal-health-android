@@ -5,7 +5,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import {
-    View, Text, StyleSheet, StatusBar, Animated, Pressable,
+    View, Text, StyleSheet, StatusBar, Animated, Pressable, ActivityIndicator,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -154,7 +154,16 @@ export default function RPPGScreen({ navigation, route }) {
     const q = qualityCode(quality);
     const elapsed = scanning && startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
 
-    if (!perm) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
+    if (!perm) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="small" color={C.text} />
+                <Text style={{ color: C.textMid, fontFamily: T.MONO, fontSize: 11, letterSpacing: 2, marginTop: 14, fontWeight: '700' }}>
+                    REQUESTING CAMERA ACCESS...
+                </Text>
+            </View>
+        );
+    }
     if (!perm.granted) {
         return (
             <TerminalScreen style={{ paddingTop: ins.top }}>

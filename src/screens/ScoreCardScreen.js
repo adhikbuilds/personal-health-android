@@ -2,12 +2,13 @@
 // End-of-session telemetry report. Mono everywhere, distribution bars,
 // share as a formatted report.
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     View, Text, ScrollView, StyleSheet,
     StatusBar, ActivityIndicator, Share, Alert, Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
 import { useUser } from '../context/UserContext';
 import { Fade } from '../ui';
@@ -60,9 +61,14 @@ export default function ScoreCardScreen({ navigation, route }) {
     const [clapCount, setClapCount] = useState(0);
     const clock = useLiveClock();
 
-    useEffect(() => {
-        if (!sessionId) { setLoading(false); return; }
+    // Refetch on focus AND on sessionId/athleteId change. The focus pass
+    // catches the case where the user navigates back from another flow that
+    // mutated this session (e.g., posted a clap, ended an in-progress retry).
+    const loadCard = useCallback(() => {
+        if (!sessionId) { setLoading(false); return () => {}; }
         let mounted = true;
+        setLoading(true);
+        // Don't blank out card while refetching — keeps the UI from flashing.
         Promise.all([
             api.getScorecard(sessionId).catch(() => null),
             api.getRepCount(sessionId).catch(() => null),
@@ -76,6 +82,9 @@ export default function ScoreCardScreen({ navigation, route }) {
         });
         return () => { mounted = false; };
     }, [sessionId, athleteId]);
+
+    useEffect(() => loadCard(), [loadCard]);
+    useFocusEffect(useCallback(() => loadCard(), [loadCard]));
 
     const handleClap = async () => {
         if (clapped || !sessionId) return;
@@ -198,13 +207,17 @@ export default function ScoreCardScreen({ navigation, route }) {
                                 )}
                             </View>
                         </View>
-                        {sparkData.length > 1 && (
+                        {sparkData.length > 1 ? (
                             <View style={s.sparkWrap}>
                                 <Sparkline data={sparkData} width={330} height={48} color={col} stroke={1.5} />
                                 <View style={s.sparkRange}>
                                     <Text style={s.sparkRangeText}>START</Text>
                                     <Text style={s.sparkRangeText}>END</Text>
                                 </View>
+                            </View>
+                        ) : (
+                            <View style={s.sparkWrap}>
+                                <Text style={s.sparkRangeText}>NO FRAME-LEVEL DATA · TREND UNAVAILABLE</Text>
                             </View>
                         )}
                     </Panel>

@@ -452,7 +452,8 @@ export default function GhostSkeletonScreen({ navigation, route }) {
                 {/* Start button */}
                 <Tap
                     style={[s.startBtn, !calibReady && s.startBtnOff]}
-                    onPress={calibReady ? handleStart : undefined}
+                    onPress={handleStart}
+                    disabled={!calibReady}
                 >
                     <Text style={[s.btnText, !calibReady && { color: 'rgba(0,0,0,0.5)' }]}>
                         {calibReady ? 'Start Session' : phase === 'countdown' ? 'Positioning...' : 'Calibrating...'}

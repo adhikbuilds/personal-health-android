@@ -7,6 +7,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { INITIAL_USER_DATA } from '../data/constants';
 import api from '../services/api';
+import { useAuth } from './AuthContext';
 
 const FITNESS_SCORE_KEY = '@fitness_test_latest';
 const STREAK_KEY = '@streak_data';
@@ -14,14 +15,37 @@ const STREAK_KEY = '@streak_data';
 const UserContext = createContext(null);
 
 export function UserProvider({ children }) {
-    const [userData, setUserData] = useState(INITIAL_USER_DATA);
+    // Bind the user record to the signed-in auth identity. AuthGate guarantees
+    // we only mount UserProvider after status === 'authed', so user is non-null
+    // for the first render.
+    const { user: authUser } = useAuth();
+
+    const [userData, setUserData] = useState(() => ({
+        ...INITIAL_USER_DATA,
+        // Hydrate optimistically from auth so screens never start with the
+        // demo athlete_01 fallback if a real user is signed in.
+        name: authUser?.name || INITIAL_USER_DATA.name,
+        avatarId: authUser?.athlete_id || INITIAL_USER_DATA.avatarId,
+    }));
     const [recentSession, setRecentSession] = useState(null);
     const [dataMode, setDataMode] = useState('mock'); // 'mock' | 'real' | 'hybrid'
     const [fitnessScore, setFitnessScoreState] = useState({
         score: 0, level: 0, label: 'Not Tested', color: '#64748b', lastTested: null,
     });
 
-    // On mount: load athlete data + persisted fitness score + streak
+    // Re-sync identity if the signed-in user changes mid-session (logout/login).
+    useEffect(() => {
+        if (authUser) {
+            setUserData(prev => ({
+                ...prev,
+                name: authUser.name || prev.name,
+                avatarId: authUser.athlete_id || prev.avatarId,
+            }));
+        }
+    }, [authUser?.id, authUser?.athlete_id, authUser?.name]);
+
+    // On mount: load persisted local-only state (fitness score, streak) and
+    // hydrate the live athlete record from the backend.
     useEffect(() => {
         AsyncStorage.getItem(FITNESS_SCORE_KEY).then(raw => {
             if (raw) { try { setFitnessScoreState(JSON.parse(raw)); } catch (_) {} }
@@ -35,13 +59,14 @@ export function UserProvider({ children }) {
                 if (lastDate === today || lastDate === yesterday) {
                     setUserData(prev => ({ ...prev, streak }));
                 } else {
-                    // Streak expired
                     setUserData(prev => ({ ...prev, streak: 0 }));
                 }
             } catch (_) {}
         });
 
-        api.getAthlete(INITIAL_USER_DATA.avatarId).then(athlete => {
+        const aid = authUser?.athlete_id;
+        if (!aid) return;
+        api.getAthlete(aid).then(athlete => {
             if (!athlete?.id) return;
             const realSessions = athlete.sessions || 0;
             const newMode = realSessions > 3 ? 'real' : realSessions > 0 ? 'hybrid' : 'mock';
@@ -50,11 +75,12 @@ export function UserProvider({ children }) {
                 ...prev,
                 bpi: athlete.bpi ?? prev.bpi,
                 sessions: realSessions ?? prev.sessions,
-                scoutReadiness: prev.scoutReadiness, // computed locally for now
-                // name/tier/level/xp/streak stay as-is until auth is implemented
+                tier: athlete.tier ?? prev.tier,
+                sport: athlete.sport ?? prev.sport,
+                scoutReadiness: prev.scoutReadiness,
             }));
         }).catch(() => { });
-    }, []);
+    }, [authUser?.athlete_id]);
 
     const addXp = useCallback((xpEarned, sessionSummary = null) => {
         setUserData(prev => {

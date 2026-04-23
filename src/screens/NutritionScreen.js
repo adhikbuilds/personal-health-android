@@ -5,7 +5,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, Animated,
-    StatusBar, Pressable,
+    StatusBar, Pressable, ActivityIndicator,
 } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -87,7 +87,14 @@ export default function NutritionScreen({ navigation }) {
 
     // No permission
     if (!permission) {
-        return <View style={{ flex: 1, backgroundColor: '#000' }} />;
+        return (
+            <View style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="small" color={C.text} />
+                <Text style={{ color: C.textMid, fontFamily: T.MONO, fontSize: 11, letterSpacing: 2, marginTop: 14, fontWeight: '700' }}>
+                    REQUESTING CAMERA ACCESS...
+                </Text>
+            </View>
+        );
     }
     if (!permission.granted) {
         return (
