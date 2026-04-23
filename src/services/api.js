@@ -411,6 +411,48 @@ export const api = {
     getExportStats: () =>
         fetchJSON('/admin/export/stats'),
 
+    /** Phase 2: open a WebSocket that streams JPEG frames to the backend.
+     *  Returns { send(b64), close() }. The backend pushes back analysis
+     *  results via onResult({ form_score, form_quality, primary_feedback,
+     *  phase, knee_angle_l, hip_angle_l, trunk_lean, ... }). */
+    connectFrameStream: (sessionId, { onResult, onError, onClose, onPing } = {}) => {
+        const wsUrl = `${WS_BASE_RESOLVED}/ws/session/${sessionId}/frames-jpeg`;
+        const ws = new WebSocket(wsUrl);
+        let closed = false;
+        ws.onopen  = () => console.log(`[WS-FRAMES] connected: ${sessionId}`);
+        ws.onmessage = (e) => {
+            let msg = null;
+            try { msg = JSON.parse(e.data); } catch (_) { return; }
+            if (!msg || typeof msg !== 'object') return;
+            if (msg.type === 'result' && onResult) onResult(msg);
+            else if (msg.type === 'ping' && onPing) onPing(msg);
+            else if (msg.type === 'error' && onError) onError(new Error(msg.code || 'ws_error'));
+        };
+        ws.onerror = (e) => {
+            console.warn('[WS-FRAMES] error:', e?.message);
+            if (onError) onError(e);
+        };
+        ws.onclose = () => {
+            closed = true;
+            console.log('[WS-FRAMES] closed');
+            if (onClose) onClose();
+        };
+        return {
+            send(b64, ts = Date.now()) {
+                if (closed || ws.readyState !== WebSocket.OPEN) return false;
+                try {
+                    ws.send(JSON.stringify({ image_b64: b64, ts }));
+                    return true;
+                } catch (_) { return false; }
+            },
+            close() {
+                closed = true;
+                try { ws.close(); } catch (_) { /* ignore */ }
+            },
+            isOpen() { return !closed && ws.readyState === WebSocket.OPEN; },
+        };
+    },
+
     /** Biomechanics live stream: WebSocket for real-time keypoint/pose data. */
     connectLiveStream: (sessionId, onMessage, onError, onClose) => {
         const wsUrl = `${WS_BASE_RESOLVED}/session/${sessionId}/live-stream`;
