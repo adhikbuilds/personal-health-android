@@ -93,6 +93,11 @@ async function _doFetch(path, options, attemptedRefresh) {
             const text = await res.text().catch(() => '');
             throw new Error(`HTTP ${res.status}: ${text}`);
         }
+        // 204 No Content responses (logout, etc.) have an empty body — JSON
+        // parsing them throws "Unexpected end of input". Return null instead.
+        if (res.status === 204) return null;
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) return null;
         return res.json();
     } finally {
         clearTimeout(timer);
