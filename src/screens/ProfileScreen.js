@@ -16,7 +16,7 @@ import api from '../services/api';
 import { Fade } from '../ui';
 import { Sparkline } from '../components/charts';
 import { C, T, LEVEL_COLORS, LEVEL_LABELS, getActiveTheme } from '../styles/colors';
-import { THEME_LIST, THEME_STORAGE_KEY } from '../styles/themes';
+import { THEME_LIST, THEME_STORAGE_KEY, CAMERA_ENGINE_KEY, CAMERA_ENGINES, DEFAULT_CAMERA_ENGINE } from '../styles/themes';
 import { sportLabel, SPORT_LABELS } from '../config/sports';
 import {
     Panel, Header, HdrMeta, Rule, FieldRow, Triad, SysBar, Ticker, DistBar, Table,
@@ -70,6 +70,23 @@ export default function ProfileScreen({ navigation }) {
     const [refreshing, setRefreshing] = useState(false);
     const [advanced, setAdvanced] = useState(null);
     const [activeTheme, setActiveThemeName] = useState(getActiveTheme());
+    const [cameraEngine, setCameraEngineState] = useState(DEFAULT_CAMERA_ENGINE);
+    useEffect(() => {
+        AsyncStorage.getItem(CAMERA_ENGINE_KEY).then((v) => {
+            if (v && Object.values(CAMERA_ENGINES).includes(v)) setCameraEngineState(v);
+        }).catch(() => {});
+    }, []);
+
+    const switchCameraEngine = useCallback((id) => {
+        if (id === cameraEngine) return;
+        AsyncStorage.setItem(CAMERA_ENGINE_KEY, id).then(() => {
+            setCameraEngineState(id);
+            Alert.alert(
+                'Camera engine changed',
+                'The change takes effect the next time you start a training session.',
+            );
+        }).catch(() => Alert.alert('Could not save', 'Try again.'));
+    }, [cameraEngine]);
 
     const switchTheme = useCallback((id) => {
         if (id === activeTheme) return;
@@ -296,6 +313,38 @@ export default function ProfileScreen({ navigation }) {
                             );
                         })}
                         <Text style={s.themeNote}>App reloads on switch · preference persists across launches</Text>
+                    </Panel>
+                </Fade>
+
+                {/* Camera engine — experimental Vision Camera toggle */}
+                <Fade delay={213}>
+                    <Panel>
+                        <Header title="CAMERA ENGINE" right={<HdrMeta color={cameraEngine === CAMERA_ENGINES.VISION ? C.warn : C.good}>{cameraEngine === CAMERA_ENGINES.VISION ? 'EXPERIMENTAL' : 'STABLE'}</HdrMeta>} />
+                        {[
+                            { id: CAMERA_ENGINES.EXPO,   label: 'EXPO CAMERA',   blurb: 'Stable · 0.3 fps shutter capture · default' },
+                            { id: CAMERA_ENGINES.VISION, label: 'VISION CAMERA', blurb: 'Experimental · v5 + Nitrogen · faster pipeline' },
+                        ].map((eng) => {
+                            const sel = eng.id === cameraEngine;
+                            return (
+                                <Pressable
+                                    key={eng.id}
+                                    onPress={() => switchCameraEngine(eng.id)}
+                                    style={({ pressed }) => [
+                                        s.themeRow,
+                                        pressed && { backgroundColor: C.surf },
+                                    ]}
+                                >
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.themeName}>{eng.label}</Text>
+                                        <Text style={s.themeBlurb} numberOfLines={1}>{eng.blurb}</Text>
+                                    </View>
+                                    <Text style={[s.themeMark, { color: sel ? C.good : C.muted }]}>
+                                        {sel ? '[ACTIVE]' : '[ ]'}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                        <Text style={s.themeNote}>Affects the next training session · falls back to Expo Camera if Vision Camera native side fails to load</Text>
                     </Panel>
                 </Fade>
 

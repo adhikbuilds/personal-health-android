@@ -5,10 +5,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Dimensions, ScrollView, Pressable, Animated, Platform, Alert } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
 import { classifyForm, isReady as classifierReady } from '../services/poseClassifier';
+import { CAMERA_ENGINE_KEY, CAMERA_ENGINES, DEFAULT_CAMERA_ENGINE } from '../styles/themes';
+// VisionTrainCamera is lazy-required only when the engine flag is set to
+// VISION — its top-level import would trigger react-native-vision-camera's
+// JS-side proxy init, which fails on devices where the CameraFactory
+// HybridObject hasn't been registered (Nitrogen native init missing).
 import { Tap, Fade } from '../ui';
 import { SPORTS as SPORTS_MAP, SPORT_RANGES, repTransition } from '../config/sports';
 import { C, T } from '../styles/colors';
@@ -74,7 +80,29 @@ export default function TrainScreen({ showToast, navigation, route }) {
     const intervalRef = useRef(null);
     const simIntervalRef = useRef(null);
     const sessionRef = useRef(null);
-    const cameraRef = useRef(null);       // CameraView ref for takePictureAsync
+    const cameraRef = useRef(null);       // CameraView/VisionTrainCamera ref — both expose takePictureAsync({base64})
+    // Pick the camera engine at first render. AsyncStorage is read once;
+    // switching engines requires a session restart (the camera component
+    // changes type, which would re-mount mid-capture otherwise).
+    const [cameraEngine, setCameraEngine] = useState(DEFAULT_CAMERA_ENGINE);
+    const [VisionCameraComp, setVisionCameraComp] = useState(null);
+    useEffect(() => {
+        AsyncStorage.getItem(CAMERA_ENGINE_KEY).then((v) => {
+            if (v === CAMERA_ENGINES.VISION) {
+                setCameraEngine(v);
+                // Only require vision-camera when the user has explicitly
+                // opted in. Wrapped so a missing native side fails the
+                // import gracefully and we fall back to expo-camera below.
+                try {
+                    const mod = require('../components/VisionTrainCamera');
+                    setVisionCameraComp(() => (mod.default || mod));
+                } catch (e) {
+                    console.warn('[TrainScreen] Vision Camera unavailable, falling back:', e?.message);
+                    setCameraEngine(CAMERA_ENGINES.EXPO);
+                }
+            }
+        }).catch(() => {});
+    }, []);
     const isCapturingRef = useRef(false); // prevents overlapping captures
     const lastPhaseRef = useRef(null);
     const analysisModeRef = useRef('idle');
@@ -182,7 +210,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
         // results land in /latest-result regardless of transport.
         try {
             wsStreamRef.current = api.connectFrameStream(sid, {
-                onResult: (msg) => {
+                onResult: async (msg) => {
                     if (msg.form_score == null || msg.form_score <= 0) return;
                     checkRep(msg.phase);
                     const frame = {
@@ -197,7 +225,21 @@ export default function TrainScreen({ showToast, navigation, route }) {
                         trunk_lean: msg.trunk_lean ?? 0,
                         limb_symmetry_idx: msg.limb_symmetry_idx ?? 1,
                         estimated_jump_height: msg.estimated_jump_height ?? 0,
+                        source: 'BACKEND',
                     };
+                    // Always-on TFLite augmentation: run the on-device classifier
+                    // on the same joint angles. We DON'T overwrite the backend
+                    // form_score (backend is authoritative) but we expose the
+                    // on-device verdict via tflite_score / tflite_quality so the
+                    // HUD can show "agreement" or surface a disagreement.
+                    try {
+                        const tf = await classifyForm(frame, sport);
+                        if (tf) {
+                            frame.tflite_score = tf.form_score;
+                            frame.tflite_quality = tf.form_quality;
+                            frame.tflite_confidence = tf.confidence;
+                        }
+                    } catch (_) { /* on-device is best-effort */ }
                     setMetrics(frame);
                     lastGoodMetricsRef.current = frame;
                     setAnalysisMode('real');
@@ -279,7 +321,17 @@ export default function TrainScreen({ showToast, navigation, route }) {
                         trunk_lean: result.trunk_lean ?? 0,
                         limb_symmetry_idx: result.limb_symmetry_idx ?? 1,
                         estimated_jump_height: result.estimated_jump_height ?? 0,
+                        source: 'BACKEND',
                     };
+                    // Always-on TFLite augmentation (best-effort).
+                    try {
+                        const tf = await classifyForm(frame, sport);
+                        if (tf) {
+                            frame.tflite_score = tf.form_score;
+                            frame.tflite_quality = tf.form_quality;
+                            frame.tflite_confidence = tf.confidence;
+                        }
+                    } catch (_) {}
                     setMetrics(frame);
                     lastGoodMetricsRef.current = frame;
                     setAnalysisMode('real');
@@ -519,14 +571,22 @@ export default function TrainScreen({ showToast, navigation, route }) {
 
     return (
         <View style={s.cameraWrap}>
-            <CameraView
-                ref={cameraRef}
-                style={StyleSheet.absoluteFill}
-                facing={'back'}
-                mute
-                animateShutter={false}
-                enableTorch={false}
-            />
+            {cameraEngine === CAMERA_ENGINES.VISION && VisionCameraComp ? (
+                <VisionCameraComp
+                    ref={cameraRef}
+                    style={StyleSheet.absoluteFill}
+                    isActive={isActive}
+                />
+            ) : (
+                <CameraView
+                    ref={cameraRef}
+                    style={StyleSheet.absoluteFill}
+                    facing={'back'}
+                    mute
+                    animateShutter={false}
+                    enableTorch={false}
+                />
+            )}
 
             {/* Top bar */}
             <View style={[s.camTopBar, { top: ins.top + 12 }]}>
@@ -585,6 +645,13 @@ export default function TrainScreen({ showToast, navigation, route }) {
                     <View style={{ alignItems: 'flex-end' }}>
                         <Text style={s.hudStatLabel}>FORM</Text>
                         <Text style={[s.hudFormScore, { color: qColor }]}>{metrics?.form_score ?? '--'}%</Text>
+                        {/* On-device TFLite verdict next to the backend score —
+                            transparency about which engine produced what. */}
+                        {metrics?.tflite_score != null && (
+                            <Text style={s.hudTfMeta} numberOfLines={1}>
+                                TF {metrics.tflite_score} ({String(metrics.tflite_quality || '').toUpperCase().slice(0, 4)})
+                            </Text>
+                        )}
                     </View>
                 </View>
             </View>
@@ -657,6 +724,7 @@ const s = StyleSheet.create({
     hudStatLabel: { fontSize: 8, color: C.textMid, fontWeight: '700', letterSpacing: 1, fontFamily: MONO },
     hudStatNum: { fontSize: 18, fontWeight: '700', fontFamily: MONO },
     hudFormScore: { fontSize: 32, fontWeight: '700', fontFamily: MONO, letterSpacing: -1 },
+    hudTfMeta:    { fontSize: 9, color: C.textMid, fontFamily: MONO, fontWeight: '700', letterSpacing: 0.5, marginTop: 2 },
 
     // Summary (remaining legacy)
     summaryHeadline: { fontSize: 28, fontWeight: '700', color: '#E8E8E8', letterSpacing: 1, fontFamily: MONO, textAlign: 'center' },
