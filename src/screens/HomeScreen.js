@@ -33,6 +33,7 @@ export default function HomeScreen({ navigation }) {
     const [refreshing, setRefreshing] = useState(false);
     const [tracker, setTracker] = useState(DAILY_TRACKER_DEFAULTS);
     const [metrics, setMetrics] = useState(null);
+    const [inbox, setInbox] = useState([]);
     const clock = useLiveClock();
 
     const TK = `@dt_${new Date().toISOString().slice(0, 10)}`;
@@ -40,7 +41,9 @@ export default function HomeScreen({ navigation }) {
     const load = () => {
         AsyncStorage.getItem(TK).then(r => { if (r) try { setTracker(JSON.parse(r)); } catch (_) {} });
         api.ping().then(ok => setOnline(!!ok));
-        api.getAdvancedMetrics(userData.avatarId || 'athlete_01', 60).then(m => { if (m) setMetrics(m); });
+        const aid = userData.avatarId || 'athlete_01';
+        api.getAdvancedMetrics(aid, 60).then(m => { if (m) setMetrics(m); });
+        api.getAthleteInbox(aid, 5).then(r => { if (r?.broadcasts) setInbox(r.broadcasts); }).catch(() => {});
     };
     useEffect(load, []);
     useEffect(() => { AsyncStorage.setItem(TK, JSON.stringify(tracker)).catch(() => {}); }, [tracker]);
@@ -99,6 +102,36 @@ export default function HomeScreen({ navigation }) {
                         SID: {userTag}.{sportTag}.{(userData.bpi || 0).toString(16).toUpperCase().padStart(4, '0')}
                     </Text>
                 </Fade>
+
+                {/* Coach broadcast — surfaces as soon as athlete opens Home */}
+                {inbox && inbox.length > 0 && (
+                    <Fade delay={40}>
+                        <Panel>
+                            <Header title="FROM YOUR COACH" right={<HdrMeta color={C.warn}>{fmtInt(inbox.length)} MSG</HdrMeta>} />
+                            {inbox.slice(0, 2).map((b, i) => {
+                                const tA = (() => {
+                                    if (!b.created_at) return '';
+                                    try {
+                                        const m = Math.floor(Math.max(0, Date.now() - new Date(b.created_at).getTime()) / 60000);
+                                        if (m < 1) return 'JUST NOW';
+                                        if (m < 60) return `${m}M AGO`;
+                                        const h = Math.floor(m / 60);
+                                        if (h < 24) return `${h}H AGO`;
+                                        return `${Math.floor(h / 24)}D AGO`;
+                                    } catch { return ''; }
+                                })();
+                                return (
+                                    <FieldRow
+                                        key={b.id || i}
+                                        label={`MSG${String(i + 1).padStart(2, '0')}........ ${(b.coach_id || 'COACH').toUpperCase()}`}
+                                        value={String(b.message || b.voice_note_url || 'VOICE NOTE').toUpperCase().slice(0, 40)}
+                                        color={C.warn}
+                                    />
+                                );
+                            })}
+                        </Panel>
+                    </Fade>
+                )}
 
                 {/* Fitscore */}
                 <Fade delay={60}>

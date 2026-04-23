@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
+import { useUser } from '../context/UserContext';
 import { Fade } from '../ui';
 import { Sparkline } from '../components/charts';
 import { C, T } from '../styles/colors';
@@ -17,6 +18,21 @@ import {
     TerminalScreen, Footer, useLiveClock,
     fmt, fmtInt, nowISO,
 } from '../components/terminal';
+
+function timeAgo(iso) {
+    if (!iso) return '';
+    try {
+        const d = new Date(iso).getTime();
+        const diff = Math.max(0, Date.now() - d);
+        const m = Math.floor(diff / 60000);
+        if (m < 1) return 'JUST NOW';
+        if (m < 60) return `${m}M AGO`;
+        const h = Math.floor(m / 60);
+        if (h < 24) return `${h}H AGO`;
+        const days = Math.floor(h / 24);
+        return `${days}D AGO`;
+    } catch { return ''; }
+}
 
 function scoreColor(v) {
     if (v >= 75) return C.good;
@@ -34,17 +50,44 @@ function formatDuration(sec) {
 export default function ScoreCardScreen({ navigation, route }) {
     const ins = useSafeAreaInsets();
     const sessionId = route?.params?.sessionId;
+    const { userData } = useUser();
+    const athleteId = userData?.avatarId || 'athlete_01';
     const [card, setCard] = useState(null);
+    const [reps, setReps] = useState(null);
+    const [inbox, setInbox] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [clapped, setClapped] = useState(false);
+    const [clapCount, setClapCount] = useState(0);
     const clock = useLiveClock();
 
     useEffect(() => {
         if (!sessionId) { setLoading(false); return; }
-        api.getScorecard(sessionId).then(data => {
-            setCard(data);
+        let mounted = true;
+        Promise.all([
+            api.getScorecard(sessionId).catch(() => null),
+            api.getRepCount(sessionId).catch(() => null),
+            api.getAthleteInbox(athleteId, 5).catch(() => null),
+        ]).then(([sc, rep, inb]) => {
+            if (!mounted) return;
+            setCard(sc);
+            setReps(rep);
+            setInbox(inb?.broadcasts || []);
             setLoading(false);
         });
-    }, [sessionId]);
+        return () => { mounted = false; };
+    }, [sessionId, athleteId]);
+
+    const handleClap = async () => {
+        if (clapped || !sessionId) return;
+        setClapped(true);
+        try {
+            const res = await api.sendClap(athleteId, sessionId);
+            if (res && typeof res.count === 'number') setClapCount(res.count);
+            else setClapCount((c) => c + 1);
+        } catch {
+            setClapped(false);
+        }
+    };
 
     const handleShare = async () => {
         if (!card) return;
@@ -105,6 +148,16 @@ export default function ScoreCardScreen({ navigation, route }) {
     const frames = card.frames || card.form_score_history || [];
     const sparkData = frames.map(f => f.form_score || f.score || 0).filter(x => x > 0).slice(-40);
 
+    // Rep count: prefer scorecard's own value, fall back to dedicated endpoint.
+    const repCount = card.rep_count != null
+        ? card.rep_count
+        : reps?.rep_count != null
+            ? reps.rep_count
+            : reps?.count != null ? reps.count : 0;
+    const eliteReps = dist.elite || 0;
+    const goodReps  = dist.good || 0;
+    const qualityReps = eliteReps + goodReps;
+
     return (
         <TerminalScreen style={{ paddingTop: ins.top }}>
             <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
@@ -157,13 +210,44 @@ export default function ScoreCardScreen({ navigation, route }) {
                     </Panel>
                 </Fade>
 
+                {/* Rep count — its own panel, prominent. */}
+                <Fade delay={80}>
+                    <Panel>
+                        <Header title="REP COUNT" right={<HdrMeta color={C.info}>DETECTED</HdrMeta>} />
+                        <View style={s.repBody}>
+                            <Text style={[s.repBig, { color: C.info }]}>{String(repCount).padStart(3, '0')}</Text>
+                            <View style={s.repRight}>
+                                <Text style={[s.repCaption, { color: C.muted }]}>TOTAL · ON-DEVICE COUNT</Text>
+                                {qualityReps > 0 && (
+                                    <Text style={[s.repCaption, { color: C.good }]}>
+                                        {qualityReps} ELITE/GOOD · {repCount > 0 ? Math.round((qualityReps / Math.max(1, total)) * 100) : 0}% QUALITY
+                                    </Text>
+                                )}
+                            </View>
+                        </View>
+                        <Rule />
+                        <Pressable
+                            onPress={handleClap}
+                            style={({ pressed }) => [
+                                s.clapBtn,
+                                pressed && { backgroundColor: '#111' },
+                                clapped && { borderColor: C.good },
+                            ]}
+                        >
+                            <Text style={[s.clapText, { color: clapped ? C.good : C.text }]}>
+                                {clapped ? `[CLAPPED] ${fmtInt(clapCount)}` : '[CLAP] · ONE-TAP REACTION'}
+                            </Text>
+                        </Pressable>
+                    </Panel>
+                </Fade>
+
                 {/* Core stats */}
                 <Fade delay={100}>
                     <Panel>
                         <Header title="TELEMETRY" />
                         <Triad items={[
                             { label: 'PK.JUMP.CM', value: fmt(card.peak_jump_height_cm || 0, 1), color: C.info },
-                            { label: 'REPS',       value: fmtInt(card.rep_count || 0), color: '#E8E8E8' },
+                            { label: 'REPS',       value: fmtInt(repCount), color: C.white },
                             { label: 'XP',         value: '+' + fmtInt(card.xp_earned || 0), color: C.warn },
                         ]} />
                         <Rule />
@@ -191,6 +275,33 @@ export default function ScoreCardScreen({ navigation, route }) {
                                 const c = q === 'elite' ? C.good : q === 'good' ? C.info : q === 'average' ? C.warn : C.bad;
                                 return <DistBar key={q} label={q} value={n} total={total} color={c} />;
                             })}
+                        </Panel>
+                    </Fade>
+                )}
+
+                {/* Coach broadcasts — anything addressed to this athlete shows here */}
+                {inbox && inbox.length > 0 && (
+                    <Fade delay={160}>
+                        <Panel>
+                            <Header
+                                title="FROM YOUR COACH"
+                                right={<HdrMeta color={C.warn}>{fmtInt(inbox.length)} MSG</HdrMeta>}
+                            />
+                            {inbox.slice(0, 3).map((b, i) => (
+                                <View key={b.id || i} style={s.coachRow}>
+                                    <Text style={[s.coachIdx, { color: C.warn }]}>
+                                        [{String(i + 1).padStart(2, '0')}]
+                                    </Text>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.coachCue}>
+                                            {String(b.message || b.voice_note_url || 'VOICE NOTE').toUpperCase().slice(0, 140)}
+                                        </Text>
+                                        <Text style={s.coachMeta}>
+                                            FROM {String(b.coach_id || '--').toUpperCase()} · {timeAgo(b.created_at)}
+                                        </Text>
+                                    </View>
+                                </View>
+                            ))}
                         </Panel>
                     </Fade>
                 )}
@@ -264,4 +375,12 @@ const s = StyleSheet.create({
 
     returnBtn:  { margin: 16, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: C.border },
     returnText: { color: C.text, fontFamily: T.MONO, fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
+
+    repBody:    { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 14 },
+    repBig:     { fontSize: 64, fontWeight: '700', fontFamily: T.MONO, letterSpacing: -3, lineHeight: 60 },
+    repRight:   { marginLeft: 14, marginBottom: 4, flex: 1 },
+    repCaption: { fontSize: 10, fontFamily: T.MONO, fontWeight: '700', marginTop: 4, letterSpacing: 1 },
+
+    clapBtn:    { paddingVertical: 12, alignItems: 'center', borderTopWidth: 0 },
+    clapText:   { fontFamily: T.MONO, fontSize: 12, fontWeight: '700', letterSpacing: 2 },
 });

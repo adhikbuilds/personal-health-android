@@ -304,6 +304,20 @@ export const api = {
     getScorecardImageUrl: (sessionId) =>
         `${API_BASE}/session/${sessionId}/scorecard.png`,
 
+    /** Standalone rep count for a session (cheap fallback if scorecard misses it). */
+    getRepCount: (sessionId) =>
+        fetchJSON(`/sessions/${sessionId}/rep-count`),
+
+    // ─── Coach Broadcasts ────────────────────────────────────────────────
+    /** Coach broadcasts addressed to this athlete (across all coaches). */
+    getAthleteInbox: (athleteId, limit = 20) =>
+        fetchJSON(`/coach/inbox/athlete/${athleteId}?limit=${limit}`),
+
+    /** Send a clap reaction. Idempotent — same caller can tap again without
+     *  double-counting. Returns { target_id, count, you_clapped }. */
+    sendClap: (athleteId, targetId) =>
+        fetchJSON(`/athlete/${athleteId}/clap/${targetId}`, { method: 'POST' }),
+
     // ─── Huddle Mode ─────────────────────────────────────────────────────
     /** Create a group training huddle */
     createHuddle: (name, sport, coachId = null) =>

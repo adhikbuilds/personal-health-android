@@ -16,7 +16,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, ScrollView } from 'react-native';
-import { C, T } from '../styles/colors';
+import { C, T, P } from '../styles/colors';
 
 // ─── Formatting helpers ────────────────────────────────────────────────────
 
@@ -77,9 +77,10 @@ export function Panel({ children, style }) {
 }
 
 export function Header({ title, right, accent = C.text }) {
+    const text = P.bracketLabels ? `[${title}]` : title;
     return (
         <View style={s.header}>
-            <Text style={[s.headerTitle, { color: accent }]}>[{title}]</Text>
+            <Text style={[s.headerTitle, { color: accent }]}>{text}</Text>
             {right && <View>{right}</View>}
         </View>
     );
@@ -129,11 +130,35 @@ export function Triad({ items = [] }) {
     );
 }
 
+export function PulseDot({ color = C.good, size = 6 }) {
+    const o = useRef(new Animated.Value(1)).current;
+    useEffect(() => {
+        const loop = Animated.loop(Animated.sequence([
+            Animated.timing(o, { toValue: 0.25, duration: 700, useNativeDriver: true }),
+            Animated.timing(o, { toValue: 1,    duration: 700, useNativeDriver: true }),
+        ]));
+        loop.start();
+        return () => loop.stop();
+    }, []);
+    return (
+        <Animated.View style={{
+            width: size, height: size, borderRadius: size / 2,
+            backgroundColor: color, opacity: o, marginRight: 8,
+        }} />
+    );
+}
+
 export function SysBar({ online, identity, clock }) {
+    const stateColor = online ? C.good : online === false ? C.bad : C.warn;
+    const stateText  = online ? 'CONN' : online === false ? 'OFF ' : 'WAIT';
     return (
         <View style={s.sysBar}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={[s.sysDot, { backgroundColor: online ? C.good : online === false ? C.bad : C.warn }]} />
+                {online ? (
+                    <PulseDot color={stateColor} />
+                ) : (
+                    <View style={[s.sysDot, { backgroundColor: stateColor }]} />
+                )}
                 <Text style={[s.sysText, { color: C.white }]}>ACTIVE</Text>
                 <Text style={[s.sysText, { color: C.text }]}>.BHARAT</Text>
                 {identity && (
@@ -144,9 +169,7 @@ export function SysBar({ online, identity, clock }) {
                 )}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={[s.sysText, { color: online ? C.good : online === false ? C.bad : C.warn }]}>
-                    {online ? 'CONN' : online === false ? 'OFF ' : 'WAIT'}
-                </Text>
+                <Text style={[s.sysText, { color: stateColor }]}>{stateText}</Text>
                 <Text style={s.sysSep}>|</Text>
                 <Text style={[s.sysText, { color: C.textMid }]}>{clock || nowHHMMSS()}</Text>
             </View>
@@ -274,18 +297,18 @@ export function useLiveClock(intervalMs = 1000) {
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#000' },
+    screen: { flex: 1, backgroundColor: P.screenBg },
 
     // Panel
     panel: {
         marginHorizontal: 16, marginTop: 14,
         borderWidth: 1, borderColor: C.border,
-        backgroundColor: '#000',
+        backgroundColor: P.panelBg,
     },
     header: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         paddingHorizontal: 12, paddingVertical: 8,
-        backgroundColor: '#080808',
+        backgroundColor: P.headerBg,
         borderBottomWidth: 1, borderBottomColor: C.border,
     },
     headerTitle: { fontSize: 11, fontWeight: '700', fontFamily: T.MONO, letterSpacing: 1.5 },
@@ -296,7 +319,7 @@ const s = StyleSheet.create({
     fieldRow: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         paddingHorizontal: 12, paddingVertical: 6,
-        borderBottomWidth: 1, borderBottomColor: '#0C0C0C',
+        borderBottomWidth: 1, borderBottomColor: C.border,
     },
     fieldLabel: { fontSize: 10, color: C.textMid, fontFamily: T.MONO, fontWeight: '600', letterSpacing: 0.5, flex: 1 },
     fieldRight: { flexDirection: 'row', alignItems: 'baseline' },
@@ -317,7 +340,7 @@ const s = StyleSheet.create({
     sysBar: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         paddingHorizontal: 12, paddingVertical: 6,
-        backgroundColor: '#000',
+        backgroundColor: P.screenBg,
         borderBottomWidth: 1, borderBottomColor: C.border,
     },
     sysDot: { width: 6, height: 6, borderRadius: 3, marginRight: 8 },
@@ -328,18 +351,18 @@ const s = StyleSheet.create({
     ticker: {
         maxHeight: 32,
         borderBottomWidth: 1, borderBottomColor: C.border,
-        backgroundColor: '#050505',
+        backgroundColor: P.tickerBg,
     },
     tickerCell: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
     tickerLabel: { fontSize: 10, color: C.textMid, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 0.5 },
-    tickerValue: { fontSize: 11, color: '#E8E8E8', fontFamily: T.MONO, fontWeight: '700', marginLeft: 6 },
+    tickerValue: { fontSize: 11, color: C.white, fontFamily: T.MONO, fontWeight: '700', marginLeft: 6 },
     tickerDelta: { fontSize: 9, fontFamily: T.MONO, fontWeight: '700', marginLeft: 4 },
     tickerSep: { fontSize: 10, color: C.muted, fontFamily: T.MONO, marginHorizontal: 12 },
 
     // Distribution
     distRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 4 },
     distLabel: { fontSize: 10, color: C.textMid, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 0.5 },
-    distBarTrack: { flex: 1, height: 8, marginHorizontal: 8, backgroundColor: '#0A0A0A', borderWidth: 1, borderColor: C.border },
+    distBarTrack: { flex: 1, height: 8, marginHorizontal: 8, backgroundColor: P.rowAltBg, borderWidth: 1, borderColor: C.border },
     distBarFill: { height: 6 },
     distValue: { fontSize: 10, fontFamily: T.MONO, fontWeight: '700', width: 96, textAlign: 'right' },
 
@@ -347,20 +370,20 @@ const s = StyleSheet.create({
     tblHead: {
         flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 6,
         borderBottomWidth: 1, borderBottomColor: C.border,
-        backgroundColor: '#060606',
+        backgroundColor: P.tblHeadBg,
     },
     tblCol: { fontSize: 9, color: C.textMid, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 0.8 },
     tblRow: {
         flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 7,
-        borderBottomWidth: 1, borderBottomColor: '#0A0A0A',
+        borderBottomWidth: 1, borderBottomColor: C.border,
     },
-    tblCell: { fontSize: 11, fontFamily: T.MONO, fontWeight: '600', color: '#E8E8E8' },
+    tblCell: { fontSize: 11, fontFamily: T.MONO, fontWeight: '600', color: C.white },
 
     // Command menu
     cmdRow: {
         flexDirection: 'row', alignItems: 'center',
         paddingHorizontal: 12, paddingVertical: 10,
-        borderBottomWidth: 1, borderBottomColor: '#0A0A0A',
+        borderBottomWidth: 1, borderBottomColor: C.border,
     },
     cmdKey: { fontSize: 10, fontFamily: T.MONO, fontWeight: '700', marginRight: 10, letterSpacing: 0.5 },
     cmdLabel: { fontSize: 12, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 1, width: 110 },
