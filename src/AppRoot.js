@@ -11,7 +11,7 @@ import React, { useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { UserProvider } from './context/UserContext';
@@ -40,13 +40,19 @@ const AuthStack = createNativeStackNavigator();
 
 const TAB_LABELS = { Home: 'HOME', Train: 'TRAIN', Progress: 'PROGRESS', Profile: 'YOU' };
 
-function ToastOverlay({ message }) {
+function ToastOverlay({ message, onDismiss }) {
     const insets = useSafeAreaInsets();
     if (!message) return null;
     return (
-        <View style={[styles.toast, { bottom: 80 + insets.bottom }]} pointerEvents="none">
-            <Text style={styles.toastText}>{message}</Text>
-        </View>
+        <Pressable
+            onPress={onDismiss}
+            style={[styles.toast, { bottom: 80 + insets.bottom }]}
+            accessibilityRole="alert"
+            accessibilityLabel={message}
+        >
+            <Text style={styles.toastText} numberOfLines={2}>{message}</Text>
+            <Text style={styles.toastClose}>✕</Text>
+        </Pressable>
     );
 }
 
@@ -151,7 +157,7 @@ export default function AppRoot() {
                     <NavigationContainer>
                         <AuthGate showToast={showToast} />
                     </NavigationContainer>
-                    <ToastOverlay message={toastMsg} />
+                    <ToastOverlay message={toastMsg} onDismiss={() => setToastMsg('')} />
                 </AuthProvider>
             </ErrorBoundary>
         </SafeAreaProvider>
@@ -177,10 +183,12 @@ const styles = StyleSheet.create({
         position: 'absolute', left: 16, right: 16,
         backgroundColor: P.toastBg,
         borderWidth: 1, borderColor: P.toastBrd,
-        padding: 12, alignItems: 'center',
+        padding: 12, paddingRight: 36,
+        flexDirection: 'row', alignItems: 'center',
         elevation: 99,
     },
-    toastText: { color: P.toastFg, fontWeight: '700', fontSize: 11, letterSpacing: 1.5, fontFamily: T.MONO },
+    toastText:  { color: P.toastFg, fontWeight: '700', fontSize: 11, letterSpacing: 1.5, fontFamily: T.MONO, flex: 1 },
+    toastClose: { color: P.toastFg, fontSize: 14, fontWeight: '700', position: 'absolute', right: 14, top: 10 },
 
     splash:     { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: P.screenBg },
     splashText: { color: C.text, fontFamily: T.MONO, fontSize: 11, letterSpacing: 2, fontWeight: '700', marginTop: 16 },

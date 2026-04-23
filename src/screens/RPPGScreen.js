@@ -219,6 +219,19 @@ export default function RPPGScreen({ navigation, route }) {
                 <Text style={s.title}>HEART RATE MONITOR</Text>
             </View>
 
+            {/* Onboarding banner — shown only when scanning AND no finger
+                detected. Tells the user exactly what to do without reading
+                the instructions panel below. */}
+            {scanning && !fingerOn && (
+                <View style={s.fingerCue}>
+                    <Text style={s.fingerCueIcon}>👆</Text>
+                    <View style={{ flex: 1 }}>
+                        <Text style={s.fingerCueTitle}>PLACE FINGER ON BACK CAMERA</Text>
+                        <Text style={s.fingerCueBody}>Cover both lens + flash. Hold still. Torch is on.</Text>
+                    </View>
+                </View>
+            )}
+
             {/* Primary BPM readout */}
             <Panel>
                 <Header
@@ -290,6 +303,15 @@ const s = StyleSheet.create({
     bpmRight:  { marginLeft: 16, marginBottom: 8, flex: 1 },
     bpmUnit:   { fontSize: 14, color: C.muted, fontFamily: T.MONO, fontWeight: '600' },
     bpmQuality:{ fontSize: 11, fontFamily: T.MONO, fontWeight: '700', marginTop: 4, letterSpacing: 1 },
+
+    fingerCue:      {
+        flexDirection: 'row', alignItems: 'center',
+        marginHorizontal: 16, marginTop: 12, padding: 14,
+        borderWidth: 1, borderColor: C.warn, backgroundColor: C.bg2,
+    },
+    fingerCueIcon:  { fontSize: 28, marginRight: 12 },
+    fingerCueTitle: { color: C.warn, fontFamily: T.MONO, fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+    fingerCueBody:  { color: C.textSub, fontFamily: T.MONO, fontSize: 10, marginTop: 4, letterSpacing: 0.5 },
 
     btn:          { margin: 16, marginTop: 20, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: C.text },
     btnText:      { fontFamily: T.MONO, fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
