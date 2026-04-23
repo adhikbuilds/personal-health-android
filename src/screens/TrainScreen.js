@@ -8,6 +8,7 @@ import { Camera, CameraView } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
+import { classifyForm, isReady as classifierReady } from '../services/poseClassifier';
 import { Tap, Fade } from '../ui';
 import { SPORTS as SPORTS_MAP, SPORT_RANGES, repTransition } from '../config/sports';
 import { C, T } from '../styles/colors';
@@ -268,7 +269,26 @@ export default function TrainScreen({ showToast, navigation, route }) {
                     }
                 }
             } catch (e) {
-                // If we can't reach the server, show error state
+                // Backend unreachable — try on-device classifier on the
+                // last known joint angles so the HUD keeps moving even when
+                // we're offline. The model expects 18 features; if angles
+                // are missing we just show stale data instead of zeros.
+                const angles = lastGoodMetricsRef.current;
+                if (angles && classifierReady()) {
+                    const offline = await classifyForm(angles, sport);
+                    if (offline) {
+                        setMetrics({ ...angles, ...offline });
+                        setAnalysisMode('real');
+                        analysisModeRef.current = 'real';
+                        setScoreHistory(h => {
+                            const next = [...h, offline.form_score];
+                            if (next.length > 30) next.shift();
+                            setAvgScore(Math.round(next.reduce((a, b) => a + b, 0) / next.length));
+                            return next;
+                        });
+                        return;
+                    }
+                }
                 if (analysisModeRef.current !== 'real') {
                     setAnalysisMode('error');
                     analysisModeRef.current = 'error';
