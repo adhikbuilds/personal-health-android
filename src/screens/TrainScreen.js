@@ -3,7 +3,7 @@
 // CameraView from expo-camera/next does NOT have takePictureAsync — that's why
 // real AI analysis was always falling back to simulation mode.
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, ScrollView, Pressable, Animated , Platform } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, ScrollView, Pressable, Animated, Platform, Alert } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
@@ -67,14 +67,17 @@ export default function TrainScreen({ showToast, navigation, route }) {
     const [avgScore, setAvgScore] = useState(0);
     const [showSummary, setShowSummary] = useState(false);
     const [summary, setSummary] = useState(null);
-    const [analysisMode, setAnalysisMode] = useState('sim'); // 'real' | 'sim' | 'no_pose'
+    // 'idle' | 'waiting' | 'real' | 'no_pose' | 'error'
+    // 'sim' was removed deliberately — we never show simulated data labelled
+    // as real. Until backend returns a pose, the HUD reads "ANALYSING".
+    const [analysisMode, setAnalysisMode] = useState('idle');
     const intervalRef = useRef(null);
     const simIntervalRef = useRef(null);
     const sessionRef = useRef(null);
     const cameraRef = useRef(null);       // CameraView ref for takePictureAsync
     const isCapturingRef = useRef(false); // prevents overlapping captures
     const lastPhaseRef = useRef(null);
-    const analysisModeRef = useRef('sim');
+    const analysisModeRef = useRef('idle');
     const lastGoodMetricsRef = useRef(null); // kept across connection drops
     const wsStreamRef = useRef(null);     // Phase 2: WebSocket frame stream (opens on session start)
     const [repCount, setRepCount] = useState(0);
@@ -110,6 +113,23 @@ export default function TrainScreen({ showToast, navigation, route }) {
         if (route?.params?.sport) setSport(route.params.sport);
     }, [route?.params?.sport]);
 
+    // Auto-start the session when arriving from GhostSkeleton calibration so
+    // the user lands directly in the live HUD, not back at the sport picker.
+    // Only fires once per nav even if the screen re-renders.
+    const autoStartedRef = useRef(false);
+    useEffect(() => {
+        if (
+            route?.params?.autoStart &&
+            !autoStartedRef.current &&
+            !isActive &&
+            permission?.granted
+        ) {
+            autoStartedRef.current = true;
+            startSession();
+        }
+        if (!route?.params?.autoStart) autoStartedRef.current = false;
+    }, [route?.params?.autoStart, isActive, permission?.granted]);
+
     // Separate ref for the result polling interval
     const resultIntervalRef = useRef(null);
 
@@ -128,8 +148,22 @@ export default function TrainScreen({ showToast, navigation, route }) {
         if (simIntervalRef.current) clearInterval(simIntervalRef.current);
         if (resultIntervalRef.current) clearInterval(resultIntervalRef.current);
 
-        const sData = await api.startSession(userData?.avatarId || 'athlete_01', sport);
+        const aid = userData?.avatarId;
+        if (!aid) {
+            Alert.alert('Not signed in', 'Sign in again to start a session.');
+            return;
+        }
+        const sData = await api.startSession(aid, sport);
         const sid = sData?.session_id || null;
+        if (!sid) {
+            // Backend down or returned malformed payload — abort cleanly so
+            // the capture loop doesn't run with a null session ref.
+            Alert.alert(
+                'Could not start session',
+                'The backend did not respond. Check your connection and try again.',
+            );
+            return;
+        }
         setSessionId(sid);
         sessionRef.current = sid;
         setIsActive(true);

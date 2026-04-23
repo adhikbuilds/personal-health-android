@@ -1,17 +1,20 @@
 // ActiveBharat — Data Constants (Minimal)
 // Only what the app actually uses. No dead exports.
 
+// Initial state used until AuthContext + backend populate the real values.
+// Every numeric field is 0 so a fresh user sees their actual zero-state
+// instead of a fake "Viraj Sharma · L4 · 12-day streak" demo profile.
 export const INITIAL_USER_DATA = {
-  name: 'Viraj Sharma',
-  tier: 'District',
-  level: 4,
-  xp: 3450,
-  xpRequired: 5000,
-  streak: 12,
-  scoutReadiness: 68,
-  bpi: 12450,
-  sessions: 8,
-  avatarId: 'athlete_01',
+  name: '',
+  tier: 'Block',
+  level: 1,
+  xp: 0,
+  xpRequired: 1000,
+  streak: 0,
+  scoutReadiness: 0,
+  bpi: 0,
+  sessions: 0,
+  avatarId: '',
   sport: 'vertical_jump',
 };
 
@@ -68,12 +71,16 @@ export function computeFitnessScore(bmi, sitReach_cm, run600_seconds) {
 
 // ─── Daily Tracker ──────────────────────────────────────────────────────────
 
+// Daily-tracker shape with empty defaults. AsyncStorage hydrates current
+// values per-day; the goal column is the user's target. Showing real zeros
+// for a fresh user is honest — fake "5845 steps already today" was the
+// single biggest "this app is fake" tell.
 export const DAILY_TRACKER_DEFAULTS = {
-  steps:          { current: 5845,  goal: 12000, unit: 'steps',    icon: '👟', label: 'Steps' },
-  activeMin:      { current: 198,   goal: 60,    unit: 'min',      icon: '⏱️', label: 'Active Min' },
-  distanceKm:     { current: 3.25,  goal: 5,     unit: 'km',       icon: '📍', label: 'Distance' },
-  caloriesBurned: { current: 1412,  goal: 500,   unit: 'kcal',     icon: '🔥', label: 'Calories' },
-  calorieIntake:  { current: 1045,  goal: 2100,  unit: 'kcal',     icon: '🥗', label: 'Cal Intake' },
-  water:          { current: 5,     goal: 12,    unit: 'glasses',  icon: '💧', label: 'Water' },
-  sleep:          { current: 0,     goal: 8,     unit: 'hr',       icon: '😴', label: 'Sleep' },
+  steps:          { current: 0, goal: 8000, unit: 'steps',   icon: '👟', label: 'Steps' },
+  activeMin:      { current: 0, goal: 30,   unit: 'min',     icon: '⏱️', label: 'Active Min' },
+  distanceKm:     { current: 0, goal: 5,    unit: 'km',      icon: '📍', label: 'Distance' },
+  caloriesBurned: { current: 0, goal: 400,  unit: 'kcal',    icon: '🔥', label: 'Calories' },
+  calorieIntake:  { current: 0, goal: 2000, unit: 'kcal',    icon: '🥗', label: 'Cal Intake' },
+  water:          { current: 0, goal: 8,    unit: 'glasses', icon: '💧', label: 'Water' },
+  sleep:          { current: 0, goal: 8,    unit: 'hr',      icon: '😴', label: 'Sleep' },
 };
