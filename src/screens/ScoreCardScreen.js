@@ -122,6 +122,27 @@ export default function ScoreCardScreen({ navigation, route }) {
         }
     };
 
+    // Guard: if we landed on this screen with no sessionId at all (e.g., a
+    // direct-link case), give an explicit message + return path instead of
+    // "REPORT NOT AVAILABLE" which reads like the data was deleted.
+    if (!sessionId) {
+        return (
+            <TerminalScreen style={{ paddingTop: ins.top }}>
+                <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
+                <SysBar online={null} identity="SCORECARD" clock={clock} />
+                <View style={s.center}>
+                    <Text style={[s.loadingText, { color: C.warn }]}>NO SESSION SELECTED</Text>
+                    <Text style={[s.loadingText, { color: C.muted, fontSize: 10, marginTop: 6 }]}>
+                        OPEN A SESSION FROM PROFILE → SESSION LOG
+                    </Text>
+                    <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.backBtn, pressed && { backgroundColor: '#111' }]}>
+                        <Text style={s.backText}>[ESC] RETURN</Text>
+                    </Pressable>
+                </View>
+            </TerminalScreen>
+        );
+    }
+
     if (loading) {
         return (
             <TerminalScreen style={{ paddingTop: ins.top }}>

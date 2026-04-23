@@ -339,8 +339,12 @@ export default function GhostSkeletonScreen({ navigation, route }) {
 
     const handleStart = useCallback(() => {
         clearInterval(intervalRef.current);
-        // Navigate to Camera tab via root Stack → Tabs navigator
-        navigation?.navigate('Tabs', { screen: 'Train', params: { sport } });
+        // Hand off to the Train tab with autoStart so we don't dump the
+        // user back to the sport picker after they just calibrated.
+        navigation?.navigate('Tabs', {
+            screen: 'Train',
+            params: { sport, autoStart: true },
+        });
     }, [sport, navigation]);
 
     // ── Permission states ────────────────────────────────────────────────────

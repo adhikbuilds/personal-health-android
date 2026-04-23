@@ -41,7 +41,8 @@ export default function HomeScreen({ navigation }) {
     const load = () => {
         AsyncStorage.getItem(TK).then(r => { if (r) try { setTracker(JSON.parse(r)); } catch (_) {} });
         api.ping().then(ok => setOnline(!!ok));
-        const aid = userData.avatarId || 'athlete_01';
+        const aid = userData.avatarId;
+        if (!aid) return;  // not yet authed / athlete provisioned — backend calls would 404
         api.getAdvancedMetrics(aid, 60).then(m => { if (m) setMetrics(m); });
         api.getAthleteInbox(aid, 5).then(r => { if (r?.broadcasts) setInbox(r.broadcasts); }).catch(() => {});
     };
@@ -96,12 +97,41 @@ export default function HomeScreen({ navigation }) {
                         <BlinkCursor />
                     </View>
                     <Text style={s.ident}>
-                        L{userData.level || 1} · {(userData.tier || 'District').toUpperCase()} · {sportName.toUpperCase()}
+                        L{userData.level || 1} · {(userData.tier || 'Block').toUpperCase()} · {sportName.toUpperCase()}
                     </Text>
                     <Text style={s.code}>
                         SID: {userTag}.{sportTag}.{(userData.bpi || 0).toString(16).toUpperCase().padStart(4, '0')}
                     </Text>
                 </Fade>
+
+                {/* New-user welcome — visible until they have a fitness test
+                    AND at least one session. Once data flows in, this block
+                    is replaced by the real metrics below. */}
+                {(!fitnessScore?.score && (userData.sessions || 0) === 0) && (
+                    <Fade delay={20}>
+                        <Panel>
+                            <Header title="WELCOME · NEW BIO-PASSPORT" right={<HdrMeta color={C.good}>SETUP</HdrMeta>} />
+                            <FieldRow
+                                label="STEP 1........ FITNESS BASELINE"
+                                value="OPEN [F5]"
+                                color={C.info}
+                                onPress={() => navigation.navigate('FitnessTest')}
+                            />
+                            <FieldRow
+                                label="STEP 2........ FIRST TRAINING SESSION"
+                                value="OPEN [F1]"
+                                color={C.text}
+                                onPress={() => navigation.navigate('GhostSkeleton', { sport: userData.sport || 'general' })}
+                            />
+                            <FieldRow
+                                label="STEP 3........ HEART RATE BASELINE"
+                                value="OPEN [F2]"
+                                color={C.bad}
+                                onPress={() => navigation.navigate('HeartRate', { sessionId: 'rppg_' + Date.now() })}
+                            />
+                        </Panel>
+                    </Fade>
+                )}
 
                 {/* Coach broadcast — surfaces as soon as athlete opens Home */}
                 {inbox && inbox.length > 0 && (
@@ -287,7 +317,7 @@ export default function HomeScreen({ navigation }) {
 
                 <Footer lines={[
                     { text: `END OF REPORT · ${nowISO()}` },
-                    { text: `BUILD.2.1.0 · ENGINE.MEDIAPIPE · MODEL.V${(metrics?.aggregate?.total_sessions ?? 0) > 0 ? '1' : '0'}` },
+                    { text: `BUILD.2.4.0 · ENGINE.MEDIAPIPE · MODEL.V${(metrics?.aggregate?.total_sessions ?? 0) > 0 ? '1' : '0'}` },
                     { text: `SESSION P/L  ${signPct(trendPct)} · MOMENTUM ${signVal(momentum, 2)}`, color: trendColor(trendPct) },
                 ]} />
 

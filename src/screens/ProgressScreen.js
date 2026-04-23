@@ -38,8 +38,8 @@ function scoreColor(v) {
 export default function ProgressScreen() {
     const ins = useSafeAreaInsets();
     const { userData } = useUser();
-    const athleteId = userData?.avatarId || 'athlete_01';
-    const userTag = (userData?.avatarId || 'ath').toUpperCase();
+    const athleteId = userData?.avatarId;
+    const userTag = (userData?.avatarId || 'ATH').toUpperCase();
     const sportTag = (userData?.sport || 'general').toUpperCase().replace('_', '-');
     const clock = useLiveClock();
 
@@ -55,6 +55,7 @@ export default function ProgressScreen() {
     const [advanced, setAdvanced] = useState(null);
 
     const load = useCallback(async () => {
+        if (!athleteId) { setLoading(false); return; }  // pre-auth state
         setLoading(true);
         try {
             const [prog, wj, ir, rd, adv, ping] = await Promise.all([
