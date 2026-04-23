@@ -251,3 +251,14 @@ export const THEME_LIST = [BLOOMBERG, CLASSIC];
 export const DEFAULT_THEME = 'bloomberg';
 
 export const THEME_STORAGE_KEY = '@active_theme';
+
+// Feature flag — when true, TrainScreen uses react-native-vision-camera
+// (newer / faster pipeline) instead of expo-camera. Stored in AsyncStorage,
+// toggled from Profile → APPEARANCE. Defaults off so a regression in the
+// VC integration doesn't brick the camera flow.
+export const CAMERA_ENGINE_KEY = '@camera_engine';
+export const CAMERA_ENGINES = {
+    EXPO:   'expo-camera',
+    VISION: 'vision-camera',
+};
+export const DEFAULT_CAMERA_ENGINE = CAMERA_ENGINES.EXPO;
