@@ -109,7 +109,7 @@ export default function ProfileScreen({ navigation }) {
 
     return (
         <TerminalScreen style={{ paddingTop: ins.top }}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+            <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
 
             <SysBar online={online} identity={`${userTag}.${sportTag}.PROF`} clock={clock} />
             <Ticker items={tickerItems} />
@@ -117,7 +117,7 @@ export default function ProfileScreen({ navigation }) {
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 40 }}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text} colors={[C.text]} progressBackgroundColor="#000" />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text} colors={[C.text]} progressBackgroundColor={C.bg} />}
             >
 
                 {/* Identity */}

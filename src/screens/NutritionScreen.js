@@ -92,7 +92,7 @@ export default function NutritionScreen({ navigation }) {
     if (!permission.granted) {
         return (
             <TerminalScreen style={{ paddingTop: ins.top }}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
                 <SysBar online={null} identity={`${userTag}.NUTR-AI`} clock={clock} />
                 <View style={{ padding: 16 }}>
                     <Text style={s.prompt}>{'> nutrition --init'}</Text>
@@ -112,7 +112,7 @@ export default function NutritionScreen({ navigation }) {
     if (screen === 'camera') {
         return (
             <TerminalScreen style={{ paddingTop: ins.top }}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
                 <SysBar online={null} identity={`${userTag}.NUTR-AI`} clock={clock} />
 
                 <View style={{ padding: 16 }}>
@@ -160,7 +160,7 @@ export default function NutritionScreen({ navigation }) {
     if (screen === 'analyzing') {
         return (
             <TerminalScreen style={{ paddingTop: ins.top }}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
                 <SysBar online={true} identity={`${userTag}.NUTR-AI`} clock={clock} />
                 <View style={{ padding: 16 }}>
                     <Text style={s.prompt}>{'> nutrition --analyse'}</Text>
@@ -189,7 +189,7 @@ export default function NutritionScreen({ navigation }) {
 
     return (
         <TerminalScreen style={{ paddingTop: ins.top }}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+            <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
             <SysBar online={true} identity={`${userTag}.NUTR-AI`} clock={clock} />
 
             <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
