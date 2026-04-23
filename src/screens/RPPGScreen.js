@@ -158,7 +158,7 @@ export default function RPPGScreen({ navigation, route }) {
     if (!perm.granted) {
         return (
             <TerminalScreen style={{ paddingTop: ins.top }}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
                 <SysBar online={null} identity="RPPG.DEVICE" clock={clock} />
                 <View style={{ padding: 16 }}>
                     <Text style={s.prompt}>{'> rppg --init'}</Text>
@@ -186,7 +186,7 @@ export default function RPPGScreen({ navigation, route }) {
 
     return (
         <TerminalScreen style={{ paddingTop: ins.top }}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+            <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
 
             <SysBar
                 online={scanning ? true : null}

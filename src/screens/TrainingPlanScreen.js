@@ -100,7 +100,7 @@ export default function TrainingPlanScreen({ navigation }) {
     if (loading && !plan) {
         return (
             <TerminalScreen style={{ paddingTop: ins.top }}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
                 <SysBar online={null} identity={`${userTag}.${sportTag}.PLAN`} clock={clock} />
                 <View style={s.center}>
                     <ActivityIndicator size="small" color={C.text} />
@@ -113,7 +113,7 @@ export default function TrainingPlanScreen({ navigation }) {
     if (!plan) {
         return (
             <TerminalScreen style={{ paddingTop: ins.top }}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
                 <SysBar online={null} identity={`${userTag}.${sportTag}.PLAN`} clock={clock} />
                 <View style={s.center}>
                     <Text style={[s.loadingText, { color: C.bad }]}>PLAN UNAVAILABLE</Text>
@@ -131,14 +131,14 @@ export default function TrainingPlanScreen({ navigation }) {
 
     return (
         <TerminalScreen style={{ paddingTop: ins.top }}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+            <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
 
             <SysBar online={true} identity={`${userTag}.${sportTag}.PLAN`} clock={clock} />
 
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 40 }}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text} colors={[C.text]} progressBackgroundColor="#000" />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text} colors={[C.text]} progressBackgroundColor={C.bg} />}
             >
 
                 {/* Identity / header */}

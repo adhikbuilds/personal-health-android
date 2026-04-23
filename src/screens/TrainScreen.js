@@ -144,7 +144,9 @@ export default function TrainScreen({ showToast, navigation, route }) {
                     const photo = await cameraRef.current.takePictureAsync({
                         base64: true,
                         quality: 0.4,
-                        skipProcessing: false,
+                        skipProcessing: true,
+                        shutterSound: false,
+                        exif: false,
                     });
                     isCapturingRef.current = false;
                     if (photo?.base64) {
@@ -249,8 +251,15 @@ export default function TrainScreen({ showToast, navigation, route }) {
             addXp(summary.xpEarned, summary); // updates UserContext
             showToast(`+${summary.xpEarned} XP added to Bio-Passport!`);
         }
+        const sid = sessionRef.current;
         setShowSummary(false);
         setSummary(null);
+        // Jump straight to the just-completed session's full ScoreCard so the
+        // user sees rep count, claps, and any coach broadcasts without having
+        // to dig through Profile → Session Log.
+        if (sid && navigation) {
+            navigation.navigate('ScoreCard', { sessionId: sid });
+        }
     };
 
     // ── Permissions ─────────────────────────────────────────────────────────────
@@ -400,7 +409,14 @@ export default function TrainScreen({ showToast, navigation, route }) {
 
     return (
         <View style={s.cameraWrap}>
-            <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={'back'} />
+            <CameraView
+                ref={cameraRef}
+                style={StyleSheet.absoluteFill}
+                facing={'back'}
+                mute
+                animateShutter={false}
+                enableTorch={false}
+            />
 
             {/* Top bar */}
             <View style={[s.camTopBar, { top: ins.top + 12 }]}>

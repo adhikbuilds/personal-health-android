@@ -87,7 +87,7 @@ export default function ProgressScreen() {
     if (loading && !progress) {
         return (
             <TerminalScreen style={{ paddingTop: ins.top }}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
                 <SysBar online={online} identity={`${userTag}.${sportTag}`} clock={clock} />
                 <View style={s.center}>
                     <ActivityIndicator size="small" color={C.text} />
@@ -108,7 +108,7 @@ export default function ProgressScreen() {
 
     return (
         <TerminalScreen style={{ paddingTop: ins.top }}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+            <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
 
             <SysBar online={online} identity={`${userTag}.${sportTag}.PROG`} clock={clock} />
             <Ticker items={tickerItems} />
@@ -116,7 +116,7 @@ export default function ProgressScreen() {
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 40 }}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text} colors={[C.text]} progressBackgroundColor="#000" />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text} colors={[C.text]} progressBackgroundColor={C.bg} />}
             >
 
                 {/* Identity / range selector */}

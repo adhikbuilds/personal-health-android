@@ -116,7 +116,7 @@ export default function ScoreCardScreen({ navigation, route }) {
     if (loading) {
         return (
             <TerminalScreen style={{ paddingTop: ins.top }}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
                 <SysBar online={null} identity="SCORECARD" clock={clock} />
                 <View style={s.center}>
                     <ActivityIndicator size="small" color={C.text} />
@@ -129,7 +129,7 @@ export default function ScoreCardScreen({ navigation, route }) {
     if (!card) {
         return (
             <TerminalScreen style={{ paddingTop: ins.top }}>
-                <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+                <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
                 <SysBar online={null} identity="SCORECARD" clock={clock} />
                 <View style={s.center}>
                     <Text style={[s.loadingText, { color: C.bad }]}>REPORT NOT AVAILABLE</Text>
@@ -160,7 +160,7 @@ export default function ScoreCardScreen({ navigation, route }) {
 
     return (
         <TerminalScreen style={{ paddingTop: ins.top }}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" translucent />
+            <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
 
             <SysBar
                 online={true}
