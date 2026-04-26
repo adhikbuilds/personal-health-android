@@ -34,20 +34,54 @@ export default function HomeScreen({ navigation }) {
     const [tracker, setTracker] = useState(DAILY_TRACKER_DEFAULTS);
     const [metrics, setMetrics] = useState(null);
     const [inbox, setInbox] = useState([]);
+    const [weeklySummary, setWeeklySummary] = useState(null);
     const clock = useLiveClock();
 
     const TK = `@dt_${new Date().toISOString().slice(0, 10)}`;
+
+    const _backendToTracker = (raw) => {
+        const t = raw?.tracker || raw || {};
+        const d = DAILY_TRACKER_DEFAULTS;
+        return {
+            steps:          { ...d.steps,          current: t.steps ?? 0 },
+            activeMin:      { ...d.activeMin,      current: t.active_minutes ?? 0 },
+            distanceKm:     { ...d.distanceKm,     current: t.distance_km ?? 0 },
+            caloriesBurned: { ...d.caloriesBurned, current: t.calories_burned ?? 0 },
+            calorieIntake:  { ...d.calorieIntake,   current: t.calorie_intake ?? 0 },
+            water:          { ...d.water,           current: t.water_glasses ?? 0 },
+            sleep:          { ...d.sleep,           current: t.sleep_hours ?? 0 },
+        };
+    };
+
+    const _trackerToBackend = (tr) => ({
+        steps: tr.steps?.current ?? 0,
+        active_minutes: tr.activeMin?.current ?? 0,
+        distance_km: tr.distanceKm?.current ?? 0,
+        calories_burned: tr.caloriesBurned?.current ?? 0,
+        calorie_intake: tr.calorieIntake?.current ?? 0,
+        water_glasses: tr.water?.current ?? 0,
+        sleep_hours: tr.sleep?.current ?? 0,
+        date: new Date().toISOString().slice(0, 10),
+    });
 
     const load = () => {
         AsyncStorage.getItem(TK).then(r => { if (r) try { setTracker(JSON.parse(r)); } catch (_) {} });
         api.ping().then(ok => setOnline(!!ok));
         const aid = userData.avatarId;
-        if (!aid) return;  // not yet authed / athlete provisioned — backend calls would 404
+        if (!aid) return;
+        api.getDailyTracker(aid).then(r => {
+            if (r?.tracker && Object.keys(r.tracker).length > 0) setTracker(_backendToTracker(r));
+        }).catch(() => {});
         api.getAdvancedMetrics(aid, 60).then(m => { if (m) setMetrics(m); });
+        api.getWeeklySummary(aid, 7).then(r => { if (r?.athlete_id) setWeeklySummary(r); }).catch(() => {});
         api.getAthleteInbox(aid, 5).then(r => { if (r?.broadcasts) setInbox(r.broadcasts); }).catch(() => {});
     };
     useEffect(load, []);
-    useEffect(() => { AsyncStorage.setItem(TK, JSON.stringify(tracker)).catch(() => {}); }, [tracker]);
+    useEffect(() => {
+        AsyncStorage.setItem(TK, JSON.stringify(tracker)).catch(() => {});
+        const aid = userData.avatarId;
+        if (aid) api.updateDailyTracker(aid, _trackerToBackend(tracker)).catch(() => {});
+    }, [tracker]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -298,6 +332,29 @@ export default function HomeScreen({ navigation }) {
                         />
                     </Panel>
                 </Fade>
+
+                {/* Weekly summary */}
+                {weeklySummary && (
+                    <Fade delay={240}>
+                        <Panel>
+                            <Header title="WEEKLY RECAP" right={<HdrMeta>{weeklySummary.window_days || 7}D</HdrMeta>} />
+                            <FieldRow label="SESSIONS......" value={fmtInt(weeklySummary.session_count || 0)} color={C.text} />
+                            <FieldRow label="AVG FORM......" value={fmt(weeklySummary.avg_form_score || 0, 1)} color={trendColor(weeklySummary.form_trend_pct)} />
+                            <FieldRow label="FORM TREND...." value={signPct(weeklySummary.form_trend_pct)} color={trendColor(weeklySummary.form_trend_pct)} />
+                            <FieldRow label="STREAK........" value={`${fmtInt(weeklySummary.streak_days || 0)}D`} color={weeklySummary.streak_days >= 3 ? C.good : C.muted} />
+                            <FieldRow label="INJURY RISK..." value={(weeklySummary.injury_risk?.risk || '--').toUpperCase()} color={
+                                weeklySummary.injury_risk?.risk === 'low' ? C.good : weeklySummary.injury_risk?.risk === 'high' ? C.bad : C.warn
+                            } />
+                            {weeklySummary.coaching_note?.bullets?.[0] && (
+                                <View style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
+                                    <Text style={{ fontFamily: T.MONO, fontSize: 10, color: C.textSub, lineHeight: 15 }}>
+                                        {weeklySummary.coaching_note.bullets[0].toUpperCase()}
+                                    </Text>
+                                </View>
+                            )}
+                        </Panel>
+                    </Fade>
+                )}
 
                 {/* Command menu */}
                 <Fade delay={260}>

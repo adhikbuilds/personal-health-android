@@ -2,10 +2,10 @@
 // Capture meal photo → POST to vision backend → render macros as terminal
 // distribution bars.
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, Animated,
-    StatusBar, Pressable, ActivityIndicator,
+    StatusBar, Pressable, ActivityIndicator, TextInput,
 } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -65,6 +65,21 @@ export default function NutritionScreen({ navigation }) {
     const [screen, setScreen] = useState('camera'); // camera | analyzing | result
     const [result, setResult] = useState(null);
     const [err, setErr] = useState('');
+    const [foodQuery, setFoodQuery] = useState('');
+    const [foodResults, setFoodResults] = useState([]);
+    const [foodSearching, setFoodSearching] = useState(false);
+
+    useEffect(() => {
+        if (!foodQuery.trim() || foodQuery.length < 2) { setFoodResults([]); return; }
+        const id = setTimeout(() => {
+            setFoodSearching(true);
+            api.searchFoods(foodQuery, 10)
+                .then(r => setFoodResults(r?.foods || []))
+                .catch(() => setFoodResults([]))
+                .finally(() => setFoodSearching(false));
+        }, 400);
+        return () => clearTimeout(id);
+    }, [foodQuery]);
 
     const capture = useCallback(async () => {
         if (!cameraRef.current) return;
@@ -271,6 +286,33 @@ export default function NutritionScreen({ navigation }) {
                     </Panel>
                 )}
 
+                {/* Food catalog search */}
+                <Panel>
+                    <Header title="FOOD CATALOG" right={<HdrMeta>SEARCH DB</HdrMeta>} />
+                    <View style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
+                        <TextInput
+                            style={s.searchInput}
+                            value={foodQuery}
+                            onChangeText={setFoodQuery}
+                            placeholder="SEARCH FOODS..."
+                            placeholderTextColor={C.muted}
+                        />
+                    </View>
+                    {foodSearching && <FieldRow label="SEARCHING" value="[...]" color={C.textMid} />}
+                    {foodResults.slice(0, 8).map((f, i) => (
+                        <FieldRow
+                            key={f.food_id || i}
+                            label={`${String(i + 1).padStart(2, '0')}.. ${(f.name || '').toUpperCase().slice(0, 20)}`}
+                            value={`${f.calories || '—'} KCAL`}
+                            color={C.text}
+                            size="sm"
+                        />
+                    ))}
+                    {foodQuery.length >= 2 && !foodSearching && foodResults.length === 0 && (
+                        <FieldRow label="NO RESULTS" value="—" color={C.muted} />
+                    )}
+                </Panel>
+
                 <Pressable onPress={() => { setResult(null); setScreen('camera'); }} style={({ pressed }) => [s.btn, pressed && { backgroundColor: '#111' }]}>
                     <Text style={s.btnText}>[N] NEW CAPTURE  ▸</Text>
                 </Pressable>
@@ -312,6 +354,7 @@ const s = StyleSheet.create({
     scoreMax:    { fontSize: 13, color: C.muted, fontFamily: T.MONO, fontWeight: '600' },
     scoreCaption:{ fontSize: 10, fontFamily: T.MONO, fontWeight: '700', marginTop: 4, letterSpacing: 1 },
 
+    searchInput:  { fontFamily: T.MONO, fontSize: 12, color: C.text, borderBottomWidth: 1, borderColor: C.border, paddingVertical: 6, letterSpacing: 1 },
     btn:          { margin: 16, marginTop: 20, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: C.text },
     btnText:      { color: C.text, fontFamily: T.MONO, fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
     btnSecondary: { marginHorizontal: 16, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: C.border },
