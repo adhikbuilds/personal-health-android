@@ -53,17 +53,19 @@ export default function ProgressScreen() {
     const [injuryRisk, setInjuryRisk] = useState(null);
     const [readiness, setReadiness] = useState(null);
     const [advanced, setAdvanced] = useState(null);
+    const [loadRec, setLoadRec] = useState(null);
 
     const load = useCallback(async () => {
-        if (!athleteId) { setLoading(false); return; }  // pre-auth state
+        if (!athleteId) { setLoading(false); return; }
         setLoading(true);
         try {
-            const [prog, wj, ir, rd, adv, ping] = await Promise.all([
+            const [prog, wj, ir, rd, adv, lr, ping] = await Promise.all([
                 api.getProgress(athleteId, days),
                 api.getWeakJoints(athleteId, days),
                 api.getInjuryRisk(athleteId, Math.min(days, 14)),
                 api.getReadiness(athleteId, Math.min(days, 14)),
                 api.getAdvancedMetrics(athleteId, days),
+                api.getLoadRecommendation(athleteId),
                 api.ping(),
             ]);
             setProgress(prog);
@@ -71,6 +73,7 @@ export default function ProgressScreen() {
             setInjuryRisk(ir);
             setReadiness(rd);
             setAdvanced(adv);
+            setLoadRec(lr);
             setOnline(!!ping);
         } finally {
             setLoading(false);
@@ -358,6 +361,35 @@ export default function ProgressScreen() {
                                     color={bandColor(advanced.fatigue.band)} size={180} label="FATIGUE"
                                 />
                             </View>
+                        </Panel>
+                    </Fade>
+                )}
+
+                {loadRec && (
+                    <Fade delay={400}>
+                        <Panel>
+                            <Header title="LOAD RECOMMENDATION" right={<HdrMeta color={
+                                loadRec.zone === 'optimal' ? C.good : loadRec.zone === 'overreaching' ? C.bad : C.warn
+                            }>[{(loadRec.zone || '--').toUpperCase()}]</HdrMeta>} />
+                            <FieldRow label="ACWR............" value={fmt(loadRec.acwr, 2)} color={
+                                loadRec.acwr >= 0.8 && loadRec.acwr <= 1.3 ? C.good : C.warn
+                            } />
+                            <FieldRow label="ACUTE (7D)......" value={fmt(loadRec.acute_load_7d, 1)} color={C.text} />
+                            <FieldRow label="CHRONIC (28D)...." value={fmt(loadRec.chronic_load_28d_avg, 1)} color={C.text} />
+                            <FieldRow label="AVG FORM (7D)...." value={fmt(loadRec.avg_form_7d, 1)} color={scoreColor(loadRec.avg_form_7d || 0)} />
+                            <Rule />
+                            <View style={{ padding: 12 }}>
+                                <Text style={{ fontFamily: T.MONO, fontSize: 11, color: C.textSub, lineHeight: 17, letterSpacing: 0.3 }}>
+                                    {(loadRec.recommendation || '').toUpperCase()}
+                                </Text>
+                            </View>
+                            {loadRec.form_guidance ? (
+                                <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
+                                    <Text style={{ fontFamily: T.MONO, fontSize: 10, color: C.muted, lineHeight: 15 }}>
+                                        {loadRec.form_guidance.toUpperCase()}
+                                    </Text>
+                                </View>
+                            ) : null}
                         </Panel>
                     </Fade>
                 )}

@@ -82,6 +82,15 @@ export default function FitnessTestScreen({ navigation }) {
 
     const [step, setStep] = useState('intro');        // intro | input | results
     const [saving, setSaving] = useState(false);
+    const [history, setHistory] = useState([]);
+
+    useEffect(() => {
+        const aid = userData?.avatarId;
+        if (!aid) return;
+        api.getFitnessTestHistory(aid)
+            .then(r => { if (r?.history?.length) setHistory(r.history); })
+            .catch(() => {});
+    }, [userData?.avatarId]);
 
     const [heightCm,  setHeightCm]  = useState('');
     const [weightKg,  setWeightKg]  = useState('');
@@ -184,6 +193,29 @@ export default function FitnessTestScreen({ navigation }) {
                             ))}
                         </Panel>
                     </Fade>
+
+                    {history.length > 0 && (
+                        <Fade delay={140}>
+                            <Panel>
+                                <Header title="HISTORY" right={<HdrMeta>LAST {fmtInt(history.length)}</HdrMeta>} />
+                                {history.slice(0, 5).map((h, i) => {
+                                    const d = h.date || h.tested_at || '';
+                                    const label = d.slice(0, 10) || `TEST ${i + 1}`;
+                                    const sc = h.score ?? h.overall ?? 0;
+                                    const lvl = h.level ?? '';
+                                    return (
+                                        <FieldRow
+                                            key={i}
+                                            label={`${label}...... L${lvl}`}
+                                            value={`${Math.round(sc)} PTS`}
+                                            color={sc >= 80 ? C.good : sc >= 50 ? C.warn : C.bad}
+                                            size="sm"
+                                        />
+                                    );
+                                })}
+                            </Panel>
+                        </Fade>
+                    )}
 
                     <Pressable onPress={() => setStep('input')} style={({ pressed }) => [s.startBtn, pressed && { backgroundColor: '#111' }]}>
                         <Text style={s.startBtnText}>[ENTER] BEGIN ASSESSMENT  ▸</Text>

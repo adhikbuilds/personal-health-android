@@ -414,6 +414,9 @@ export const api = {
             body: JSON.stringify({ athlete_id: athleteId, image_b64: imageBase64 }),
         }),
 
+    searchFoods: (query, limit = 20) =>
+        fetchJSON(`/foods/?q=${encodeURIComponent(query)}&limit=${limit}`),
+
     // ─── Data Export ─────────────────────────────────────────────────────
     /** Get dataset stats (data flywheel monitoring) */
     getExportStats: () =>
