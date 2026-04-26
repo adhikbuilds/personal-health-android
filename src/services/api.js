@@ -164,9 +164,12 @@ export const api = {
     sendFrame: (sessionId, frameData) => {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 5000);
+        const token = getAccessToken();
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers.Authorization = `Bearer ${token}`;
         return fetch(`${API_BASE}/session/${sessionId}/frame`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify(frameData),
             signal: controller.signal,
         })
