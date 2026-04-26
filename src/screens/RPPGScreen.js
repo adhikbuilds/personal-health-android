@@ -1,11 +1,11 @@
 // RPPGScreen — Bloomberg terminal.
-// Heart rate via finger-on-lens PPG. Camera hidden, torch on, frames →
-// backend WS. UI shows terminal-style live telemetry: BPM, HRV, signal
-// quality, frames captured.
+// Heart rate via finger-on-lens PPG. Native CameraX at 30fps (primary) or
+// expo-camera fallback. Frames → backend WS → CHROM rPPG → BPM/HRV.
 
 import React, { useRef, useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, StatusBar, Animated, Pressable, ActivityIndicator,
+    NativeModules, NativeEventEmitter,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +16,17 @@ import {
     Panel, Header, HdrMeta, Rule, FieldRow, Triad, SysBar, TerminalScreen, Footer, useLiveClock,
     fmt, fmtInt, nowISO,
 } from '../components/terminal';
+
+let RPPGStream = null;
+let RPPGEmitter = null;
+try {
+    RPPGStream = NativeModules.RPPGStream;
+    if (RPPGStream) {
+        RPPGEmitter = new NativeEventEmitter(RPPGStream);
+    }
+} catch (e) {
+    console.warn('[RPPGScreen] Native RPPGStream not available:', e?.message);
+}
 
 function bpmColor(b) {
     if (b <= 0) return C.muted;
@@ -58,6 +69,9 @@ export default function RPPGScreen({ navigation, route }) {
     const timerRef = useRef(null);
     const aliveRef = useRef(true);
     const scanRef = useRef(false);
+    const resultSubRef = useRef(null);
+    const errorSubRef = useRef(null);
+    const usingNativeRef = useRef(false);
 
     const [scanning, setScanning] = useState(false);
     const [bpm, setBpm] = useState(0);
@@ -67,8 +81,8 @@ export default function RPPGScreen({ navigation, route }) {
     const [fingerOn, setFingerOn] = useState(false);
     const [err, setErr] = useState('');
     const [startedAt, setStartedAt] = useState(0);
+    const [waveform, setWaveform] = useState([]);
 
-    // Pulse animation on the BPM cell
     const pulse = useRef(new Animated.Value(1)).current;
     useEffect(() => {
         if (bpm <= 0) return;
@@ -88,6 +102,12 @@ export default function RPPGScreen({ navigation, route }) {
 
     function stop() {
         scanRef.current = false;
+        if (resultSubRef.current) { resultSubRef.current.remove(); resultSubRef.current = null; }
+        if (errorSubRef.current) { errorSubRef.current.remove(); errorSubRef.current = null; }
+        if (usingNativeRef.current && RPPGStream) {
+            RPPGStream.stop().catch(() => {});
+            usingNativeRef.current = false;
+        }
         const t = timerRef.current;
         const w = wsRef.current;
         timerRef.current = null;
@@ -95,6 +115,42 @@ export default function RPPGScreen({ navigation, route }) {
         if (t) clearInterval(t);
         if (w) try { w.close(); } catch (_) {}
         setScanning(false);
+    }
+
+    function startFallback() {
+        const w = api.connectRPPGLiveStream(sid,
+            (r) => {
+                if (!aliveRef.current || !scanRef.current) return;
+                if (r.bpm > 0 && r.status !== 'warmup') setBpm(r.bpm);
+                setHrv(r.hrv_ms ?? 0);
+                setQuality(r.signal_quality || '');
+                const sq = (r.signal_quality || '').toLowerCase();
+                setFingerOn(sq !== 'no_pulse' && sq !== 'no_face' && r.status !== 'invalid');
+                if (r.waveform) setWaveform(r.waveform);
+            },
+            () => { setErr('WS CONNECT FAILED'); stop(); },
+            () => { if (scanRef.current) { setErr('WS DROPPED'); stop(); } },
+        );
+        wsRef.current = w;
+
+        const t = setInterval(async () => {
+            if (!scanRef.current || !camRef.current) return;
+            try {
+                const p = await camRef.current.takePictureAsync({
+                    base64: true, quality: 0.3,
+                    shutterSound: false, animateShutter: false, skipProcessing: true,
+                });
+                if (!scanRef.current || !wsRef.current) return;
+                if (wsRef.current.readyState === 1 && p?.base64) {
+                    wsRef.current.send(JSON.stringify({
+                        image_b64: p.base64,
+                        ts: Date.now() / 1000,
+                    }));
+                    if (aliveRef.current) setSamples(c => c + 1);
+                }
+            } catch (_) {}
+        }, 100);
+        timerRef.current = t;
     }
 
     function start() {
@@ -109,39 +165,39 @@ export default function RPPGScreen({ navigation, route }) {
         setFingerOn(false);
         setQuality('warmup');
         setStartedAt(Date.now());
+        setWaveform([]);
 
-        const w = api.connectRPPGLiveStream(sid,
-            (r) => {
+        if (RPPGStream && RPPGEmitter) {
+            const wsUrl = `${api.getWsBase()}/rppg/live-stream/${sid}`;
+
+            resultSubRef.current = RPPGEmitter.addListener('onRPPGResult', (r) => {
                 if (!aliveRef.current || !scanRef.current) return;
                 if (r.bpm > 0 && r.status !== 'warmup') setBpm(r.bpm);
                 setHrv(r.hrv_ms ?? 0);
                 setQuality(r.signal_quality || '');
-                if (r.face_detected !== undefined) setFingerOn(true);
-            },
-            () => { setErr('WS CONNECT FAILED'); stop(); },
-            () => { if (scanRef.current) { setErr('WS DROPPED'); stop(); } },
-        );
-        wsRef.current = w;
+                const sq = (r.signal_quality || '').toLowerCase();
+                setFingerOn(sq !== 'no_pulse' && sq !== 'no_face' && r.status !== 'invalid');
+                if (r.waveform) setWaveform(r.waveform);
+                setSamples(c => c + 1);
+            });
 
-        const t = setInterval(async () => {
-            if (!scanRef.current || !camRef.current) return;
-            try {
-                const p = await camRef.current.takePictureAsync({
-                    base64: true, quality: 0.01,
-                    shutterSound: false, animateShutter: false, skipProcessing: true,
+            errorSubRef.current = RPPGEmitter.addListener('onRPPGError', (e) => {
+                setErr(e.error || 'NATIVE ERROR');
+                stop();
+            });
+
+            usingNativeRef.current = true;
+            RPPGStream.start(sid, wsUrl)
+                .then(() => console.log('[RPPGScreen] Native stream started'))
+                .catch((e) => {
+                    console.warn('[RPPGScreen] Native start failed, falling back:', e);
+                    usingNativeRef.current = false;
+                    startFallback();
                 });
-                if (!scanRef.current || !wsRef.current) return;
-                if (wsRef.current.readyState === 1 && p?.base64) {
-                    wsRef.current.send(JSON.stringify({
-                        face_found: true,
-                        image_b64: p.base64,
-                        ts: Date.now() / 1000,
-                    }));
-                    if (aliveRef.current) setSamples(c => c + 1);
-                }
-            } catch (_) {}
-        }, 500);
-        timerRef.current = t;
+            return;
+        }
+
+        startFallback();
     }
 
     function handleBack() {
@@ -178,7 +234,7 @@ export default function RPPGScreen({ navigation, route }) {
                     <View style={{ padding: 14 }}>
                         <Text style={s.body}>
                             Place finger over back camera lens. Torch illuminates the fingertip;
-                            camera captures red-channel intensity pulsing with blood flow at ~2 Hz.
+                            camera captures red-channel intensity pulsing with blood flow at ~30 Hz.
                             Frames stream to backend for CHROM rPPG analysis.
                         </Text>
                     </View>
@@ -203,25 +259,24 @@ export default function RPPGScreen({ navigation, route }) {
                 clock={clock}
             />
 
-            {/* Hidden camera (torch on when scanning) */}
-            <View style={{ position: 'absolute', top: -9999, left: -9999, width: 1, height: 1 }}>
-                <CameraView
-                    ref={camRef}
-                    style={{ width: 1, height: 1 }}
-                    facing="back"
-                    enableTorch={scanning}
-                    animateShutter={false}
-                />
-            </View>
+            {/* Hidden camera — only needed for expo-camera fallback */}
+            {scanning && !usingNativeRef.current && (
+                <View style={{ position: 'absolute', top: -9999, left: -9999, width: 1, height: 1 }}>
+                    <CameraView
+                        ref={camRef}
+                        style={{ width: 1, height: 1 }}
+                        facing="back"
+                        enableTorch={scanning}
+                        animateShutter={false}
+                    />
+                </View>
+            )}
 
             <View style={{ padding: 16 }}>
                 <Text style={s.prompt}>{'> rppg --live --session='}{String(sid).slice(0, 10)}</Text>
                 <Text style={s.title}>HEART RATE MONITOR</Text>
             </View>
 
-            {/* Onboarding banner — shown only when scanning AND no finger
-                detected. Tells the user exactly what to do without reading
-                the instructions panel below. */}
             {scanning && !fingerOn && (
                 <View style={s.fingerCue}>
                     <Text style={s.fingerCueIcon}>👆</Text>
@@ -232,7 +287,6 @@ export default function RPPGScreen({ navigation, route }) {
                 </View>
             )}
 
-            {/* Primary BPM readout */}
             <Panel>
                 <Header
                     title="BPM"
@@ -250,18 +304,33 @@ export default function RPPGScreen({ navigation, route }) {
                 </View>
             </Panel>
 
-            {/* Vitals */}
             <Panel>
-                <Header title="VITALS · LIVE" right={<HdrMeta>{scanning ? 'CAPTURING' : 'IDLE'}</HdrMeta>} />
+                <Header title="VITALS · LIVE" right={<HdrMeta>{scanning ? (RPPGStream ? 'NATIVE 30HZ' : 'FALLBACK') : 'IDLE'}</HdrMeta>} />
                 <FieldRow label="BPM........... BEATS PER MINUTE" value={bpm > 0 ? fmt(bpm, 1) : '--'} color={col} />
                 <FieldRow label="HRV........... RMSSD (MS)" value={hrv > 0 ? fmt(hrv, 1) : '--'} color={C.info} />
                 <FieldRow label="SIG........... SIGNAL QUALITY" value={`[${q.label}]`} color={q.color} />
                 <FieldRow label="FNG........... FINGER DETECTED" value={fingerOn ? 'YES' : 'NO'} color={fingerOn ? C.good : C.muted} />
                 <FieldRow label="FRM........... FRAMES SENT" value={fmtInt(samples)} color={C.text} />
                 <FieldRow label="ELP........... ELAPSED (SEC)" value={fmtInt(elapsed)} color={C.textSub} size="sm" dim />
+                {waveform.length > 0 && (
+                    <>
+                        <Rule />
+                        <View style={{ height: 40, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8 }}>
+                            {waveform.map((v, i) => (
+                                <View key={i} style={{
+                                    flex: 1,
+                                    height: Math.max(1, Math.abs(v) * 35),
+                                    marginHorizontal: 0.3,
+                                    backgroundColor: v >= 0 ? C.good : C.info,
+                                    opacity: 0.6 + Math.abs(v) * 0.4,
+                                    alignSelf: v >= 0 ? 'flex-end' : 'flex-start',
+                                }} />
+                            ))}
+                        </View>
+                    </>
+                )}
             </Panel>
 
-            {/* Instructions */}
             <Panel>
                 <Header title="INSTRUCTIONS" />
                 <FieldRow label="01............ COVER BACK CAMERA" value="▸ FINGER"  color={C.textMid} size="sm" />
@@ -270,7 +339,6 @@ export default function RPPGScreen({ navigation, route }) {
                 <FieldRow label="04............ WARMUP"               value="▸ 2.5 SEC" color={C.textMid} size="sm" />
             </Panel>
 
-            {/* Action */}
             {scanning ? (
                 <Pressable onPress={stop} style={({ pressed }) => [s.btn, { borderColor: C.bad }, pressed && { backgroundColor: '#111' }]}>
                     <Text style={[s.btnText, { color: C.bad }]}>[SPACE] STOP MEASUREMENT</Text>
@@ -287,7 +355,7 @@ export default function RPPGScreen({ navigation, route }) {
 
             <Footer lines={[
                 { text: `RPPG SESSION ${String(sid).slice(0, 10).toUpperCase()}` },
-                { text: `CHROM ALGO · De Haan & Jeanne 2013 · FS 2 HZ` },
+                { text: RPPGStream ? 'NATIVE CAMERAX · 30 HZ · CHROM ALGO' : 'EXPO-CAMERA FALLBACK · 10 HZ · CHROM ALGO' },
             ]} />
         </TerminalScreen>
     );

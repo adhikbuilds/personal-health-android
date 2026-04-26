@@ -16,7 +16,7 @@ import { CAMERA_ENGINE_KEY, CAMERA_ENGINES, DEFAULT_CAMERA_ENGINE } from '../sty
 // JS-side proxy init, which fails on devices where the CameraFactory
 // HybridObject hasn't been registered (Nitrogen native init missing).
 import { Tap, Fade } from '../ui';
-import { SPORTS as SPORTS_MAP, SPORT_RANGES, repTransition } from '../config/sports';
+import { SPORTS as SPORTS_MAP, repTransition } from '../config/sports';
 import { C, T } from '../styles/colors';
 import { SysBar, Panel, Header, HdrMeta, FieldRow, Triad, TerminalScreen, Footer, useLiveClock, fmt, fmtInt } from '../components/terminal';
 
@@ -32,30 +32,6 @@ const SPORTS = [
     SPORTS_MAP.push_up, SPORTS_MAP.pull_up, SPORTS_MAP.sprint,
     SPORTS_MAP.snatch, SPORTS_MAP.javelin, SPORTS_MAP.cricket_bat,
 ].map(s => ({ key: s.key, label: s.label }));
-
-function rng(lo, hi) { return lo + Math.random() * (hi - lo); }
-
-function simulateFrame(sport) {
-    const p = SPORT_RANGES[sport] || SPORT_RANGES.vertical_jump;
-    const kneeL = rng(...p.knee), kneeR = rng(...p.knee);
-    const hipL = rng(...p.hip), hipR = rng(...p.hip);
-    const trunk = rng(...p.trunk);
-    const sym = p.sym + (Math.random() - 0.5) * 0.06;
-    const jh = p.jh[1] > 0 ? rng(...p.jh) : 0;
-    const score = Math.round(60 + Math.random() * 35);
-    const quality = score >= 90 ? 'elite' : score >= 75 ? 'good' : score >= 55 ? 'average' : 'poor';
-    const feedback = {
-        elite: 'Elite biomechanics! Maintain this pattern.',
-        good: 'Good form. Focus on symmetry.',
-        average: 'Lower your hips. Control trunk lean.',
-        poor: 'LOWER HIPS — critical form deviation!',
-    }[quality];
-    return {
-        knee_angle_l: kneeL, knee_angle_r: kneeR, hip_angle_l: hipL, hip_angle_r: hipR,
-        trunk_lean: trunk, limb_symmetry_idx: sym, estimated_jump_height: jh,
-        form_score: score, form_quality: quality, primary_feedback: feedback, phase: 'descent'
-    };
-}
 
 const Q_COLORS = { elite: '#22c55e', good: '#06b6d4', average: '#f97316', poor: '#ef4444' };
 
@@ -107,6 +83,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
     const lastPhaseRef = useRef(null);
     const analysisModeRef = useRef('idle');
     const lastGoodMetricsRef = useRef(null); // kept across connection drops
+    const lastProcessedFrameRef = useRef(-1);
     const wsStreamRef = useRef(null);     // Phase 2: WebSocket frame stream (opens on session start)
     const [repCount, setRepCount] = useState(0);
 
@@ -203,6 +180,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
         analysisModeRef.current = 'waiting';
         setRepCount(0);
         lastPhaseRef.current = null;
+        lastProcessedFrameRef.current = -1;
 
         // Phase 2: open a WebSocket frame stream. Falls back to HTTP /frame
         // (handled inside captureAndSend) if the socket is closed or absent.
@@ -212,19 +190,32 @@ export default function TrainScreen({ showToast, navigation, route }) {
             wsStreamRef.current = api.connectFrameStream(sid, {
                 onResult: async (msg) => {
                     if (msg.form_score == null || msg.form_score <= 0) return;
+                    const fn = msg.frame_num ?? -1;
+                    if (fn >= 0 && fn <= lastProcessedFrameRef.current) return;
+                    lastProcessedFrameRef.current = fn;
                     checkRep(msg.phase);
                     const frame = {
                         form_score: msg.form_score,
                         form_quality: msg.form_quality,
                         primary_feedback: msg.primary_feedback,
                         phase: msg.phase,
-                        knee_angle_l: msg.knee_angle_l ?? 0,
-                        knee_angle_r: 0,
                         hip_angle_l: msg.hip_angle_l ?? 0,
-                        hip_angle_r: 0,
+                        hip_angle_r: msg.hip_angle_r ?? 0,
+                        knee_angle_l: msg.knee_angle_l ?? 0,
+                        knee_angle_r: msg.knee_angle_r ?? 0,
+                        shoulder_angle_l: msg.shoulder_angle_l ?? 0,
+                        shoulder_angle_r: msg.shoulder_angle_r ?? 0,
+                        elbow_angle_l: msg.elbow_angle_l ?? 0,
+                        elbow_angle_r: msg.elbow_angle_r ?? 0,
+                        ankle_dorsiflexion_l: msg.ankle_dorsiflexion_l ?? 0,
+                        ankle_dorsiflexion_r: msg.ankle_dorsiflexion_r ?? 0,
                         trunk_lean: msg.trunk_lean ?? 0,
-                        limb_symmetry_idx: msg.limb_symmetry_idx ?? 1,
+                        spine_deviation: msg.spine_deviation ?? 0,
+                        shoulder_hip_sep: msg.shoulder_hip_sep ?? 0,
+                        head_forward_pos: msg.head_forward_pos ?? 0,
+                        com_height_norm: msg.com_height_norm ?? 0.5,
                         estimated_jump_height: msg.estimated_jump_height ?? 0,
+                        limb_symmetry_idx: msg.limb_symmetry_idx ?? 1,
                         source: 'BACKEND',
                     };
                     // Always-on TFLite augmentation: run the on-device classifier
@@ -261,30 +252,41 @@ export default function TrainScreen({ showToast, navigation, route }) {
         // ── FRAME CAPTURE ────────────────────────────────────────────────────
         const captureAndSend = async () => {
             try {
-                if (cameraRef.current && !isCapturingRef.current && sessionRef.current) {
-                    isCapturingRef.current = true;
-                    const photo = await cameraRef.current.takePictureAsync({
-                        base64: true,
-                        quality: 0.4,
-                        skipProcessing: true,
-                        shutterSound: false,
-                        exif: false,
-                    });
+                if (!cameraRef.current || isCapturingRef.current || !sessionRef.current) return;
+                isCapturingRef.current = true;
+
+                if (cameraEngine === CAMERA_ENGINES.VISION && VisionCameraComp) {
+                    const buf = await cameraRef.current.takeSnapshotBinary?.();
                     isCapturingRef.current = false;
-                    if (photo?.base64) {
+                    if (buf) {
                         setFrameNum(n => n + 1);
-                        // Prefer WebSocket if it's open — saves HTTP overhead per frame
-                        // and lets the server push results back without a poll cycle.
                         const ws = wsStreamRef.current;
                         if (ws && ws.isOpen()) {
-                            ws.send(photo.base64);
-                        } else {
-                            api.sendFrame(sessionRef.current, {
-                                image_b64: photo.base64,
-                                sport,
-                                form_score: 0, form_quality: 'unknown', primary_feedback: ''
-                            }).catch((e) => console.warn('[TrainScreen] sendFrame failed:', e?.message));
+                            ws.sendBinary(buf);
                         }
+                    }
+                    return;
+                }
+
+                const photo = await cameraRef.current.takePictureAsync({
+                    base64: true,
+                    quality: 0.4,
+                    skipProcessing: true,
+                    shutterSound: false,
+                    exif: false,
+                });
+                isCapturingRef.current = false;
+                if (photo?.base64) {
+                    setFrameNum(n => n + 1);
+                    const ws = wsStreamRef.current;
+                    if (ws && ws.isOpen()) {
+                        ws.send(photo.base64);
+                    } else {
+                        api.sendFrame(sessionRef.current, {
+                            image_b64: photo.base64,
+                            sport,
+                            form_score: 0, form_quality: 'unknown', primary_feedback: ''
+                        }).catch((e) => console.warn('[TrainScreen] sendFrame failed:', e?.message));
                     }
                 }
             } catch {
@@ -292,10 +294,9 @@ export default function TrainScreen({ showToast, navigation, route }) {
             }
         };
 
-        // Capture first frame after 1.5s (camera needs time to initialize)
-        setTimeout(captureAndSend, 1500);
-        // Then every 3s
-        intervalRef.current = setInterval(captureAndSend, 3000);
+        const captureMs = (cameraEngine === CAMERA_ENGINES.VISION && VisionCameraComp) ? 100 : 1000;
+        setTimeout(captureAndSend, captureMs === 100 ? 500 : 1500);
+        intervalRef.current = setInterval(captureAndSend, captureMs);
 
         // Simulation disabled — only real AI data shown.
         // If no pose detected, UI shows "NO POSE" instead of fake numbers.
@@ -307,20 +308,32 @@ export default function TrainScreen({ showToast, navigation, route }) {
             try {
                 const result = await api.getLatestResult(sessionRef.current);
                 if (result?.pose_detected && result.form_score > 0) {
-                    // Real AI result — update UI
+                    const fn = result.frame_num ?? -1;
+                    if (fn >= 0 && fn <= lastProcessedFrameRef.current) return;
+                    lastProcessedFrameRef.current = fn;
                     checkRep(result.phase);
                     const frame = {
                         form_score: result.form_score,
                         form_quality: result.form_quality,
                         primary_feedback: result.primary_feedback,
                         phase: result.phase,
-                        knee_angle_l: result.knee_angle_l ?? 0,
-                        knee_angle_r: result.knee_angle_r ?? 0,
                         hip_angle_l: result.hip_angle_l ?? 0,
                         hip_angle_r: result.hip_angle_r ?? 0,
+                        knee_angle_l: result.knee_angle_l ?? 0,
+                        knee_angle_r: result.knee_angle_r ?? 0,
+                        shoulder_angle_l: result.shoulder_angle_l ?? 0,
+                        shoulder_angle_r: result.shoulder_angle_r ?? 0,
+                        elbow_angle_l: result.elbow_angle_l ?? 0,
+                        elbow_angle_r: result.elbow_angle_r ?? 0,
+                        ankle_dorsiflexion_l: result.ankle_dorsiflexion_l ?? 0,
+                        ankle_dorsiflexion_r: result.ankle_dorsiflexion_r ?? 0,
                         trunk_lean: result.trunk_lean ?? 0,
-                        limb_symmetry_idx: result.limb_symmetry_idx ?? 1,
+                        spine_deviation: result.spine_deviation ?? 0,
+                        shoulder_hip_sep: result.shoulder_hip_sep ?? 0,
+                        head_forward_pos: result.head_forward_pos ?? 0,
+                        com_height_norm: result.com_height_norm ?? 0.5,
                         estimated_jump_height: result.estimated_jump_height ?? 0,
+                        limb_symmetry_idx: result.limb_symmetry_idx ?? 1,
                         source: 'BACKEND',
                     };
                     // Always-on TFLite augmentation (best-effort).

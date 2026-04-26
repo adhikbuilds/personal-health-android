@@ -148,6 +148,8 @@ export function _resetApiCache() {
 
 // ─── Session API ─────────────────────────────────────────────────────────────
 export const api = {
+    getWsBase: () => WS_BASE_RESOLVED,
+
     patch: (path, body) => fetchJSON(path, {
         method: 'PATCH',
         body: JSON.stringify(body),
@@ -458,6 +460,13 @@ export const api = {
                 if (closed || ws.readyState !== WebSocket.OPEN) return false;
                 try {
                     ws.send(JSON.stringify({ image_b64: b64, ts }));
+                    return true;
+                } catch (_) { return false; }
+            },
+            sendBinary(arrayBuffer) {
+                if (closed || ws.readyState !== WebSocket.OPEN) return false;
+                try {
+                    ws.send(arrayBuffer);
                     return true;
                 } catch (_) { return false; }
             },

@@ -126,7 +126,7 @@ function _buildRaw(frame, sport) {
     for (let i = 0; i < FEATURES.length; i++) {
         const name = FEATURES[i]
         if (name === 'sport_idx') {
-            raw[i] = (SPORT_INDEX[sport] ?? 0) / 4.0
+            raw[i] = (SPORT_INDEX[sport] ?? 0) / 7.0
             continue
         }
         const v = frame[name]
