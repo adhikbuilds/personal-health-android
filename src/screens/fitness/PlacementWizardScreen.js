@@ -126,7 +126,7 @@ export default function PlacementWizardScreen({ navigation, route }) {
                 >
                     <Text style={[
                         s.btnText,
-                        current.band === 'green' ? { color: '#0a0e1a' } : { color: C.text },
+                        current.band === 'green' ? { color: '#FBFBF8' } : { color: C.text },
                     ]}>
                         {current.band === 'green'
                             ? 'tap to start'

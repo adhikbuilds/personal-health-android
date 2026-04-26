@@ -28,8 +28,8 @@ const { width: W, height: H } = Dimensions.get('window');
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 const C = {
-    bg: '#0f172a', cyan: '#06b6d4', green: '#22c55e',
-    orange: '#f97316', red: '#ef4444', text: '#f1f5f9', muted: '#64748b',
+    bg: '#FBFBF8', cyan: '#FC4C02', green: '#22c55e',
+    orange: '#f97316', red: '#ef4444', text: '#242428', muted: '#9CA3AF',
     yellow: '#facc15',
 };
 

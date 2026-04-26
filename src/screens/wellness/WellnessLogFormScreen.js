@@ -114,7 +114,7 @@ export default function WellnessLogFormScreen({ navigation, route }) {
                             {[0, 1, 2, 3].map(n => (
                                 <TouchableOpacity key={n} onPress={() => setInterruptions(n)}
                                     style={[sf.interBtn, interruptions === n && { backgroundColor: C.cyan, borderColor: C.cyan }]}>
-                                    <Text style={[sf.interText, interruptions === n && { color: '#0a0e1a' }]}>{n === 3 ? '3+' : n}</Text>
+                                    <Text style={[sf.interText, interruptions === n && { color: '#FBFBF8' }]}>{n === 3 ? '3+' : n}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
@@ -129,7 +129,7 @@ export default function WellnessLogFormScreen({ navigation, route }) {
                         {WATER_PRESETS.map(ml => (
                             <TouchableOpacity key={ml} onPress={() => setWaterMl(String(ml))}
                                 style={[sf.presetBtn, waterMl === String(ml) && { backgroundColor: C.cyan, borderColor: C.cyan }]}>
-                                <Text style={[sf.presetText, waterMl === String(ml) && { color: '#0a0e1a' }]}>
+                                <Text style={[sf.presetText, waterMl === String(ml) && { color: '#FBFBF8' }]}>
                                     {ml >= 1000 ? `${ml / 1000}L` : `${ml}ml`}
                                 </Text>
                             </TouchableOpacity>

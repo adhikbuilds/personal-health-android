@@ -6,12 +6,12 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-const CYAN  = '#06b6d4';
-const BG    = '#0a0e1a';
-const CARD  = '#111827';
-const TEXT  = '#f1f5f9';
-const MUTED = '#94a3b8';
-const DIM   = '#64748b';
+const CYAN  = '#FC4C02';
+const BG    = '#FBFBF8';
+const CARD  = '#FFFFFF';
+const TEXT  = '#242428';
+const MUTED = '#9CA3AF';
+const DIM   = '#9CA3AF';
 
 export default function WellnessPlaceholderScreen({ navigation }) {
     return (

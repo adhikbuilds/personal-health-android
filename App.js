@@ -28,6 +28,7 @@ import FitnessTestScreen   from './src/screens/fitness/FitnessTestScreen';
 import OnboardingScreen    from './src/screens/fitness/OnboardingScreen';
 import PlacementWizardScreen from './src/screens/fitness/PlacementWizardScreen';
 import DrillPickerScreen   from './src/screens/fitness/DrillPickerScreen';
+import FirstScoreScreen    from './src/screens/fitness/FirstScoreScreen';
 import ShareCardScreen     from './src/screens/fitness/ShareCardScreen';
 import InjuryRiskScreen    from './src/screens/fitness/InjuryRiskScreen';
 import ParentConsentScreen from './src/screens/fitness/ParentConsentScreen';
@@ -56,9 +57,15 @@ import { hasCompletedOnboarding } from './src/services/deviceIdentity';
 const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-const CYAN  = '#06b6d4';
-const MUTED = '#64748b';
-const BG    = '#0f172a';
+// Strava theme — matches frontend web app
+const ORANGE = '#FC4C02';
+const DARK   = '#242428';
+const MUTED  = '#9CA3AF';
+const BG     = '#FFFFFF';
+const CREAM  = '#FBFBF8';
+const BORDER = '#E6E6EA';
+// Legacy alias kept so any inline reference still resolves to brand
+const CYAN   = ORANGE;
 
 // AN-04: Vector tab icons (Ionicons), no emojis
 const TAB_ICONS = {
@@ -97,7 +104,7 @@ function TabNavigator({ showToast }) {
                         <Ionicons
                             name={TAB_ICONS[route.name] || 'ellipse-outline'}
                             size={22}
-                            color={focused ? CYAN : MUTED}
+                            color={focused ? ORANGE : MUTED}
                         />
                     </View>
                 ),
@@ -106,9 +113,10 @@ function TabNavigator({ showToast }) {
                 ),
                 tabBarStyle:  styles.tabBar,
                 tabBarBackground: () => (
-                    <BlurView intensity={80} tint="dark" style={{ flex: 1, backgroundColor: 'rgba(10,10,12,0.85)' }} />
+                    <BlurView intensity={70} tint="light" style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.95)' }} />
                 ),
-                tabBarActiveTintColor: CYAN,
+                tabBarActiveTintColor: ORANGE,
+                tabBarInactiveTintColor: MUTED,
                 headerShown:  false,
             })}
         >
@@ -142,7 +150,9 @@ function LaunchScreen({ navigation }) {
 
     return (
         <View style={[styles.launch, { backgroundColor: BG }]}>
-            <Text style={{ color: '#f9fafb', fontSize: 18, fontWeight: '800' }}>Personal Health</Text>
+            <Text style={{ color: ORANGE, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>
+                PERSONAL HEALTH
+            </Text>
         </View>
     );
 }
@@ -170,6 +180,7 @@ function AppNavigator({ showToast }) {
             <Stack.Screen name="CameraSession">
                 {(props) => <TrainScreen {...props} showToast={showToast} />}
             </Stack.Screen>
+            <Stack.Screen name="FirstScore" component={FirstScoreScreen} />
             <Stack.Screen name="ShareCard">
                 {(props) => <ShareCardScreen {...props} showToast={showToast} />}
             </Stack.Screen>
@@ -316,7 +327,7 @@ export default function App() {
 
     return (
         <SafeAreaProvider>
-            <StatusBar style="light" backgroundColor={BG} />
+            <StatusBar style="dark" backgroundColor={BG} />
             <UserProvider>
                 <NavigationContainer ref={navigationRef} linking={linking}>
                     <AppNavigator showToast={showToast} />
@@ -330,36 +341,36 @@ export default function App() {
 const styles = StyleSheet.create({
     launch: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     tabBar: {
-        backgroundColor: BG,
-        borderTopColor:  'rgba(255,255,255,0.08)',
-        borderTopWidth:  1,
-        height:          68,
-        paddingBottom:   8,
-        paddingTop:      6,
-        elevation:       20,
+        backgroundColor: 'transparent',                  // BlurView paints the bg
+        borderTopColor:  BORDER,
+        borderTopWidth:  StyleSheet.hairlineWidth,
+        height:          76,                              // taller — clears safe-area on most phones
+        paddingBottom:   12,
+        paddingTop:      8,
+        elevation:       8,
         shadowColor:     '#000',
-        shadowOpacity:   0.5,
-        shadowOffset:    { width: 0, height: -4 },
-        shadowRadius:    12,
+        shadowOpacity:   0.06,
+        shadowOffset:    { width: 0, height: -2 },
+        shadowRadius:    8,
     },
-    tabIconWrap:   { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    tabIconActive: { backgroundColor: 'rgba(6,182,212,0.15)' },
+    tabIconWrap:   { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    tabIconActive: { backgroundColor: 'rgba(252, 76, 2, 0.10)' },
     tabIconText:   { fontSize: 18 },
-    tabLabel:      { fontSize: 9, fontWeight: '700', color: MUTED, marginTop: 2 },
-    tabLabelActive:{ color: CYAN },
+    tabLabel:      { fontSize: 10, fontWeight: '700', color: MUTED, marginTop: 2, letterSpacing: 0.3 },
+    tabLabelActive:{ color: ORANGE },
     toast: {
         position:        'absolute',
         left:            20,
         right:           20,
-        backgroundColor: 'rgba(6,182,212,0.96)',
-        borderRadius:    14,
+        backgroundColor: ORANGE,
+        borderRadius:    8,
         padding:         14,
         alignItems:      'center',
         elevation:       99,
-        shadowColor:     CYAN,
-        shadowOpacity:   0.5,
+        shadowColor:     ORANGE,
+        shadowOpacity:   0.4,
         shadowOffset:    { width: 0, height: 4 },
-        shadowRadius:    10,
+        shadowRadius:    14,
     },
-    toastText: { color: '#000', fontWeight: '800', fontSize: 13 },
+    toastText: { color: '#fff', fontWeight: '700', fontSize: 12, letterSpacing: 0.5, textTransform: 'uppercase' },
 });

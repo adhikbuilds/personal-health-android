@@ -1,22 +1,30 @@
-// AcademyScreen — Sports Academy Directory
-// Entry point to the full 18-sport library.
-// Tapping a sport navigates to LearnSportsScreen with that sport's video gallery.
+// AcademyScreen — Strava-clean rewrite
+// Sports library directory · single orange accent · no rainbow palette.
+
 import React, { useState } from 'react';
 import {
     View, Text, ScrollView, StyleSheet, TouchableOpacity,
-    SafeAreaView, FlatList, Dimensions, TextInput,
+    SafeAreaView, FlatList, TextInput, StatusBar,
 } from 'react-native';
-import { C } from '../../styles/colors';
-import { SPORTS_LIBRARY, SPORTS_ACADEMY } from '../../data/constants';
+import { Ionicons } from '@expo/vector-icons';
+import { SPORTS_LIBRARY } from '../../data/constants';
 
-const { width: SW } = Dimensions.get('window');
+// ─── Strava palette ─────────────────────────
+const ORANGE = '#FC4C02';
+const DARK   = '#242428';
+const GRAY   = '#6D6D78';
+const DIM    = '#9CA3AF';
+const LIGHT  = '#F7F7FA';
+const BORDER = '#E6E6EA';
+const BG     = '#FFFFFF';
+
 const CATEGORIES = ['All', 'team', 'court', 'combat', 'track', 'aquatic', 'precision'];
-const CAT_LABELS  = { All: 'All', team: 'Team', court: 'Court', combat: 'Combat', track: 'Track', aquatic: 'Aquatic', precision: 'Precision' };
+const CAT_LABELS = { All: 'All', team: 'Team', court: 'Court', combat: 'Combat', track: 'Track', aquatic: 'Aquatic', precision: 'Precision' };
 
 function SportTile({ sport, onPress }) {
     return (
-        <TouchableOpacity style={[st.tile, { borderColor: sport.color + '35' }]} onPress={() => onPress(sport)} activeOpacity={0.82}>
-            <View style={[st.iconWrap, { backgroundColor: sport.color + '18' }]}>
+        <TouchableOpacity style={st.tile} activeOpacity={0.7} onPress={() => onPress(sport)}>
+            <View style={st.iconWrap}>
                 <Text style={st.emoji}>{sport.emoji}</Text>
             </View>
             <Text style={st.name} numberOfLines={1}>{sport.name}</Text>
@@ -25,15 +33,15 @@ function SportTile({ sport, onPress }) {
     );
 }
 
-export default function AcademyScreen({ navigation, showToast }) {
+export default function AcademyScreen({ navigation }) {
     const [activeCategory, setActiveCategory] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearch, setShowSearch] = useState(false);
 
     const filtered = (activeCategory === 'All'
         ? SPORTS_LIBRARY
-        : SPORTS_LIBRARY.filter(s => s.category === activeCategory)
-    ).filter(s => !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        : SPORTS_LIBRARY.filter((sp) => sp.category === activeCategory)
+    ).filter((sp) => !searchQuery || sp.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const handleSportPress = (sport) => {
         navigation.navigate('LearnSports', { sport });
@@ -41,11 +49,20 @@ export default function AcademyScreen({ navigation, showToast }) {
 
     return (
         <SafeAreaView style={s.safe}>
+            <StatusBar barStyle="dark-content" />
+
             {/* Top bar */}
             <View style={s.topbar}>
-                <Text style={s.title}>Sports Academy</Text>
-                <TouchableOpacity style={s.searchBtn} onPress={() => { setShowSearch(v => !v); setSearchQuery(''); }}>
-                    <Text style={{ fontSize: 18 }}>{showSearch ? '✕' : '🔍'}</Text>
+                <View>
+                    <Text style={s.eyebrow}>BROWSE BY SPORT</Text>
+                    <Text style={s.title}>Sports Academy</Text>
+                </View>
+                <TouchableOpacity
+                    style={s.searchBtn}
+                    onPress={() => { setShowSearch((v) => !v); setSearchQuery(''); }}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name={showSearch ? 'close' : 'search'} size={18} color={DARK} />
                 </TouchableOpacity>
             </View>
 
@@ -53,24 +70,25 @@ export default function AcademyScreen({ navigation, showToast }) {
                 <TextInput
                     style={s.searchInput}
                     placeholder="Search sports..."
-                    placeholderTextColor={C.muted}
+                    placeholderTextColor={DIM}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                     autoFocus
                 />
             )}
 
-            {/* Category filter tabs */}
+            {/* Category pills */}
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={s.catScroll}
             >
-                {CATEGORIES.map(cat => (
+                {CATEGORIES.map((cat) => (
                     <TouchableOpacity
                         key={cat}
                         style={[s.catChip, activeCategory === cat && s.catChipActive]}
                         onPress={() => setActiveCategory(cat)}
+                        activeOpacity={0.7}
                     >
                         <Text style={[s.catChipText, activeCategory === cat && s.catChipTextActive]}>
                             {CAT_LABELS[cat]}
@@ -82,17 +100,17 @@ export default function AcademyScreen({ navigation, showToast }) {
             {/* Sport grid */}
             <FlatList
                 data={filtered}
-                keyExtractor={item => item.id}
+                keyExtractor={(item) => item.id}
                 numColumns={3}
                 contentContainerStyle={s.grid}
-                columnWrapperStyle={{ gap: 10 }}
+                columnWrapperStyle={{ gap: 8 }}
                 renderItem={({ item }) => (
                     <SportTile sport={item} onPress={handleSportPress} />
                 )}
                 showsVerticalScrollIndicator={false}
                 ListFooterComponent={() => (
                     <View style={s.footer}>
-                        <Text style={s.footerText}>More sports and drills unlocking soon 🚀</Text>
+                        <Text style={s.footerText}>More sports & drills unlocking soon</Text>
                     </View>
                 )}
             />
@@ -101,25 +119,90 @@ export default function AcademyScreen({ navigation, showToast }) {
 }
 
 const s = StyleSheet.create({
-    safe:          { flex: 1, backgroundColor: C.bg },
-    topbar:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 16, paddingBottom: 8 },
-    title:         { fontSize: 20, fontWeight: '900', color: C.text },
-    searchBtn:     { width: 40, height: 40, borderRadius: 12, backgroundColor: C.surf, alignItems: 'center', justifyContent: 'center' },
-    searchInput:   { marginHorizontal: 16, backgroundColor: C.surf, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, color: C.text, fontSize: 14, borderWidth: 1, borderColor: C.border, marginBottom: 8 },
-    catScroll:     { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
-    catChip:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99, backgroundColor: C.surf, borderWidth: 1, borderColor: C.border },
-    catChipActive: { backgroundColor: C.cyan, borderColor: C.cyan },
-    catChipText:   { fontSize: 12, fontWeight: '700', color: C.muted },
-    catChipTextActive: { color: C.bg },
-    grid:          { padding: 16, paddingTop: 8, paddingBottom: 30 },
-    footer:        { backgroundColor: 'rgba(99,102,241,0.1)', borderRadius: 14, padding: 14, alignItems: 'center', marginTop: 4, borderWidth: 1, borderColor: 'rgba(99,102,241,0.2)' },
-    footerText:    { fontSize: 12, color: '#818cf8', fontWeight: '600', textAlign: 'center' },
+    safe: { flex: 1, backgroundColor: BG },
+
+    topbar: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: 12,
+    },
+    eyebrow: { fontSize: 10, fontWeight: '800', color: ORANGE, letterSpacing: 0.8 },
+    title: { fontSize: 22, fontWeight: '800', color: DARK, marginTop: 2, letterSpacing: -0.5 },
+    searchBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: LIGHT,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    searchInput: {
+        marginHorizontal: 20,
+        backgroundColor: LIGHT,
+        borderRadius: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        color: DARK,
+        fontSize: 14,
+        borderWidth: 1,
+        borderColor: BORDER,
+        marginBottom: 8,
+    },
+
+    // Category pills (Strava-style underline-on-active is tricky for pills, use filled)
+    catScroll: { paddingHorizontal: 20, paddingBottom: 12, gap: 8 },
+    catChip: {
+        paddingHorizontal: 14,
+        paddingVertical: 7,
+        borderRadius: 50,
+        backgroundColor: BG,
+        borderWidth: 1,
+        borderColor: BORDER,
+    },
+    catChipActive: { backgroundColor: DARK, borderColor: DARK },
+    catChipText: { fontSize: 12, fontWeight: '700', color: GRAY, letterSpacing: 0.3 },
+    catChipTextActive: { color: '#fff' },
+
+    grid: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 100 },
+
+    footer: {
+        marginTop: 16,
+        backgroundColor: LIGHT,
+        borderRadius: 8,
+        padding: 14,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: BORDER,
+        borderStyle: 'dashed',
+    },
+    footerText: { fontSize: 12, color: GRAY, fontWeight: '600' },
 });
 
 const st = StyleSheet.create({
-    tile:     { flex: 1, backgroundColor: C.surf, borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, marginBottom: 10 },
-    iconWrap: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-    emoji:    { fontSize: 26 },
-    name:     { fontSize: 11, fontWeight: '800', color: C.text, textAlign: 'center', marginBottom: 3 },
-    count:    { fontSize: 9, color: C.muted, fontWeight: '600' },
+    tile: {
+        flex: 1,
+        backgroundColor: BG,
+        borderRadius: 8,
+        padding: 14,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: BORDER,
+        marginBottom: 8,
+    },
+    iconWrap: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: 'rgba(252, 76, 2, 0.10)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 8,
+    },
+    emoji: { fontSize: 24 },
+    name: { fontSize: 12, fontWeight: '700', color: DARK, textAlign: 'center', marginBottom: 2 },
+    count: { fontSize: 9, color: GRAY, fontWeight: '600', letterSpacing: 0.3 },
 });

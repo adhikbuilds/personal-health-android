@@ -17,12 +17,22 @@ import {
 import * as Haptics from 'expo-haptics';
 import { C } from '../../styles/colors';
 import api from '../../services/api';
+import {
+    generateCoachInviteLink,
+    hasInvitedCoach,
+    markCoachInvited,
+} from '../../services/coachInvite';
 
 export default function ShareCardScreen({ navigation, route }) {
     const sessionId = route.params?.sessionId;
+    const athleteId = route.params?.athleteId;
     const [card, setCard] = useState(null);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [showCoachInvite, setShowCoachInvite] = useState(false);
+    const [coachInviteLoading, setCoachInviteLoading] = useState(false);
+    const [inviteLink, setInviteLink] = useState(null);
+    const [inviteConfirmed, setInviteConfirmed] = useState(false);
 
     const load = useCallback(async () => {
         if (!sessionId) {
@@ -42,7 +52,41 @@ export default function ShareCardScreen({ navigation, route }) {
         }
     }, [sessionId]);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+        checkCoachInviteEligibility();
+    }, [load]);
+
+    const checkCoachInviteEligibility = async () => {
+        try {
+            const hasInvited = await hasInvitedCoach();
+            setShowCoachInvite(!hasInvited);
+        } catch {}
+    };
+
+    const handleCoachInvite = async () => {
+        if (!athleteId) return;
+        setCoachInviteLoading(true);
+        try {
+            const result = await generateCoachInviteLink(athleteId);
+            setInviteLink(result);
+            await markCoachInvited();
+            setShowCoachInvite(false);
+
+            const message = result.whatsapp_share_text || `Train with me on Personal Health:\n${result.invite_url}`;
+            const shareResult = await Share.share({
+                message,
+                title: 'Invite your coach',
+            });
+            if (shareResult.action !== Share.dismissedAction) {
+                setInviteConfirmed(true);
+            }
+        } catch (e) {
+            console.warn('[ShareCard] coach invite failed', e);
+        } finally {
+            setCoachInviteLoading(false);
+        }
+    };
 
     const onShare = async () => {
         if (!card) return;
@@ -83,10 +127,10 @@ export default function ShareCardScreen({ navigation, route }) {
     }
 
     const ds = card.design_system || {};
-    const accent = ds.accent || '#06b6d4';
-    const bg = ds.background || '#0a0e1a';
-    const textPrimary = ds.text_primary || '#f9fafb';
-    const textSecondary = ds.text_secondary || '#9ca3af';
+    const accent = ds.accent || '#FC4C02';
+    const bg = ds.background || '#FBFBF8';
+    const textPrimary = ds.text_primary || '#242428';
+    const textSecondary = ds.text_secondary || '#9CA3AF';
     const chipColour = card.chip_colour || textSecondary;
 
     const deltaArrow =
@@ -123,7 +167,7 @@ export default function ShareCardScreen({ navigation, route }) {
                     <Text style={[s.chipText, { color: chipColour }]}>{card.chip}</Text>
                 </View>
 
-                <Text style={[s.wordmark, { color: '#6b7280' }]}>Personal Health</Text>
+                <Text style={[s.wordmark, { color: '#6D6D78' }]}>Personal Health</Text>
             </View>
 
             {/* Multiplayer transparency — tell the athlete who else will see this */}
@@ -145,16 +189,43 @@ export default function ShareCardScreen({ navigation, route }) {
                     <Text style={[s.secondaryText, { color: textSecondary }]}>done</Text>
                 </TouchableOpacity>
             </View>
+
+            {showCoachInvite && !inviteConfirmed && (
+                <View style={[s.coachSection, { backgroundColor: '#FFFFFF', borderColor: accent + '33' }]}>
+                    <Text style={[s.coachTitle, { color: textPrimary }]}>Training with a coach?</Text>
+                    <Text style={[s.coachSub, { color: textSecondary }]}>
+                        Send them this — they'll see your form scores and can send you notes.
+                    </Text>
+                    <TouchableOpacity
+                        style={[s.coachBtn, { backgroundColor: accent }]}
+                        onPress={handleCoachInvite}
+                        disabled={coachInviteLoading}
+                    >
+                        <Text style={s.coachBtnText}>
+                            {coachInviteLoading ? 'Generating…' : 'Share with your coach'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {inviteConfirmed && (
+                <View style={[s.coachSection, { backgroundColor: '#FFFFFF', borderColor: accent + '33' }]}>
+                    <Text style={[s.coachTitle, { color: textPrimary }]}>Sent</Text>
+                    <Text style={[s.coachSub, { color: textSecondary }]}>
+                        Your coach will appear on your roster once they install.
+                    </Text>
+                </View>
+            )}
         </SafeAreaView>
     );
 }
 
 const s = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: '#0a0e1a', alignItems: 'center', justifyContent: 'center' },
+    safe: { flex: 1, backgroundColor: '#FBFBF8', alignItems: 'center', justifyContent: 'center' },
 
     card: {
         width: '86%', paddingVertical: 48, alignItems: 'center',
-        borderRadius: 24, backgroundColor: '#111827',
+        borderRadius: 24, backgroundColor: '#FFFFFF',
     },
     hero: { fontSize: 120, fontWeight: '900', lineHeight: 128 },
     heroLabel: { fontSize: 13, letterSpacing: 1.5, marginTop: 6, textAlign: 'center' },
@@ -177,7 +248,7 @@ const s = StyleSheet.create({
 
     actions: { flexDirection: 'row', gap: 14, marginTop: 28, width: '86%' },
     shareBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-    shareText: { color: '#0a0e1a', fontWeight: '800', fontSize: 16, letterSpacing: 0.4 },
+    shareText: { color: '#FBFBF8', fontWeight: '800', fontSize: 16, letterSpacing: 0.4 },
     secondaryBtn: { paddingVertical: 14, paddingHorizontal: 22, alignItems: 'center', justifyContent: 'center' },
     secondaryText: { fontWeight: '700', fontSize: 14 },
 
@@ -185,7 +256,13 @@ const s = StyleSheet.create({
     errorTitle: { color: C.text, fontSize: 18, fontWeight: '700' },
     errorBody: { color: C.muted, fontSize: 14, textAlign: 'center' },
     retryBtn: { marginTop: 12, paddingVertical: 10, paddingHorizontal: 22, backgroundColor: C.cyan, borderRadius: 10 },
-    retryText: { color: '#0a0e1a', fontWeight: '800' },
+    retryText: { color: '#FBFBF8', fontWeight: '800' },
     backBtn: { paddingVertical: 10 },
     backText: { color: C.muted, fontSize: 13 },
+
+    coachSection: { marginTop: 20, width: '86%', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
+    coachTitle: { fontSize: 15, fontWeight: '800', marginBottom: 6 },
+    coachSub: { fontSize: 13, lineHeight: 18, marginBottom: 12 },
+    coachBtn: { paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+    coachBtnText: { color: '#FBFBF8', fontSize: 14, fontWeight: '800' },
 });

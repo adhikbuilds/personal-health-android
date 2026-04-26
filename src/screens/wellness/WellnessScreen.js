@@ -4,8 +4,11 @@ import {
     View, Text, ScrollView, TouchableOpacity, StyleSheet,
     SafeAreaView, ActivityIndicator,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { C } from '../../styles/colors';
 import api from '../../services/api';
+
+const tap = () => { try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} };
 
 const COMPONENT_MAX = { sleep: 30, hydration: 15, mood: 15, energy: 15, stress: 10, soreness: 15 };
 const COMPONENT_LABELS = { sleep: 'Sleep', hydration: 'Hydration', mood: 'Mood', energy: 'Energy', stress: 'Stress', soreness: 'Soreness' };
@@ -114,6 +117,10 @@ export default function WellnessScreen({ navigation, route }) {
                         </View>
                         {scoreData?.recommendation ? (
                             <Text style={s.recommendation}>{scoreData.recommendation}</Text>
+                        ) : !hasData ? (
+                            <Text style={s.recommendation}>
+                                A 15-second check-in and you'll see recovery readiness based on sleep, mood, soreness.
+                            </Text>
                         ) : null}
                     </View>
 
@@ -139,10 +146,14 @@ export default function WellnessScreen({ navigation, route }) {
                     {/* CTA */}
                     <TouchableOpacity
                         style={[s.ctaBtn, hasData ? s.ctaBtnSecondary : s.ctaBtnPrimary]}
-                        onPress={() => navigation.navigate('WellnessLogForm', { athleteId, prefill: scoreData })}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                            tap();
+                            navigation.navigate('WellnessLogForm', { athleteId, prefill: scoreData });
+                        }}
                     >
-                        <Text style={[s.ctaText, hasData ? { color: C.cyan } : { color: '#0a0e1a' }]}>
-                            {hasData ? 'Update Today' : 'Log Today'}
+                        <Text style={[s.ctaText, hasData ? { color: C.cyan } : { color: '#FBFBF8' }]}>
+                            {hasData ? 'Update today' : 'Start check-in'}
                         </Text>
                     </TouchableOpacity>
 

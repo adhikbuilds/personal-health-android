@@ -72,7 +72,8 @@
       "expo-font"
     ],
     "extra": {
-      "backendHost": ""
+      "backendHost": "172.17.69.181",
+      "backendPort": 8082
     }
   }
 }
