@@ -17,24 +17,21 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-    View, Text, StyleSheet,
+    View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
     Dimensions, Animated, Easing,
 } from 'react-native';
-import { Tap } from '../ui';
 import { Camera, CameraView } from 'expo-camera';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Line, Circle, Text as SvgText } from 'react-native-svg';
-import api from '../services/api';
+import api from '../../services/api';
 
 const { width: W, height: H } = Dimensions.get('window');
 
-// ─── Colors (terminal palette, local alias to preserve SVG overlay logic) ────
+// ─── Colors ──────────────────────────────────────────────────────────────────
 const C = {
-    bg: '#000000', cyan: '#FFAA00', green: '#00E676',
-    orange: '#FFB300', red: '#FF3B30', text: '#E8E8E8', muted: '#5C4600',
-    yellow: '#FFAA00', amber: '#FFAA00', border: '#262B31',
+    bg: '#FBFBF8', cyan: '#FC4C02', green: '#22c55e',
+    orange: '#f97316', red: '#ef4444', text: '#242428', muted: '#9CA3AF',
+    yellow: '#facc15',
 };
-const MONO = require('react-native').Platform.OS === 'android' ? 'monospace' : 'Menlo';
 
 // ─── MediaPipe Pose Connections ───────────────────────────────────────────────
 const CONNECTIONS = [
@@ -243,7 +240,6 @@ const cd = StyleSheet.create({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function GhostSkeletonScreen({ navigation, route }) {
-    const ins = useSafeAreaInsets();
     const sport = route?.params?.sport || 'vertical_jump';
     const idealKP = getIdeal(sport);
 
@@ -331,20 +327,16 @@ export default function GhostSkeletonScreen({ navigation, route }) {
 
     const getFeedbackMsg = (score) => {
         if (!score) return 'Align your body with the green ghost skeleton';
-        if (score >= 85) return 'Excellent! Hold this position...';
-        if (score >= 70) return 'Good — straighten up a bit more';
-        if (score >= 50) return 'Move closer to the ghost skeleton position';
-        return 'Form too different — check camera angle and distance';
+        if (score >= 85) return '✅ Excellent! Hold this position...';
+        if (score >= 70) return '👍 Good — straighten up a bit more';
+        if (score >= 50) return '⚠️ Move closer to the ghost skeleton position';
+        return '❌ Form too different — check camera angle and distance';
     };
 
     const handleStart = useCallback(() => {
         clearInterval(intervalRef.current);
-        // Hand off to the Train tab with autoStart so we don't dump the
-        // user back to the sport picker after they just calibrated.
-        navigation?.navigate('Tabs', {
-            screen: 'Train',
-            params: { sport, autoStart: true },
-        });
+        // Navigate to Camera tab via root Stack → Tabs navigator
+        navigation?.navigate('Tabs', { screen: 'Camera', params: { sport } });
     }, [sport, navigation]);
 
     // ── Permission states ────────────────────────────────────────────────────
@@ -352,15 +344,15 @@ export default function GhostSkeletonScreen({ navigation, route }) {
 
     if (!permission.granted) {
         return (
-            <View style={[s.safeBg, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
+            <SafeAreaView style={s.safeBg}>
                 <View style={s.center}>
-                    <Text style={s.permTitle}>Camera Permission</Text>
+                    <Text style={s.permTitle}>📷 Camera Permission</Text>
                     <Text style={s.permText}>Camera access is needed to show the skeleton overlay and compare your form with the AI model.</Text>
-                    <Tap style={s.grantBtn} onPress={() => Camera.requestCameraPermissionsAsync().then(({ status }) => setPermission({ granted: status === 'granted' }))}>
+                    <TouchableOpacity style={s.grantBtn} onPress={() => Camera.requestCameraPermissionsAsync().then(({ status }) => setPermission({ granted: status === 'granted' }))}>
                         <Text style={s.btnText}>Grant Camera Access</Text>
-                    </Tap>
+                    </TouchableOpacity>
                 </View>
-            </View>
+            </SafeAreaView>
         );
     }
 
@@ -389,11 +381,11 @@ export default function GhostSkeletonScreen({ navigation, route }) {
             {phase === 'countdown' && <CountdownOverlay seconds={countdown} />}
 
             {/* ── Top HUD ── */}
-            <View style={[s.hud, { paddingTop: ins.top + 8 }]}>
+            <SafeAreaView style={s.hud}>
                 <View style={s.hudRow}>
-                    <Tap style={s.backBtn} onPress={() => navigation?.goBack()}>
+                    <TouchableOpacity style={s.backBtn} onPress={() => navigation?.goBack()}>
                         <Text style={s.backTxt}>← Back</Text>
-                    </Tap>
+                    </TouchableOpacity>
 
                     <View style={s.sportChip}>
                         <Text style={s.sportTxt}>{sport.replace(/_/g, ' ').toUpperCase()}</Text>
@@ -421,14 +413,14 @@ export default function GhostSkeletonScreen({ navigation, route }) {
                         <View style={[s.legendDot, { backgroundColor: C.orange }]} />
                         <Text style={s.legendTxt}>Off-target</Text>
                     </View>
-                    <Tap style={s.labelToggle} onPress={() => setShowLabels(l => !l)}>
+                    <TouchableOpacity style={s.labelToggle} onPress={() => setShowLabels(l => !l)}>
                         <Text style={s.labelToggleTxt}>{showLabels ? 'Hide Labels' : 'Labels'}</Text>
-                    </Tap>
+                    </TouchableOpacity>
                 </View>
-            </View>
+            </SafeAreaView>
 
             {/* ── Bottom Panel ── */}
-            <View style={[s.bottom, { paddingBottom: ins.bottom + 20 }]}>
+            <View style={s.bottom}>
                 {/* Calibration dots */}
                 {phase === 'calibrating' || phase === 'ready' ? (
                     <View style={s.calibRow}>
@@ -439,7 +431,7 @@ export default function GhostSkeletonScreen({ navigation, route }) {
                             ]} />
                         ))}
                         <Text style={s.calibHint}>
-                            {calibReady ? 'Ready to start!' : `${Math.max(0, 3 - goodFrames)} more good frames needed`}
+                            {calibReady ? '✅ Ready to start!' : `${Math.max(0, 3 - goodFrames)} more good frames needed`}
                         </Text>
                     </View>
                 ) : (
@@ -454,15 +446,16 @@ export default function GhostSkeletonScreen({ navigation, route }) {
                 <Text style={s.feedbackTxt}>{feedback}</Text>
 
                 {/* Start button */}
-                <Tap
+                <TouchableOpacity
                     style={[s.startBtn, !calibReady && s.startBtnOff]}
                     onPress={handleStart}
+                    activeOpacity={0.85}
                     disabled={!calibReady}
                 >
                     <Text style={[s.btnText, !calibReady && { color: 'rgba(0,0,0,0.5)' }]}>
-                        {calibReady ? 'Start Session' : phase === 'countdown' ? 'Positioning...' : 'Calibrating...'}
+                        {calibReady ? '🚀 Start Session' : phase === 'countdown' ? 'Positioning...' : 'Calibrating...'}
                     </Text>
-                </Tap>
+                </TouchableOpacity>
             </View>
         </View>
     );
@@ -471,37 +464,37 @@ export default function GhostSkeletonScreen({ navigation, route }) {
 
 const s = StyleSheet.create({
     fill: { flex: 1, backgroundColor: '#000' },
-    safeBg: { flex: 1, backgroundColor: '#000' },
+    safeBg: { flex: 1, backgroundColor: C.bg },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 28 },
-    permTitle: { color: C.text, fontSize: 22, fontWeight: '700', marginBottom: 12, fontFamily: MONO, letterSpacing: 1 },
-    permText: { color: '#8A929C', fontSize: 12, textAlign: 'center', lineHeight: 18, marginBottom: 24, fontFamily: MONO },
-    grantBtn: { borderWidth: 1, borderColor: C.amber, paddingHorizontal: 20, paddingVertical: 12 },
+    permTitle: { color: C.cyan, fontSize: 22, fontWeight: '900', marginBottom: 12 },
+    permText: { color: C.muted, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+    grantBtn: { backgroundColor: C.cyan, borderRadius: 12, paddingHorizontal: 28, paddingVertical: 13 },
     hud: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-    hudRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8, backgroundColor: 'rgba(0,0,0,0.7)', borderBottomWidth: 1, borderBottomColor: C.border },
-    backBtn: { borderWidth: 1, borderColor: C.border, paddingHorizontal: 10, paddingVertical: 6 },
-    backTxt: { color: C.text, fontWeight: '700', fontSize: 10, fontFamily: MONO, letterSpacing: 1 },
-    sportChip: { flex: 1, borderWidth: 1, borderColor: C.border, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center' },
-    sportTxt: { color: C.amber, fontWeight: '700', fontSize: 10, letterSpacing: 1, fontFamily: MONO },
-    scoreChip: { borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, alignItems: 'center' },
-    scoreNum: { fontSize: 20, fontWeight: '700', fontFamily: MONO, letterSpacing: -0.5 },
-    scoreLabel: { fontSize: 8, color: '#5C4600', fontWeight: '700', letterSpacing: 1, fontFamily: MONO },
-    legend: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, flexWrap: 'wrap', backgroundColor: 'rgba(0,0,0,0.5)', borderBottomWidth: 1, borderBottomColor: C.border },
+    hudRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 8, gap: 8 },
+    backBtn: { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, paddingHorizontal: 13, paddingVertical: 8 },
+    backTxt: { color: C.text, fontWeight: '700', fontSize: 13 },
+    sportChip: { flex: 1, backgroundColor: 'rgba(6,182,212,0.12)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, alignItems: 'center' },
+    sportTxt: { color: C.cyan, fontWeight: '800', fontSize: 11, letterSpacing: 0.5 },
+    scoreChip: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5, alignItems: 'center', borderWidth: 1 },
+    scoreNum: { fontSize: 22, fontWeight: '900' },
+    scoreLabel: { fontSize: 8, color: C.muted, fontWeight: '700', textTransform: 'uppercase' },
+    legend: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, marginTop: 8, flexWrap: 'wrap' },
     legendPill: { flexDirection: 'row', alignItems: 'center' },
-    legendDot: { width: 8, height: 8, marginRight: 4 },
-    legendTxt: { color: C.text, fontSize: 10, fontWeight: '700', fontFamily: MONO, letterSpacing: 0.5 },
-    labelToggle: { marginLeft: 'auto', borderWidth: 1, borderColor: C.border, paddingHorizontal: 8, paddingVertical: 3 },
-    labelToggleTxt: { color: '#8A929C', fontSize: 9, fontWeight: '700', fontFamily: MONO, letterSpacing: 1 },
+    legendDot: { width: 9, height: 9, borderRadius: 5, marginRight: 4 },
+    legendTxt: { color: C.text, fontSize: 10, fontWeight: '700' },
+    labelToggle: { marginLeft: 'auto', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+    labelToggleTxt: { color: C.muted, fontSize: 9, fontWeight: '700' },
     bottom: {
         position: 'absolute', bottom: 0, left: 0, right: 0,
-        backgroundColor: 'rgba(0,0,0,0.92)',
-        borderTopWidth: 1, borderTopColor: C.border,
-        padding: 16,
+        backgroundColor: 'rgba(15,23,42,0.90)',
+        borderTopLeftRadius: 22, borderTopRightRadius: 22,
+        padding: 20, paddingBottom: 34,
     },
     calibRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-    calibDot: { width: 12, height: 12, marginRight: 8 },
-    calibHint: { color: C.text, fontSize: 11, fontWeight: '700', flex: 1, fontFamily: MONO, letterSpacing: 0.5 },
-    feedbackTxt: { color: '#8A929C', fontSize: 11, lineHeight: 16, marginBottom: 12, fontFamily: MONO },
-    startBtn: { borderWidth: 1, borderColor: C.amber, paddingVertical: 12, alignItems: 'center' },
-    startBtnOff: { borderColor: C.border },
-    btnText: { color: C.amber, fontWeight: '700', fontSize: 12, fontFamily: MONO, letterSpacing: 1.5 },
+    calibDot: { width: 13, height: 13, borderRadius: 7, marginRight: 9 },
+    calibHint: { color: C.text, fontSize: 12, fontWeight: '700', flex: 1 },
+    feedbackTxt: { color: C.muted, fontSize: 12, lineHeight: 18, marginBottom: 14 },
+    startBtn: { backgroundColor: C.cyan, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+    startBtnOff: { backgroundColor: 'rgba(6,182,212,0.18)' },
+    btnText: { color: '#000', fontWeight: '900', fontSize: 14 },
 });
