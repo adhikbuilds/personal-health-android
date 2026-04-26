@@ -3,7 +3,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    View, Text, ScrollView, StyleSheet,
+    View, Text, ScrollView, StyleSheet, TextInput,
     Dimensions, StatusBar, ActivityIndicator, RefreshControl,
     Pressable, Alert, DevSettings,
 } from 'react-native';
@@ -42,7 +42,7 @@ function fmtDate(iso) {
 
 export default function ProfileScreen({ navigation }) {
     const ins = useSafeAreaInsets();
-    const { userData, fitnessScore, dataMode } = useUser();
+    const { userData, fitnessScore, dataMode, refreshUser } = useUser();
     const { user: authUser, logout } = useAuth();
     const athleteId = userData?.avatarId || authUser?.athlete_id || 'athlete_01';
 
@@ -69,6 +69,38 @@ export default function ProfileScreen({ navigation }) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [advanced, setAdvanced] = useState(null);
+    const [editing, setEditing] = useState(false);
+    const [editName, setEditName] = useState('');
+    const [editSport, setEditSport] = useState('');
+    const [editHeight, setEditHeight] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    const startEdit = useCallback(() => {
+        setEditName(userData?.name || '');
+        setEditSport(userData?.sport || 'vertical_jump');
+        setEditHeight(String(userData?.height_cm || '170'));
+        setEditing(true);
+    }, [userData]);
+
+    const saveProfile = useCallback(async () => {
+        setSaving(true);
+        try {
+            const body = {};
+            if (editName.trim()) body.name = editName.trim();
+            if (editSport) body.sport = editSport;
+            const h = parseFloat(editHeight);
+            if (h > 0) body.height_cm = h;
+            await api.patch(`/athlete/${encodeURIComponent(athleteId)}`, body);
+            refreshUser();
+            setEditing(false);
+            Alert.alert('Saved', 'Profile updated.');
+        } catch (e) {
+            Alert.alert('Error', 'Could not save profile.');
+        } finally {
+            setSaving(false);
+        }
+    }, [athleteId, editName, editSport, editHeight, refreshUser]);
+
     const [activeTheme, setActiveThemeName] = useState(getActiveTheme());
     const [cameraEngine, setCameraEngineState] = useState(DEFAULT_CAMERA_ENGINE);
     useEffect(() => {
@@ -175,6 +207,46 @@ export default function ProfileScreen({ navigation }) {
                         <FieldRow label="SPT........... SPORT" value={sport.toUpperCase()} color={C.info} />
                         <FieldRow label="TIR........... TIER" value={(userData?.tier || '--').toUpperCase()} color={C.text} />
                         <FieldRow label="LVL........... FIT INDIA BAND" value={`L${lvl} · ${(LEVEL_LABELS[lvl] || '').toUpperCase()}`} color={LEVEL_COLORS[lvl] || C.text} />
+                    </Panel>
+                </Fade>
+
+                {/* Edit profile */}
+                <Fade delay={80}>
+                    <Panel>
+                        <Header title="EDIT PROFILE" right={
+                            !editing
+                                ? <Pressable onPress={startEdit}><Text style={{ color: C.info, fontSize: 11, fontFamily: T.mono }}>[ EDIT ]</Text></Pressable>
+                                : <Pressable onPress={() => setEditing(false)}><Text style={{ color: C.muted, fontSize: 11, fontFamily: T.mono }}>[ CANCEL ]</Text></Pressable>
+                        } />
+                        {editing ? (
+                            <View style={{ gap: 10, paddingTop: 4 }}>
+                                <View style={s.editRow}>
+                                    <Text style={s.editLabel}>NAME</Text>
+                                    <TextInput style={s.editInput} value={editName} onChangeText={setEditName} placeholderTextColor={C.muted} maxLength={60} />
+                                </View>
+                                <View style={s.editRow}>
+                                    <Text style={s.editLabel}>SPORT</Text>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
+                                        {Object.entries(SPORT_LABELS).map(([key, label]) => (
+                                            <Pressable key={key} onPress={() => setEditSport(key)}
+                                                style={[s.sportChip, editSport === key && s.sportChipActive]}>
+                                                <Text style={[s.sportChipText, editSport === key && { color: C.bg }]}>{label.toUpperCase()}</Text>
+                                            </Pressable>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                                <View style={s.editRow}>
+                                    <Text style={s.editLabel}>HEIGHT CM</Text>
+                                    <TextInput style={[s.editInput, { width: 80 }]} value={editHeight} onChangeText={setEditHeight} keyboardType="numeric" placeholderTextColor={C.muted} maxLength={5} />
+                                </View>
+                                <Pressable onPress={saveProfile} disabled={saving}
+                                    style={[s.saveBtn, saving && { opacity: 0.5 }]}>
+                                    <Text style={s.saveBtnText}>{saving ? 'SAVING...' : 'SAVE PROFILE'}</Text>
+                                </Pressable>
+                            </View>
+                        ) : (
+                            <Text style={{ color: C.muted, fontSize: 11, fontFamily: T.mono }}>TAP EDIT TO MODIFY NAME, SPORT, OR HEIGHT</Text>
+                        )}
                     </Panel>
                 </Fade>
 
@@ -443,4 +515,13 @@ const s = StyleSheet.create({
 
     logoutBtn:  { paddingVertical: 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: C.border },
     logoutText: { color: C.bad, fontFamily: T.MONO, fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+
+    editRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    editLabel: { fontSize: 10, color: C.muted, fontFamily: T.MONO, fontWeight: '700', width: 76, letterSpacing: 0.5 },
+    editInput: { flex: 1, borderWidth: 1, borderColor: C.border, backgroundColor: C.bg, color: C.text, fontFamily: T.MONO, fontSize: 12, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 0 },
+    sportChip: { paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: C.border, marginRight: 6 },
+    sportChipActive: { backgroundColor: C.info, borderColor: C.info },
+    sportChipText: { fontSize: 10, fontFamily: T.MONO, fontWeight: '700', color: C.text, letterSpacing: 0.5 },
+    saveBtn:   { marginTop: 6, backgroundColor: C.info, paddingVertical: 10, alignItems: 'center' },
+    saveBtnText: { color: C.bg, fontFamily: T.MONO, fontSize: 11, fontWeight: '700', letterSpacing: 2 },
 });

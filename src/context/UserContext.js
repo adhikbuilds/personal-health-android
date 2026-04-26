@@ -119,6 +119,22 @@ export function UserProvider({ children }) {
         }));
     }, []);
 
+    const refreshUser = useCallback(() => {
+        const aid = authUser?.athlete_id;
+        if (!aid) return;
+        api.getAthlete(aid).then(athlete => {
+            if (!athlete?.id) return;
+            setUserData(prev => ({
+                ...prev,
+                name: athlete.name ?? prev.name,
+                bpi: athlete.bpi ?? prev.bpi,
+                sessions: athlete.sessions ?? prev.sessions,
+                tier: athlete.tier ?? prev.tier,
+                sport: athlete.sport ?? prev.sport,
+            }));
+        }).catch(() => {});
+    }, [authUser?.athlete_id]);
+
     const updateFitnessScore = useCallback((score, level, label, color) => {
         const updated = { score, level, label, color, lastTested: new Date().toISOString() };
         setFitnessScoreState(updated);
@@ -126,7 +142,7 @@ export function UserProvider({ children }) {
     }, []);
 
     return (
-        <UserContext.Provider value={{ userData, addXp, updateScoutReadiness, recentSession, dataMode, fitnessScore, updateFitnessScore }}>
+        <UserContext.Provider value={{ userData, addXp, updateScoutReadiness, refreshUser, recentSession, dataMode, fitnessScore, updateFitnessScore }}>
             {children}
         </UserContext.Provider>
     );
@@ -140,6 +156,7 @@ export function useUser() {
             userData: INITIAL_USER_DATA,
             addXp: () => {},
             updateScoutReadiness: () => {},
+            refreshUser: () => {},
             recentSession: null,
             dataMode: 'mock',
             fitnessScore: { score: 0, level: 0, label: 'Not Tested', color: '#64748b', lastTested: null },

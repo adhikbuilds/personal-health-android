@@ -148,6 +148,11 @@ export function _resetApiCache() {
 
 // ─── Session API ─────────────────────────────────────────────────────────────
 export const api = {
+    patch: (path, body) => fetchJSON(path, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+    }),
+
     /** Check if API is reachable */
     ping: () => fetchJSON('/health'),
 
@@ -464,7 +469,7 @@ export const api = {
         };
     },
 
-    /** Biomechanics live stream: WebSocket for real-time keypoint/pose data. */
+    // DEPRECATED: No screen uses this. Candidate for removal.
     connectLiveStream: (sessionId, onMessage, onError, onClose) => {
         const wsUrl = `${WS_BASE_RESOLVED}/session/${sessionId}/live-stream`;
         console.log(`[WS-STREAM] Connecting: ${wsUrl}`);
