@@ -52,6 +52,9 @@ async function fetchJSON(path, options = {}) {
             const text = await res.text().catch(() => '');
             throw new Error(`HTTP ${res.status}: ${text}`);
         }
+        if (res.status === 204) return null;
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) return null;
         return await res.json();
     } catch (err) {
         clearTimeout(timer);
@@ -285,6 +288,37 @@ export const api = {
 
     generateNotification: (athleteId) =>
         fetchJSON(`/notifications/generate/${encodeURIComponent(athleteId)}`, { method: 'POST' }),
+
+    // ─── Profile edit (Phase 3) ──────────────────────────────────────────
+    updateAthlete: (athleteId, data) =>
+        fetchJSON(`/athlete/${athleteId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+    // ─── Auth ────────────────────────────────────────────────────────────
+    authRegister: (name, email, password, role = 'athlete') =>
+        fetchJSON('/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password, role }) }),
+    authLogin: (email, password) =>
+        fetchJSON('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    authMe: () => fetchJSON('/auth/me'),
+    authRefresh: (refreshToken) =>
+        fetchJSON('/auth/refresh', { method: 'POST', body: JSON.stringify({ refresh_token: refreshToken }) }),
+
+    /** Phase 2: open a WebSocket that streams JPEG frames to the backend. */
+    connectFrameStream: (sessionId, { onResult, onError, onClose, onPing } = {}) => {
+        const wsUrl = `${WS_BASE_RESOLVED}/ws/session/${sessionId}/frames-jpeg`;
+        const ws = new WebSocket(wsUrl);
+        ws.onopen = () => console.log(`[WS-FRAMES] connected: ${sessionId}`);
+        ws.onmessage = (e) => {
+            let msg = null;
+            try { msg = JSON.parse(e.data); } catch (_) { return; }
+            if (!msg || typeof msg !== 'object') return;
+            if (msg.type === 'result' && onResult) onResult(msg);
+            else if (msg.type === 'ping' && onPing) onPing(msg);
+            else if (msg.type === 'error' && onError) onError(new Error(msg.code || 'ws_error'));
+        };
+        ws.onerror = (e) => { if (onError) onError(e); };
+        ws.onclose = () => { if (onClose) onClose(); };
+        return { send: (b64) => ws.readyState === 1 && ws.send(JSON.stringify({ type: 'frame', data: b64 })), close: () => ws.close() };
+    },
 
     // ─── Generic REST helpers ────────────────────────────────────────────
     get:   (path)         => fetchJSON(path),
