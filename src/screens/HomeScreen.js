@@ -155,7 +155,7 @@ export default function HomeScreen({ navigation }) {
                                 label="STEP 2........ FIRST TRAINING SESSION"
                                 value="OPEN [F1]"
                                 color={C.text}
-                                onPress={() => navigation.navigate('GhostSkeleton', { sport: userData.sport || 'general' })}
+                                onPress={() => navigation.navigate('Tabs', { screen: 'Train', params: { sport: userData.sport || 'general' } })}
                             />
                             <FieldRow
                                 label="STEP 3........ HEART RATE BASELINE"
@@ -361,7 +361,7 @@ export default function HomeScreen({ navigation }) {
                     <Panel>
                         <Header title="CMD MENU" />
                         {[
-                            { hotkey: 'F1', label: 'START.TRAIN', desc: 'ghost calibration → live form scoring', color: C.text, target: 'GhostSkeleton', params: { sport: userData.sport || 'general' } },
+                            { hotkey: 'F1', label: 'START.TRAIN', desc: 'live AI form scoring', color: C.text, target: 'Tabs', params: { screen: 'Train', params: { sport: userData.sport || 'general' } } },
                             { hotkey: 'F2', label: 'HEART.RATE', desc: 'finger rPPG · 2.5s warmup · HRV', color: C.bad, target: 'HeartRate', params: { sessionId: 'rppg_' + Date.now() } },
                             { hotkey: 'F3', label: 'PLAN.WEEK',  desc: 'personalised drills · adherence', color: C.good, target: 'TrainingPlan' },
                             { hotkey: 'F4', label: 'NUTR.AI',    desc: 'photo → macros via vision model', color: C.warn, target: 'Nutrition' },

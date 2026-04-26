@@ -5,7 +5,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, StatusBar, Animated, Pressable, ActivityIndicator,
-    NativeModules, NativeEventEmitter,
+    NativeModules, NativeEventEmitter, ScrollView,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +16,8 @@ import {
     Panel, Header, HdrMeta, Rule, FieldRow, Triad, SysBar, TerminalScreen, Footer, useLiveClock,
     fmt, fmtInt, nowISO,
 } from '../components/terminal';
+
+const MEASUREMENT_DURATION_MS = 15000;
 
 let RPPGStream = null;
 let RPPGEmitter = null;
@@ -59,6 +61,50 @@ function qualityCode(q) {
     return { label: q ? c : 'IDLE', color: C.textMid };
 }
 
+function hrvStatus(ms) {
+    if (ms <= 0) return { label: '--', color: C.muted, hint: '' };
+    if (ms < 20) return { label: 'LOW', color: C.bad, hint: 'HIGH STRESS' };
+    if (ms < 50) return { label: 'NORMAL', color: C.good, hint: 'BALANCED' };
+    if (ms < 100) return { label: 'HIGH', color: C.info, hint: 'RECOVERED' };
+    return { label: 'V.HIGH', color: C.info, hint: 'DEEP RECOVERY' };
+}
+
+function ProgressRing({ progress, size = 100, strokeWidth = 4, color }) {
+    const leftRotation = progress <= 50
+        ? `${-180 + (progress / 50) * 180}deg`
+        : '0deg';
+    const rightRotation = progress > 50
+        ? `${-180 + ((progress - 50) / 50) * 180}deg`
+        : '-180deg';
+
+    return (
+        <View style={{ width: size, height: size }}>
+            <View style={{
+                position: 'absolute', width: size, height: size,
+                borderRadius: size / 2, borderWidth: strokeWidth,
+                borderColor: C.border,
+            }} />
+            <View style={{ position: 'absolute', width: size / 2, height: size, left: 0, overflow: 'hidden' }}>
+                <View style={{
+                    width: size, height: size, borderRadius: size / 2,
+                    borderWidth: strokeWidth, borderColor: color,
+                    borderRightColor: 'transparent', borderBottomColor: 'transparent',
+                    transform: [{ rotate: leftRotation }],
+                }} />
+            </View>
+            <View style={{ position: 'absolute', width: size / 2, height: size, right: 0, overflow: 'hidden' }}>
+                <View style={{
+                    width: size, height: size, borderRadius: size / 2,
+                    borderWidth: strokeWidth, borderColor: color,
+                    borderLeftColor: 'transparent', borderTopColor: 'transparent',
+                    transform: [{ rotate: rightRotation }],
+                    left: -(size / 2),
+                }} />
+            </View>
+        </View>
+    );
+}
+
 export default function RPPGScreen({ navigation, route }) {
     const ins = useSafeAreaInsets();
     const clock = useLiveClock();
@@ -72,6 +118,8 @@ export default function RPPGScreen({ navigation, route }) {
     const resultSubRef = useRef(null);
     const errorSubRef = useRef(null);
     const usingNativeRef = useRef(false);
+    const startedAtRef = useRef(0);
+    const measurementCompleteRef = useRef(false);
 
     const [scanning, setScanning] = useState(false);
     const [bpm, setBpm] = useState(0);
@@ -82,6 +130,10 @@ export default function RPPGScreen({ navigation, route }) {
     const [err, setErr] = useState('');
     const [startedAt, setStartedAt] = useState(0);
     const [waveform, setWaveform] = useState([]);
+    const [progress, setProgress] = useState(0);
+    const [bpmHistory, setBpmHistory] = useState([]);
+    const [measurementComplete, setMeasurementComplete] = useState(false);
+    const [saved, setSaved] = useState(false);
 
     const pulse = useRef(new Animated.Value(1)).current;
     useEffect(() => {
@@ -100,6 +152,30 @@ export default function RPPGScreen({ navigation, route }) {
         return () => { aliveRef.current = false; stop(); };
     }, []);
 
+    function handleResult(r) {
+        if (!aliveRef.current || !scanRef.current) return;
+        const sq = (r.signal_quality || '').toLowerCase();
+        const reliable = sq === 'fair' || sq === 'good' || sq === 'excellent';
+
+        if (r.bpm > 0 && reliable) {
+            setBpm(r.bpm);
+            setBpmHistory(prev => [...prev.slice(-29), r.bpm]);
+        }
+        setHrv(r.hrv_ms ?? 0);
+        setQuality(r.signal_quality || '');
+        setFingerOn(sq !== 'no_pulse' && sq !== 'no_face' && r.status !== 'invalid');
+        if (r.waveform) setWaveform(r.waveform);
+
+        const elapsed = Date.now() - startedAtRef.current;
+        const timeProgress = Math.min(100, (elapsed / MEASUREMENT_DURATION_MS) * 100);
+        setProgress(Math.round(timeProgress));
+
+        if (timeProgress >= 100 && !measurementCompleteRef.current && r.bpm > 0 && reliable) {
+            measurementCompleteRef.current = true;
+            setMeasurementComplete(true);
+        }
+    }
+
     function stop() {
         scanRef.current = false;
         if (resultSubRef.current) { resultSubRef.current.remove(); resultSubRef.current = null; }
@@ -115,19 +191,16 @@ export default function RPPGScreen({ navigation, route }) {
         if (t) clearInterval(t);
         if (w) try { w.close(); } catch (_) {}
         setScanning(false);
+        setProgress(0);
+        setMeasurementComplete(false);
+        measurementCompleteRef.current = false;
+        setSaved(false);
+        setBpmHistory([]);
     }
 
     function startFallback() {
         const w = api.connectRPPGLiveStream(sid,
-            (r) => {
-                if (!aliveRef.current || !scanRef.current) return;
-                if (r.bpm > 0 && r.status !== 'warmup') setBpm(r.bpm);
-                setHrv(r.hrv_ms ?? 0);
-                setQuality(r.signal_quality || '');
-                const sq = (r.signal_quality || '').toLowerCase();
-                setFingerOn(sq !== 'no_pulse' && sq !== 'no_face' && r.status !== 'invalid');
-                if (r.waveform) setWaveform(r.waveform);
-            },
+            handleResult,
             () => { setErr('WS CONNECT FAILED'); stop(); },
             () => { if (scanRef.current) { setErr('WS DROPPED'); stop(); } },
         );
@@ -164,20 +237,21 @@ export default function RPPGScreen({ navigation, route }) {
         setHrv(0);
         setFingerOn(false);
         setQuality('warmup');
-        setStartedAt(Date.now());
+        const now = Date.now();
+        setStartedAt(now);
+        startedAtRef.current = now;
         setWaveform([]);
+        setProgress(0);
+        setBpmHistory([]);
+        setMeasurementComplete(false);
+        measurementCompleteRef.current = false;
+        setSaved(false);
 
         if (RPPGStream && RPPGEmitter) {
             const wsUrl = `${api.getWsBase()}/rppg/live-stream/${sid}`;
 
             resultSubRef.current = RPPGEmitter.addListener('onRPPGResult', (r) => {
-                if (!aliveRef.current || !scanRef.current) return;
-                if (r.bpm > 0 && r.status !== 'warmup') setBpm(r.bpm);
-                setHrv(r.hrv_ms ?? 0);
-                setQuality(r.signal_quality || '');
-                const sq = (r.signal_quality || '').toLowerCase();
-                setFingerOn(sq !== 'no_pulse' && sq !== 'no_face' && r.status !== 'invalid');
-                if (r.waveform) setWaveform(r.waveform);
+                handleResult(r);
                 setSamples(c => c + 1);
             });
 
@@ -200,6 +274,16 @@ export default function RPPGScreen({ navigation, route }) {
         startFallback();
     }
 
+    async function saveResult() {
+        if (saved) return;
+        try {
+            await api.endSession(sid);
+            setSaved(true);
+        } catch (e) {
+            console.warn('[RPPGScreen] Save failed:', e?.message);
+        }
+    }
+
     function handleBack() {
         stop();
         setTimeout(() => navigation?.canGoBack() && navigation.goBack(), 80);
@@ -208,6 +292,7 @@ export default function RPPGScreen({ navigation, route }) {
     const col = bpmColor(bpm);
     const zone = zoneCode(bpm);
     const q = qualityCode(quality);
+    const h = hrvStatus(hrv);
     const elapsed = scanning && startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
 
     if (!perm) {
@@ -272,91 +357,172 @@ export default function RPPGScreen({ navigation, route }) {
                 </View>
             )}
 
-            <View style={{ padding: 16 }}>
-                <Text style={s.prompt}>{'> rppg --live --session='}{String(sid).slice(0, 10)}</Text>
-                <Text style={s.title}>HEART RATE MONITOR</Text>
-            </View>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: ins.bottom + 20 }}
+            >
+                <View style={{ padding: 16 }}>
+                    <Text style={s.prompt}>{'> rppg --live --session='}{String(sid).slice(0, 10)}</Text>
+                    <Text style={s.title}>HEART RATE MONITOR</Text>
+                </View>
 
-            {scanning && !fingerOn && (
-                <View style={s.fingerCue}>
-                    <Text style={s.fingerCueIcon}>👆</Text>
-                    <View style={{ flex: 1 }}>
+                {/* Finger guidance */}
+                {scanning && !fingerOn && (
+                    <View style={s.fingerCue}>
                         <Text style={s.fingerCueTitle}>PLACE FINGER ON BACK CAMERA</Text>
-                        <Text style={s.fingerCueBody}>Cover both lens + flash. Hold still. Torch is on.</Text>
-                    </View>
-                </View>
-            )}
-
-            <Panel>
-                <Header
-                    title="BPM"
-                    right={<HdrMeta color={col}>[{zone}]</HdrMeta>}
-                />
-                <View style={s.bpmBody}>
-                    <Animated.Text style={[s.bpmBig, { color: col, transform: [{ scale: pulse }] }]}>
-                        {bpm > 0 ? String(Math.round(bpm)).padStart(3, '0') : '---'}
-                    </Animated.Text>
-                    <View style={s.bpmRight}>
-                        <Text style={s.bpmUnit}>BPM</Text>
-                        <Text style={[s.bpmQuality, { color: q.color }]}>{q.label}</Text>
-                        {err ? <Text style={[s.bpmQuality, { color: C.bad }]}>{err.toUpperCase()}</Text> : null}
-                    </View>
-                </View>
-            </Panel>
-
-            <Panel>
-                <Header title="VITALS · LIVE" right={<HdrMeta>{scanning ? (RPPGStream ? 'NATIVE 30HZ' : 'FALLBACK') : 'IDLE'}</HdrMeta>} />
-                <FieldRow label="BPM........... BEATS PER MINUTE" value={bpm > 0 ? fmt(bpm, 1) : '--'} color={col} />
-                <FieldRow label="HRV........... RMSSD (MS)" value={hrv > 0 ? fmt(hrv, 1) : '--'} color={C.info} />
-                <FieldRow label="SIG........... SIGNAL QUALITY" value={`[${q.label}]`} color={q.color} />
-                <FieldRow label="FNG........... FINGER DETECTED" value={fingerOn ? 'YES' : 'NO'} color={fingerOn ? C.good : C.muted} />
-                <FieldRow label="FRM........... FRAMES SENT" value={fmtInt(samples)} color={C.text} />
-                <FieldRow label="ELP........... ELAPSED (SEC)" value={fmtInt(elapsed)} color={C.textSub} size="sm" dim />
-                {waveform.length > 0 && (
-                    <>
-                        <Rule />
-                        <View style={{ height: 40, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8 }}>
-                            {waveform.map((v, i) => (
-                                <View key={i} style={{
-                                    flex: 1,
-                                    height: Math.max(1, Math.abs(v) * 35),
-                                    marginHorizontal: 0.3,
-                                    backgroundColor: v >= 0 ? C.good : C.info,
-                                    opacity: 0.6 + Math.abs(v) * 0.4,
-                                    alignSelf: v >= 0 ? 'flex-end' : 'flex-start',
-                                }} />
-                            ))}
+                        <Text style={s.fingerCueBody}>
+                            Cover both the camera lens and flash completely.{'\n'}
+                            Hold still — torch will illuminate your fingertip.
+                        </Text>
+                        <View style={s.fingerCueDots}>
+                            <View style={{ alignItems: 'center' }}>
+                                <View style={s.fingerDot} />
+                                <Text style={s.fingerDotLabel}>LENS</Text>
+                            </View>
+                            <View style={{ alignItems: 'center' }}>
+                                <View style={s.fingerDot} />
+                                <Text style={s.fingerDotLabel}>FLASH</Text>
+                            </View>
                         </View>
-                    </>
+                    </View>
                 )}
-            </Panel>
 
-            <Panel>
-                <Header title="INSTRUCTIONS" />
-                <FieldRow label="01............ COVER BACK CAMERA" value="▸ FINGER"  color={C.textMid} size="sm" />
-                <FieldRow label="02............ HOLD STILL"           value="▸ 10 SEC"  color={C.textMid} size="sm" />
-                <FieldRow label="03............ TORCH WILL ACTIVATE"  value="▸ AUTO"    color={C.textMid} size="sm" />
-                <FieldRow label="04............ WARMUP"               value="▸ 2.5 SEC" color={C.textMid} size="sm" />
-            </Panel>
+                {/* BPM Panel */}
+                <Panel>
+                    <Header
+                        title="BPM"
+                        right={<HdrMeta color={col}>[{zone}]</HdrMeta>}
+                    />
+                    {scanning && progress < 20 ? (
+                        <View style={s.bpmBody}>
+                            <View style={{ width: 100, height: 100, alignItems: 'center', justifyContent: 'center' }}>
+                                <ProgressRing progress={progress} size={100} strokeWidth={4} color={C.info} />
+                                <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+                                    <Text style={{ fontSize: 20, fontWeight: '700', fontFamily: T.MONO, color: C.info }}>{progress}%</Text>
+                                </View>
+                            </View>
+                            <View style={s.bpmRight}>
+                                <Text style={[s.bpmUnit, { color: C.info }]}>WARMING UP</Text>
+                                <Text style={[s.bpmQuality, { color: C.textMid }]}>{samples} FRAMES</Text>
+                                {err ? <Text style={[s.bpmQuality, { color: C.bad }]}>{err.toUpperCase()}</Text> : null}
+                            </View>
+                        </View>
+                    ) : (
+                        <View style={s.bpmBody}>
+                            <Animated.Text style={[s.bpmBig, { color: col, transform: [{ scale: pulse }] }]}>
+                                {bpm > 0 ? String(Math.round(bpm)).padStart(3, '0') : '---'}
+                            </Animated.Text>
+                            <View style={s.bpmRight}>
+                                <Text style={s.bpmUnit}>BPM</Text>
+                                <Text style={[s.bpmQuality, { color: q.color }]}>{q.label}</Text>
+                                {scanning && progress < 100 && (
+                                    <Text style={[s.bpmQuality, { color: C.textMid }]}>{progress}% COMPLETE</Text>
+                                )}
+                                {scanning && progress >= 100 && (
+                                    <Text style={[s.bpmQuality, { color: C.good }]}>MEASUREMENT READY</Text>
+                                )}
+                                {err ? <Text style={[s.bpmQuality, { color: C.bad }]}>{err.toUpperCase()}</Text> : null}
+                            </View>
+                        </View>
+                    )}
+                    {/* BPM sparkline */}
+                    {bpmHistory.length > 3 && (
+                        <View style={{ height: 24, flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingBottom: 6 }}>
+                            {(() => {
+                                const min = Math.min(...bpmHistory);
+                                const max = Math.max(...bpmHistory);
+                                const range = max - min || 1;
+                                return bpmHistory.map((v, i) => (
+                                    <View key={i} style={{
+                                        flex: 1, marginHorizontal: 0.3,
+                                        height: Math.max(2, ((v - min) / range) * 20),
+                                        backgroundColor: bpmColor(v),
+                                        opacity: 0.4 + (i / bpmHistory.length) * 0.6,
+                                    }} />
+                                ));
+                            })()}
+                        </View>
+                    )}
+                </Panel>
 
-            {scanning ? (
-                <Pressable onPress={stop} style={({ pressed }) => [s.btn, { borderColor: C.bad }, pressed && { backgroundColor: '#111' }]}>
-                    <Text style={[s.btnText, { color: C.bad }]}>[SPACE] STOP MEASUREMENT</Text>
+                {/* Vitals Panel */}
+                <Panel>
+                    <Header title="VITALS · LIVE" right={<HdrMeta>{scanning ? (RPPGStream ? 'NATIVE 30HZ' : 'FALLBACK') : 'IDLE'}</HdrMeta>} />
+                    <FieldRow label="BPM........... BEATS PER MINUTE" value={bpm > 0 ? fmt(bpm, 1) : '--'} color={col} />
+                    <FieldRow label="HRV........... RMSSD (MS)" value={hrv > 0 ? `${fmt(hrv, 1)} [${h.label}]` : '--'} color={h.color} />
+                    <FieldRow label="SIG........... SIGNAL QUALITY" value={`[${q.label}]`} color={q.color} />
+                    <FieldRow label="FNG........... FINGER DETECTED" value={fingerOn ? 'YES' : 'NO'} color={fingerOn ? C.good : C.muted} />
+                    <FieldRow label="FRM........... FRAMES SENT" value={fmtInt(samples)} color={C.text} />
+                    <FieldRow label="ELP........... ELAPSED (SEC)" value={fmtInt(elapsed)} color={C.textSub} size="sm" dim />
+                    {waveform.length > 0 && (
+                        <>
+                            <Rule />
+                            <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8 }}>
+                                {(() => {
+                                    const maxAbs = Math.max(...waveform.map(Math.abs), 0.001);
+                                    return waveform.map((v, i) => {
+                                        const norm = v / maxAbs;
+                                        return (
+                                            <View key={i} style={{
+                                                flex: 1,
+                                                height: Math.max(1, Math.abs(norm) * 20),
+                                                marginHorizontal: 0.3,
+                                                backgroundColor: norm >= 0 ? C.good : C.info,
+                                                opacity: 0.5 + Math.abs(norm) * 0.5,
+                                                alignSelf: norm >= 0 ? 'flex-end' : 'flex-start',
+                                            }} />
+                                        );
+                                    });
+                                })()}
+                            </View>
+                        </>
+                    )}
+                </Panel>
+
+                {/* Measurement Complete */}
+                {measurementComplete && (
+                    <Panel>
+                        <Header title="MEASUREMENT COMPLETE" right={<HdrMeta color={C.good}>DONE</HdrMeta>} />
+                        <FieldRow label="FINAL BPM....." value={bpm > 0 ? String(Math.round(bpm)) : '--'} color={bpmColor(bpm)} />
+                        <FieldRow label="AVG HRV......." value={hrv > 0 ? `${fmt(hrv, 1)} ms` : '--'} color={h.color} />
+                        <FieldRow label="QUALITY......." value={q.label} color={q.color} />
+                        <FieldRow label="DURATION......" value={`${elapsed}s · ${samples} FRAMES`} color={C.textSub} size="sm" />
+                        <Pressable onPress={saveResult} style={({ pressed }) => [s.btn, { marginTop: 8 }, pressed && { backgroundColor: '#111' }]}>
+                            <Text style={[s.btnText, { color: saved ? C.good : C.text }]}>
+                                {saved ? '[SAVED] BIO-PASSPORT' : '[S] SAVE RESULT'}
+                            </Text>
+                        </Pressable>
+                    </Panel>
+                )}
+
+                {/* Instructions */}
+                <Panel>
+                    <Header title="INSTRUCTIONS" />
+                    <FieldRow label="01............ COVER BACK CAMERA" value="▸ FINGER"  color={C.textMid} size="sm" />
+                    <FieldRow label="02............ HOLD STILL"           value="▸ 15 SEC" color={C.textMid} size="sm" />
+                    <FieldRow label="03............ TORCH WILL ACTIVATE"  value="▸ AUTO"    color={C.textMid} size="sm" />
+                    <FieldRow label="04............ WARMUP"               value="▸ 3 SEC"   color={C.textMid} size="sm" />
+                </Panel>
+
+                {scanning ? (
+                    <Pressable onPress={stop} style={({ pressed }) => [s.btn, { borderColor: C.bad }, pressed && { backgroundColor: '#111' }]}>
+                        <Text style={[s.btnText, { color: C.bad }]}>[SPACE] STOP MEASUREMENT</Text>
+                    </Pressable>
+                ) : (
+                    <Pressable onPress={start} style={({ pressed }) => [s.btn, pressed && { backgroundColor: '#111' }]}>
+                        <Text style={[s.btnText, { color: C.text }]}>[SPACE] START MEASUREMENT  ▸</Text>
+                    </Pressable>
+                )}
+
+                <Pressable onPress={handleBack} style={({ pressed }) => [s.btnSecondary, pressed && { backgroundColor: '#111' }]}>
+                    <Text style={s.btnSecondaryText}>[ESC] RETURN</Text>
                 </Pressable>
-            ) : (
-                <Pressable onPress={start} style={({ pressed }) => [s.btn, pressed && { backgroundColor: '#111' }]}>
-                    <Text style={[s.btnText, { color: C.text }]}>[SPACE] START MEASUREMENT  ▸</Text>
-                </Pressable>
-            )}
 
-            <Pressable onPress={handleBack} style={({ pressed }) => [s.btnSecondary, pressed && { backgroundColor: '#111' }]}>
-                <Text style={s.btnSecondaryText}>[ESC] RETURN</Text>
-            </Pressable>
-
-            <Footer lines={[
-                { text: `RPPG SESSION ${String(sid).slice(0, 10).toUpperCase()}` },
-                { text: RPPGStream ? 'NATIVE CAMERAX · 30 HZ · CHROM ALGO' : 'EXPO-CAMERA FALLBACK · 10 HZ · CHROM ALGO' },
-            ]} />
+                <Footer lines={[
+                    { text: `RPPG SESSION ${String(sid).slice(0, 10).toUpperCase()}` },
+                    { text: RPPGStream ? 'NATIVE CAMERAX · 30 HZ · CHROM ALGO' : 'EXPO-CAMERA FALLBACK · 10 HZ · CHROM ALGO' },
+                ]} />
+            </ScrollView>
         </TerminalScreen>
     );
 }
@@ -372,14 +538,18 @@ const s = StyleSheet.create({
     bpmUnit:   { fontSize: 14, color: C.muted, fontFamily: T.MONO, fontWeight: '600' },
     bpmQuality:{ fontSize: 11, fontFamily: T.MONO, fontWeight: '700', marginTop: 4, letterSpacing: 1 },
 
-    fingerCue:      {
-        flexDirection: 'row', alignItems: 'center',
-        marginHorizontal: 16, marginTop: 12, padding: 14,
-        borderWidth: 1, borderColor: C.warn, backgroundColor: C.bg2,
+    fingerCue: {
+        marginHorizontal: 16, marginTop: 12, padding: 16,
+        borderWidth: 1, borderColor: C.warn, backgroundColor: 'rgba(234,179,8,0.08)',
     },
-    fingerCueIcon:  { fontSize: 28, marginRight: 12 },
-    fingerCueTitle: { color: C.warn, fontFamily: T.MONO, fontSize: 12, fontWeight: '700', letterSpacing: 1 },
-    fingerCueBody:  { color: C.textSub, fontFamily: T.MONO, fontSize: 10, marginTop: 4, letterSpacing: 0.5 },
+    fingerCueTitle: { color: C.warn, fontFamily: T.MONO, fontSize: 13, fontWeight: '700', letterSpacing: 1.5, textAlign: 'center' },
+    fingerCueBody: {
+        color: C.textSub, fontFamily: T.MONO, fontSize: 10, marginTop: 8,
+        textAlign: 'center', lineHeight: 16,
+    },
+    fingerCueDots: { flexDirection: 'row', justifyContent: 'center', marginTop: 12, gap: 16 },
+    fingerDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.warn },
+    fingerDotLabel: { color: C.textMid, fontFamily: T.MONO, fontSize: 8, marginTop: 4 },
 
     btn:          { margin: 16, marginTop: 20, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: C.text },
     btnText:      { fontFamily: T.MONO, fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
