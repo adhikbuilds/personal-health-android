@@ -4,13 +4,13 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
-import { PLAYFIELDS } from '../data/constants';
-import { API_BASE } from '../services/api';
+import { PLAYFIELDS } from '../../data/constants';
+import { API_BASE } from '../../services/api';
 
 // Map served from the proxy-server /map route (no Live Server needed)
 const DEV_MAP_URL = `${API_BASE}/map`;
 
-const C = { bg: '#0f172a', cyan: '#06b6d4', text: '#f1f5f9', muted: '#64748b', surf: '#1e293b' };
+const C = { bg: '#FBFBF8', cyan: '#FC4C02', text: '#242428', muted: '#9CA3AF', surf: '#FFFFFF' };
 
 const FILTER_PILLS = [
     { label: 'Challenges', icon: '⚡', action: 'showChallenges' },
@@ -180,7 +180,7 @@ const s = StyleSheet.create({
     },
     pillText: { color: C.cyan, fontWeight: '700', fontSize: 11 },
     webview: { flex: 1 },
-    loadingView: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#050a14', padding: 24 },
+    loadingView: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FBFBF8', padding: 24 },
     loadingText: { color: C.cyan, fontWeight: '700', fontSize: 16, marginBottom: 12 },
     loadingHint: { color: C.muted, fontSize: 11, textAlign: 'center', lineHeight: 18 },
 });

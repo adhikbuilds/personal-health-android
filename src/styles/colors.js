@@ -1,44 +1,51 @@
-// Personal Health — Shared Color System
-// Import this in every screen instead of duplicating the C object.
-// To change the theme, edit here once.
+// ActiveBharat — Active Theme Tokens
+// -----------------------------------------------------------------------------
+// Re-exports the currently-active theme as `C`, `T`, `ZONES`, `LEVEL_COLORS`,
+// `LEVEL_LABELS`, `GRADIENTS`, `P`. Screens import from here exactly as before.
+//
+// IMPORTANT: the active theme MUST be set (via applyTheme) BEFORE any screen
+// module is imported. App.js does this at boot — it reads AsyncStorage and
+// applies the theme synchronously, then dynamically requires the rest of
+// the app. This works because every screen captures these values at module
+// load time inside StyleSheet.create({...}).
+//
+// To change theme at runtime, call applyTheme(name) and then DevSettings.reload()
+// (or a full app restart) so module-level styles re-evaluate.
 
-export const C = {
-    bg:      '#0f172a',
-    bg2:     '#0a0f1e',
-    surf:    '#1e293b',
-    surf2:   '#263248',
-    border:  'rgba(255,255,255,0.08)',
-    border2: 'rgba(255,255,255,0.14)',
-    text:    '#f1f5f9',
-    textSub: '#cbd5e1',
-    muted:   '#64748b',
-    cyan:    '#06b6d4',
-    orange:  '#f97316',
-    green:   '#22c55e',
-    yellow:  '#facc15',
-    purple:  '#8b5cf6',
-    red:     '#ef4444',
-    indigo:  '#6366f1',
-    pink:    '#ec4899',
-};
+import { THEMES, DEFAULT_THEME } from './themes';
 
-// Fitness level band colors (L1 → L7)
-export const LEVEL_COLORS = {
-    1: '#ef4444',  // Work Harder — red
-    2: '#f97316',  // Must Improve — orange
-    3: '#eab308',  // Can do better — yellow
-    4: '#84cc16',  // Good — lime
-    5: '#22c55e',  // Very Good — green
-    6: '#06b6d4',  // Athletic — cyan
-    7: '#8b5cf6',  // Excellent — purple
-};
+let _active = DEFAULT_THEME;
 
-export const LEVEL_LABELS = {
-    1: 'Work Harder',
-    2: 'Must Improve',
-    3: 'Can do better',
-    4: 'Good',
-    5: 'Very Good',
-    6: 'Athletic',
-    7: 'Excellent',
-};
+// Mutable token objects — same reference for the lifetime of the JS bundle.
+// applyTheme() rewrites their keys in place so any module that has imported
+// them sees the latest values when it next reads them.
+export const C            = { ...THEMES[DEFAULT_THEME].C };
+export const T            = { ...THEMES[DEFAULT_THEME].T };
+export const ZONES        = { ...THEMES[DEFAULT_THEME].ZONES };
+export const LEVEL_COLORS = { ...THEMES[DEFAULT_THEME].LEVEL_COLORS };
+export const LEVEL_LABELS = { ...THEMES[DEFAULT_THEME].LEVEL_LABELS };
+export const GRADIENTS    = { ...THEMES[DEFAULT_THEME].GRADIENTS };
+export const P            = { ...THEMES[DEFAULT_THEME].P };
+
+function rewrite(target, source) {
+    Object.keys(target).forEach((k) => { delete target[k]; });
+    Object.assign(target, source);
+}
+
+export function applyTheme(name) {
+    const t = THEMES[name] || THEMES[DEFAULT_THEME];
+    _active = t.id;
+    rewrite(C, t.C);
+    rewrite(T, t.T);
+    rewrite(ZONES, t.ZONES);
+    rewrite(LEVEL_COLORS, t.LEVEL_COLORS);
+    rewrite(LEVEL_LABELS, t.LEVEL_LABELS);
+    rewrite(GRADIENTS, t.GRADIENTS);
+    rewrite(P, t.P);
+}
+
+export function getActiveTheme() {
+    return _active;
+}
+
+export default C;

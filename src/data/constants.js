@@ -181,16 +181,16 @@ export const SPORTS_LIBRARY = [
   { id: 'athletics',    name: 'Athletics',     emoji: '🏃', color: '#f97316', videoCount: 28, category: 'track' },
   { id: 'kabaddi',      name: 'Kabaddi',       emoji: '🤼', color: '#ef4444', videoCount: 22, category: 'combat' },
   { id: 'wrestling',    name: 'Wrestling',     emoji: '🤼‍♂️', color: '#8b5cf6', videoCount: 18, category: 'combat' },
-  { id: 'kho_kho',      name: 'Kho-Kho',       emoji: '🏃‍♀️', color: '#06b6d4', videoCount: 16, category: 'team' },
+  { id: 'kho_kho',      name: 'Kho-Kho',       emoji: '🏃‍♀️', color: '#FC4C02', videoCount: 16, category: 'team' },
   { id: 'gymnastics',   name: 'Gymnastics',    emoji: '🤸', color: '#ec4899', videoCount: 24, category: 'track' },
   { id: 'judo',         name: 'Judo',          emoji: '🥋', color: '#84cc16', videoCount: 20, category: 'combat' },
   { id: 'table_tennis', name: 'Table Tennis',  emoji: '🏓', color: '#22c55e', videoCount: 19, category: 'court' },
   { id: 'archery',      name: 'Archery',       emoji: '🏹', color: '#eab308', videoCount: 15, category: 'precision' },
-  { id: 'swimming',     name: 'Swimming',      emoji: '🏊', color: '#06b6d4', videoCount: 26, category: 'aquatic' },
-  { id: 'shooting',     name: 'Shooting',      emoji: '🎯', color: '#64748b', videoCount: 12, category: 'precision' },
+  { id: 'swimming',     name: 'Swimming',      emoji: '🏊', color: '#FC4C02', videoCount: 26, category: 'aquatic' },
+  { id: 'shooting',     name: 'Shooting',      emoji: '🎯', color: '#9CA3AF', videoCount: 12, category: 'precision' },
   { id: 'football',     name: 'Football',      emoji: '⚽', color: '#22c55e', videoCount: 32, category: 'team' },
   { id: 'basketball',   name: 'Basketball',    emoji: '🏀', color: '#f97316', videoCount: 27, category: 'court' },
-  { id: 'badminton',    name: 'Badminton',     emoji: '🏸', color: '#06b6d4', videoCount: 34, category: 'court',
+  { id: 'badminton',    name: 'Badminton',     emoji: '🏸', color: '#FC4C02', videoCount: 34, category: 'court',
     videos: [
       { id: 'b1', title: 'How to Prepare to Return a Serve in Singles', duration: '4:12', youtubeId: 'WKb-FuwKHy8' },
       { id: 'b2', title: 'How to Hit a Backhand Flick Serve',           duration: '3:45', youtubeId: 'Bq6HXQT2YQU' },
@@ -206,7 +206,7 @@ export const SPORTS_LIBRARY = [
   { id: 'lawn_tennis',  name: 'Lawn Tennis',   emoji: '🎾', color: '#84cc16', videoCount: 30, category: 'court' },
   { id: 'volleyball',   name: 'Volleyball',    emoji: '🏐', color: '#eab308', videoCount: 17, category: 'team' },
   { id: 'weightlifting',name: 'Weightlifting', emoji: '🏋️', color: '#8b5cf6', videoCount: 14, category: 'track' },
-  { id: 'hockey',       name: 'Hockey',        emoji: '🏑', color: '#06b6d4', videoCount: 23, category: 'team' },
+  { id: 'hockey',       name: 'Hockey',        emoji: '🏑', color: '#FC4C02', videoCount: 23, category: 'team' },
 ];
 
 // ─── Fitness Test Configuration ───────────────────────────────────────────────
@@ -216,7 +216,7 @@ export const FITNESS_TEST_BANDS = [
   { level: 3, label: 'Can do better', color: '#eab308', minScore: 28, maxScore: 43 },
   { level: 4, label: 'Good',          color: '#84cc16', minScore: 43, maxScore: 57 },
   { level: 5, label: 'Very Good',     color: '#22c55e', minScore: 57, maxScore: 71 },
-  { level: 6, label: 'Athletic',      color: '#06b6d4', minScore: 71, maxScore: 86 },
+  { level: 6, label: 'Athletic',      color: '#FC4C02', minScore: 71, maxScore: 86 },
   { level: 7, label: 'Excellent',     color: '#8b5cf6', minScore: 86, maxScore: 100 },
 ];
 
@@ -280,13 +280,14 @@ export const DAILY_TRACKER_DEFAULTS = {
 // ─── Home Content Grid (8 tiles) ─────────────────────────────────────────────
 export const HOME_CONTENT_GRID = [
   { id: 'learn_sports',  label: 'Learn Sports',    emoji: '⚽', color: '#22c55e', route: 'LearnSports' },
-  { id: 'playfields',    label: 'Find Playfields',  emoji: '📍', color: '#06b6d4', route: 'Playfields' },
+  { id: 'playfields',    label: 'Find Playfields',  emoji: '📍', color: '#FC4C02', route: 'Map' },
   { id: 'yoga',          label: 'Yoga Centres',     emoji: '🧘', color: '#8b5cf6', route: null },
   { id: 'nutrition',     label: 'Nutrition',        emoji: '🥗', color: '#f97316', route: 'Hub', routeParams: { section: 'nutrition' } },
   { id: 'pe_lessons',    label: 'PE Lessons',       emoji: '📚', color: '#eab308', route: 'Classes' },
   { id: 'live_sessions', label: 'Live Sessions',    emoji: '📡', color: '#ef4444', route: 'SocialFeed' },
   { id: 'quiz',          label: 'Quiz',             emoji: '🧠', color: '#ec4899', route: null },
   { id: 'assignments',   label: 'Assignments',      emoji: '📝', color: '#84cc16', route: null },
+  { id: 'wellness',      label: 'Wellness',         emoji: '💚', color: '#FC4C02', route: 'Wellness' },
 ];
 
 // ─── Featured Banners ─────────────────────────────────────────────────────────
@@ -322,7 +323,7 @@ export const TRENDING_CREATORS = [
   { id: 'c1', name: 'Fit India Icons',       handle: '@FitIndiaIcons',   initials: 'FI', color: '#f97316' },
   { id: 'c2', name: 'Fit India Champions',   handle: '@FitChampions',    initials: 'FC', color: '#22c55e' },
   { id: 'c3', name: 'Fit India Ambassadors', handle: '@FitAmbassadors',  initials: 'FA', color: '#8b5cf6' },
-  { id: 'c4', name: 'Rishi Arora',           handle: '@RishiArora',      initials: 'RA', color: '#06b6d4' },
+  { id: 'c4', name: 'Rishi Arora',           handle: '@RishiArora',      initials: 'RA', color: '#FC4C02' },
   { id: 'c5', name: 'Aditi Dixit',           handle: '@AditiDixit',      initials: 'AD', color: '#ec4899' },
 ];
 
@@ -388,7 +389,7 @@ export const MOCK_FEED_POSTS = [
     author: 'Rishi Arora',
     handle: '@RishiArora',
     initials: 'RA',
-    avatarColor: '#06b6d4',
+    avatarColor: '#FC4C02',
     sport: 'Athletics',
     content: 'Just hit a new PB in the 400m! Hard work finally paying off 💪 #FitIndia',
     likes: 142,
