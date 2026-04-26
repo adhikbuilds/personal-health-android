@@ -197,8 +197,17 @@ export default function SocialFeedScreen({ navigation }) {
                 )}
                 ListEmptyComponent={() => (
                     <View style={s.empty}>
-                        <Text style={s.emptyEmoji}>📭</Text>
-                        <Text style={s.emptyText}>No posts yet. Follow some creators!</Text>
+                        <Text style={s.emptyEmoji}>👥</Text>
+                        <Text style={s.emptyTitle}>Your huddle + coach's roster post here</Text>
+                        <Text style={s.emptyText}>PBs, milestones, coach notes. Add your coach to see activity.</Text>
+                        <TouchableOpacity
+                            style={s.emptyBtn}
+                            onPress={() => {
+                                try { navigation.navigate('ShareCard', { sessionId: 'dummy' }); } catch {}
+                            }}
+                        >
+                            <Text style={s.emptyBtnText}>Invite your coach</Text>
+                        </TouchableOpacity>
                     </View>
                 )}
             />
@@ -226,7 +235,10 @@ const s = StyleSheet.create({
     expandBtn:     { fontSize: 16, color: C.muted },
     empty:         { alignItems: 'center', paddingTop: 60, paddingBottom: 40 },
     emptyEmoji:    { fontSize: 48, marginBottom: 12 },
-    emptyText:     { fontSize: 14, color: C.muted, fontWeight: '600' },
+    emptyTitle:    { fontSize: 16, fontWeight: '800', color: C.text, marginBottom: 6, paddingHorizontal: 20, textAlign: 'center' },
+    emptyText:     { fontSize: 14, color: C.muted, fontWeight: '600', marginBottom: 16, paddingHorizontal: 20, textAlign: 'center' },
+    emptyBtn:      { backgroundColor: C.cyan, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
+    emptyBtnText:  { color: C.bg, fontSize: 14, fontWeight: '700' },
 });
 
 const av = StyleSheet.create({

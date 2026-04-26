@@ -16,12 +16,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
+import { fetchDrillsCatalog } from '../../services/drillsCatalog';
+import DrillTile from '../../components/DrillTile';
 
-const BG      = '#0a0e1a';
-const SURFACE = '#111827';
-const ACCENT  = '#06b6d4';
-const TEXT    = '#f9fafb';
-const MUTED   = '#9ca3af';
+const BG      = '#FBFBF8';
+const SURFACE = '#FFFFFF';
+const ACCENT  = '#FC4C02';
+const TEXT    = '#242428';
+const MUTED   = '#9CA3AF';
 const SUCCESS = '#10b981';
 const BORDER  = 'rgba(255,255,255,0.08)';
 
@@ -150,6 +152,7 @@ export default function DrillPickerScreen({ navigation }) {
     const [athleteId,   setAthleteId]   = useState(null);
     const [assignments, setAssignments] = useState([]);
     const [planWeek,    setPlanWeek]    = useState(null);
+    const [drills,      setDrills]      = useState([]);
     const [loading,     setLoading]     = useState(true);
     const [error,       setError]       = useState(false);
 
@@ -159,9 +162,10 @@ export default function DrillPickerScreen({ navigation }) {
         setLoading(true);
         setError(false);
         try {
-            const [assignData, planData] = await Promise.all([
+            const [assignData, planData, drillCatalog] = await Promise.all([
                 api.getDrillAssignments(id),
                 api.getWeeklyPlan(id),
+                fetchDrillsCatalog(),
             ]);
             // Only show assignments that are scheduled for today
             const todayOnly = (assignData?.assignments || []).filter(
@@ -169,6 +173,7 @@ export default function DrillPickerScreen({ navigation }) {
             );
             setAssignments(todayOnly);
             setPlanWeek(planData || null);
+            setDrills(drillCatalog || []);
         } catch (_) {
             setError(true);
         } finally {
@@ -312,22 +317,35 @@ export default function DrillPickerScreen({ navigation }) {
                 {/* ── Free training ── */}
                 <View style={s.section}>
                     <SectionHeader label="OR CHOOSE YOUR OWN" />
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={s.sportScrollContent}
-                    >
-                        {SPORTS.map(sport => (
-                            <TouchableOpacity
-                                key={sport.key}
-                                style={s.sportPill}
-                                onPress={() => handleStartFreeSport(sport.key)}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={s.sportPillText}>{sport.label}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
+                    {drills.length > 0 ? (
+                        <View style={s.drillGrid}>
+                            {drills.map(drill => (
+                                <DrillTile
+                                    key={drill.key}
+                                    drill={drill}
+                                    onPress={() => handleStartFreeSport(drill.key)}
+                                    showSportChip={false}
+                                />
+                            ))}
+                        </View>
+                    ) : (
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={s.sportScrollContent}
+                        >
+                            {SPORTS.map(sport => (
+                                <TouchableOpacity
+                                    key={sport.key}
+                                    style={s.sportPill}
+                                    onPress={() => handleStartFreeSport(sport.key)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={s.sportPillText}>{sport.label}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    )}
                 </View>
 
             </ScrollView>
@@ -395,7 +413,7 @@ const s = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    primaryBtnText: { fontSize: 17, fontWeight: '800', color: '#001018' },
+    primaryBtnText: { fontSize: 17, fontWeight: '800', color: '#FBFBF8' },
 
     // Week chips
     weekRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
@@ -468,6 +486,9 @@ const s = StyleSheet.create({
         borderColor: BORDER,
     },
     sportPillText: { fontSize: 14, fontWeight: '700', color: TEXT },
+
+    // Drill grid
+    drillGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
 
     errorText: { fontSize: 15, color: MUTED, marginBottom: 20, textAlign: 'center' },
 });

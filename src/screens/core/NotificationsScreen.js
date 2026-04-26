@@ -7,11 +7,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 import api from '../../services/api';
 
-const BG      = '#0a0e1a';
-const SURFACE = '#111827';
-const TEXT    = '#f9fafb';
-const MUTED   = '#9ca3af';
-const ACCENT  = '#06b6d4';
+const BG      = '#FBFBF8';
+const SURFACE = '#FFFFFF';
+const TEXT    = '#242428';
+const MUTED   = '#9CA3AF';
+const ACCENT  = '#FC4C02';
 const WARNING = '#f59e0b';
 const SUCCESS = '#22c55e';
 const RED     = '#ef4444';

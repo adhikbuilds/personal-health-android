@@ -20,19 +20,19 @@ const WF_H = 80;
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
 const T = {
-    bg: '#060a12',
-    surf: '#0d1526',
-    card: '#111a2e',
+    bg: '#FBFBF8',
+    surf: '#FFFFFF',
+    card: '#FFFFFF',
     border: 'rgba(255,255,255,0.07)',
-    cyan: '#06b6d4',
+    cyan: '#FC4C02',
     green: '#22c55e',
     orange: '#f97316',
     red: '#ef4444',
     yellow: '#facc15',
     purple: '#a78bfa',
-    text: '#f1f5f9',
-    muted: '#64748b',
-    dim: '#1e293b',
+    text: '#242428',
+    muted: '#9CA3AF',
+    dim: '#FFFFFF',
 };
 
 function bpmColor(bpm) {

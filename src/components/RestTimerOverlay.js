@@ -2,11 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Speech from 'expo-speech';
 
-const BG = '#0a0e1a';
-const MUTED = '#9ca3af';
-const ACCENT = '#06b6d4';
-const TEXT = '#f9fafb';
-const SURFACE = '#1f2937';
+const BG = '#FBFBF8';
+const MUTED = '#9CA3AF';
+const ACCENT = '#FC4C02';
+const TEXT = '#242428';
+const SURFACE = '#F7F7FA';
 
 const SPEECH_OPTS = { rate: 0.85, pitch: 1.0, language: 'en' };
 

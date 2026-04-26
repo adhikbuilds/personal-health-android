@@ -105,14 +105,14 @@ async function apiFetch(path, options = {}) {
 }
 
 const C = {
-    bg:      '#0a0e1a',
-    surf:    '#111827',
-    deep:    '#0d1117',
-    cyan:    '#06b6d4',
-    text:    '#f9fafb',
-    muted:   '#9ca3af',
+    bg:      '#FBFBF8',
+    surf:    '#FFFFFF',
+    deep:    '#FBFBF8',
+    cyan:    '#FC4C02',
+    text:    '#242428',
+    muted:   '#9CA3AF',
     border:  'rgba(255,255,255,0.08)',
-    input:   '#1f2937',
+    input:   '#F7F7FA',
     red:     '#ef4444',
 };
 

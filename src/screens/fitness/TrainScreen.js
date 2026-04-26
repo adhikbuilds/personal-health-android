@@ -5,14 +5,14 @@ import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
 import { Audio } from 'expo-av';
 import api from '../../services/api';
-import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
+import { getOrCreateAnonymousAthleteId, hasCompletedOnboarding } from '../../services/deviceIdentity';
 import RestTimerOverlay from '../../components/RestTimerOverlay';
 
-const BG = '#0a0e1a';
-const SURFACE = '#111827';
-const TEXT = '#f9fafb';
-const MUTED = '#9ca3af';
-const ACCENT = '#06b6d4';
+const BG = '#FBFBF8';
+const SURFACE = '#FFFFFF';
+const TEXT = '#242428';
+const MUTED = '#9CA3AF';
+const ACCENT = '#FC4C02';
 const SUCCESS = '#10b981';
 const WARNING = '#f59e0b';
 const RED = '#ef4444';
@@ -219,8 +219,13 @@ export default function TrainScreen({ navigation, route, showToast }) {
         Speech.stop();
         if (!sessionId) return;
         await api.endSession(sessionId);
-        navigation.replace('ShareCard', {
+
+        const onboarded = await hasCompletedOnboarding().catch(() => true);
+        const route = onboarded ? 'ShareCard' : 'FirstScore';
+
+        navigation.replace(route, {
             sessionId,
+            athleteId,
             onboardingMode,
         });
     };
@@ -340,7 +345,7 @@ const s = StyleSheet.create({
     sportTileActive: { borderColor: ACCENT, backgroundColor: 'rgba(6,182,212,0.10)' },
     sportText: { color: TEXT, fontSize: 18, fontWeight: '800' },
     primaryBtn: { backgroundColor: ACCENT, borderRadius: 999, marginTop: 24, paddingVertical: 18, alignItems: 'center' },
-    primaryBtnText: { color: '#001018', fontSize: 18, fontWeight: '900', textTransform: 'lowercase' },
+    primaryBtnText: { color: '#FBFBF8', fontSize: 18, fontWeight: '900', textTransform: 'lowercase' },
     liveWrap: { flex: 1, backgroundColor: BG },
     warningBar: { position: 'absolute', top: 52, left: 16, right: 16, zIndex: 6, backgroundColor: RED, borderRadius: 18, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center' },
     warningText: { color: TEXT, fontSize: 36, fontWeight: '900', textAlign: 'center', lineHeight: 40 },

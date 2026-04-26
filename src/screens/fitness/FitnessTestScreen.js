@@ -42,7 +42,7 @@ function LevelBand({ score, level }) {
                     ['Can do better', '#eab308'],
                     ['Good', '#84cc16'],
                     ['Very Good', '#22c55e'],
-                    ['Athletic', '#06b6d4'],
+                    ['Athletic', '#FC4C02'],
                     ['Excellent', '#8b5cf6'],
                 ].map(([lbl, clr]) => (
                     <View key={lbl} style={lb.legendItem}>

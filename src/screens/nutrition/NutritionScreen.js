@@ -5,9 +5,12 @@ import {
     SafeAreaView, ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { C } from '../../styles/colors';
 import api from '../../services/api';
 import ProgressRing from '../../components/ProgressRing';
+
+const tap = () => { try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} };
 
 const SLOTS = ['breakfast', 'lunch', 'dinner', 'snack'];
 const SLOT_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
@@ -17,6 +20,14 @@ function fmtDate(d) {
     if (d === today) return 'Today';
     const dt = new Date(d + 'T00:00:00');
     return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function getMealCTA() {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'breakfast';
+    if (hour < 16) return 'lunch';
+    if (hour < 20) return 'dinner';
+    return 'snack';
 }
 
 function dateAdd(d, days) {
@@ -106,18 +117,34 @@ export default function NutritionScreen({ navigation, route }) {
                 <ActivityIndicator color={C.cyan} style={{ marginTop: 40 }} />
             ) : (
                 <ScrollView contentContainerStyle={{ padding: 14 }}>
-                    {/* Summary */}
-                    <View style={s.summaryCard}>
-                        <Text style={s.summaryTitle}>
-                            {Math.round(consumed.calories)} / {goals.calories || 2400} kcal
-                        </Text>
-                        <View style={s.ringsRow}>
-                            <ProgressRing value={pct.calories || 0} size={68} strokeWidth={7} label={`${pct.calories || 0}%`} sublabel="Cal" />
-                            <ProgressRing value={pct.protein_g || 0} size={58} strokeWidth={6} color="#8b5cf6" label={`${Math.round(consumed.protein_g)}g`} sublabel="Protein" />
-                            <ProgressRing value={pct.carbs_g || 0} size={58} strokeWidth={6} color="#f59e0b" label={`${Math.round(consumed.carbs_g)}g`} sublabel="Carbs" />
-                            <ProgressRing value={pct.fat_g || 0} size={58} strokeWidth={6} color="#ef4444" label={`${Math.round(consumed.fat_g)}g`} sublabel="Fat" />
+                    {/* Summary or empty state */}
+                    {Object.values(meals).some(m => (m?.items || []).length > 0) ? (
+                        <View style={s.summaryCard}>
+                            <Text style={s.summaryTitle}>
+                                {Math.round(consumed.calories)} / {goals.calories || 2400} kcal
+                            </Text>
+                            <View style={s.ringsRow}>
+                                <ProgressRing value={pct.calories || 0} size={68} strokeWidth={7} label={`${pct.calories || 0}%`} sublabel="Cal" />
+                                <ProgressRing value={pct.protein_g || 0} size={58} strokeWidth={6} color="#8b5cf6" label={`${Math.round(consumed.protein_g)}g`} sublabel="Protein" />
+                                <ProgressRing value={pct.carbs_g || 0} size={58} strokeWidth={6} color="#f59e0b" label={`${Math.round(consumed.carbs_g)}g`} sublabel="Carbs" />
+                                <ProgressRing value={pct.fat_g || 0} size={58} strokeWidth={6} color="#ef4444" label={`${Math.round(consumed.fat_g)}g`} sublabel="Fat" />
+                            </View>
                         </View>
-                    </View>
+                    ) : (
+                        <View style={s.emptyStateCard}>
+                            <Text style={s.emptyStateTitle}>Log a meal to see your macros trend through the day.</Text>
+                            <TouchableOpacity
+                                style={s.emptyStateCTA}
+                                onPress={() => {
+                                    tap();
+                                    const slot = getMealCTA();
+                                    navigation.navigate('MealLog', { athleteId, date, slot });
+                                }}
+                            >
+                                <Text style={s.emptyStateCTAText}>Log {SLOT_LABELS[getMealCTA()]}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
 
                     {/* Meal slots */}
                     {SLOTS.map(slot => {
@@ -152,7 +179,7 @@ export default function NutritionScreen({ navigation, route }) {
                                                 </View>
                                             ))
                                         )}
-                                        <TouchableOpacity style={s.addFoodBtn} onPress={() => navigation.navigate('MealLog', { athleteId, date, slot })}>
+                                        <TouchableOpacity style={s.addFoodBtn} onPress={() => { tap(); navigation.navigate('MealLog', { athleteId, date, slot }); }}>
                                             <Text style={s.addFoodText}>+ Add Food</Text>
                                         </TouchableOpacity>
                                         {recents.length > 0 && (
@@ -173,7 +200,7 @@ export default function NutritionScreen({ navigation, route }) {
                         );
                     })}
 
-                    <TouchableOpacity style={s.goalsLink} onPress={() => navigation.navigate('NutritionGoals', { athleteId })}>
+                    <TouchableOpacity style={s.goalsLink} onPress={() => { tap(); navigation.navigate('NutritionGoals', { athleteId }); }}>
                         <Text style={s.goalsLinkText}>Set Custom Goals →</Text>
                     </TouchableOpacity>
                 </ScrollView>
@@ -215,4 +242,8 @@ const s = StyleSheet.create({
     quickAddPlus: { color: C.cyan, fontSize: 20, fontWeight: '700', marginLeft: 8 },
     goalsLink: { alignItems: 'center', padding: 16 },
     goalsLinkText: { color: C.cyan, fontSize: 13, fontWeight: '600' },
+    emptyStateCard: { backgroundColor: C.surf, borderRadius: 14, padding: 24, alignItems: 'center', marginBottom: 12 },
+    emptyStateTitle: { color: C.muted, fontSize: 15, lineHeight: 22, marginBottom: 16, textAlign: 'center' },
+    emptyStateCTA: { backgroundColor: C.cyan, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 12 },
+    emptyStateCTAText: { color: C.bg, fontSize: 14, fontWeight: '700' },
 });

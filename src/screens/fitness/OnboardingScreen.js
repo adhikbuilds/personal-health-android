@@ -7,7 +7,9 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { getOrCreateAnonymousAthleteId, markOnboardingComplete } from '../../services/deviceIdentity';
 import { scheduleDailyReminder } from '../../services/notifications';
+import { fetchDrillsCatalog } from '../../services/drillsCatalog';
 import api from '../../services/api';
+import DrillTile from '../../components/DrillTile';
 import { C } from '../../styles/colors';
 
 const BG     = C.bg;
@@ -35,6 +37,17 @@ const DRILLS = [
     { key: 'javelin',       label: 'Javelin',       motion: 'Plant + release' },
     { key: 'cricket_bat',   label: 'Cricket Bat',   motion: 'Front-foot drive' },
 ];
+
+const DRILL_RELEVANCE = {
+    sprint:        ['sprint', 'squat', 'push_up', 'plank'],
+    vertical_jump: ['vertical_jump', 'squat', 'push_up', 'plank'],
+    push_up:       ['push_up', 'squat', 'plank'],
+    squat:         ['squat', 'vertical_jump', 'push_up'],
+    javelin:       ['javelin', 'push_up', 'squat'],
+    cricket_bat:   ['cricket_bat', 'squat', 'push_up'],
+    football:      ['sprint', 'squat', 'push_up', 'vertical_jump'],
+    swimming:      ['push_up', 'squat', 'plank'],
+};
 
 function SportCard({ sport, selected, onPress }) {
     const scale = useRef(new Animated.Value(1)).current;
@@ -70,37 +83,12 @@ function SportCard({ sport, selected, onPress }) {
     );
 }
 
-function DrillTile({ drill, onPress }) {
-    const bob = useRef(new Animated.Value(0)).current;
-    useEffect(() => {
-        const loop = Animated.loop(
-            Animated.sequence([
-                Animated.timing(bob, { toValue: -6, duration: 900, useNativeDriver: true }),
-                Animated.timing(bob, { toValue: 0,  duration: 900, useNativeDriver: true }),
-            ]),
-        );
-        loop.start();
-        return () => loop.stop();
-    }, [bob]);
-
-    return (
-        <TouchableOpacity style={s.drillTile} activeOpacity={0.9} onPress={onPress}>
-            <Animated.View style={[s.motionWrap, { transform: [{ translateY: bob }] }]}>
-                <View style={s.motionLine} />
-                <View style={s.motionDot} />
-                <View style={[s.motionLine, { width: 42 }]} />
-            </Animated.View>
-            <Text style={s.drillLabel}>{drill.label}</Text>
-            <Text style={s.drillSub}>{drill.motion}</Text>
-        </TouchableOpacity>
-    );
-}
-
 export default function OnboardingScreen({ navigation }) {
     const [step, setStep]               = useState(0); // 0 = sport, 1 = drill
     const [athleteId, setAthleteId]     = useState(null);
     const [selectedSport, setSelected]  = useState(null);
     const [saving, setSaving]           = useState(false);
+    const [catalog, setCatalog]         = useState(null);
 
     const fadeAnim  = useRef(new Animated.Value(1)).current;
 
@@ -108,6 +96,9 @@ export default function OnboardingScreen({ navigation }) {
         getOrCreateAnonymousAthleteId()
             .then(id => setAthleteId(id))
             .catch(() => setAthleteId('athlete_01'));
+        fetchDrillsCatalog()
+            .then(drills => setCatalog(drills && drills.length ? drills : null))
+            .catch(() => setCatalog(null));
     }, []);
 
     const transitionTo = (nextStep) => {
@@ -152,11 +143,23 @@ export default function OnboardingScreen({ navigation }) {
     };
 
     const relevantDrills = useMemo(() => {
-        if (!selectedSport) return DRILLS;
-        const primary = DRILLS.find(d => d.key === selectedSport);
-        const rest = DRILLS.filter(d => d.key !== selectedSport);
-        return primary ? [primary, ...rest] : DRILLS;
-    }, [selectedSport]);
+        const source = catalog && catalog.length ? catalog : DRILLS;
+        if (!selectedSport) return source;
+        const sportRelevance = DRILL_RELEVANCE[selectedSport];
+        if (!sportRelevance) return source;
+
+        const relevant = source.filter(d => sportRelevance.includes(d.key));
+        const primary = relevant.find(d => d.key === selectedSport);
+        const rest = relevant.filter(d => d.key !== selectedSport);
+
+        if (relevant.length < 3) {
+            const neutralKeys = ['push_up', 'plank', 'squat'];
+            const neutral = source.filter(d => !relevant.find(r => r.key === d.key) && neutralKeys.includes(d.key));
+            return primary ? [primary, ...rest, ...neutral] : [...relevant, ...neutral];
+        }
+
+        return primary ? [primary, ...rest] : relevant;
+    }, [selectedSport, catalog]);
 
     return (
         <SafeAreaView style={s.safe}>
@@ -212,12 +215,11 @@ export default function OnboardingScreen({ navigation }) {
                         <View style={s.drillGrid}>
                             {relevantDrills.map(drill => (
                                 <View key={drill.key} style={{ width: '48%' }}>
-                                    {drill.key === selectedSport && (
-                                        <View style={s.suggestedChip}>
-                                            <Text style={s.suggestedText}>your sport</Text>
-                                        </View>
-                                    )}
-                                    <DrillTile drill={drill} onPress={() => handleDrillSelect(drill.key)} />
+                                    <DrillTile
+                                        drill={drill}
+                                        selectedSport={selectedSport}
+                                        onPress={() => handleDrillSelect(drill.key)}
+                                    />
                                 </View>
                             ))}
                         </View>
@@ -257,18 +259,10 @@ const s = StyleSheet.create({
 
     continueBtn:     { flexDirection: 'row', backgroundColor: ACCENT, borderRadius: 14, height: 54, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
     continueBtnDisabled: { backgroundColor: 'rgba(255,255,255,0.08)' },
-    continueBtnText: { color: '#0a0e1a', fontSize: 16, fontWeight: '800' },
+    continueBtnText: { color: '#FBFBF8', fontSize: 16, fontWeight: '800' },
     skipLink:        { alignItems: 'center', padding: 16, marginTop: 4 },
     skipText:        { color: MUTED, fontSize: 14 },
 
     drillGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-    drillTile:       { width: '100%', backgroundColor: SURF, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-    motionWrap:      { height: 80, borderRadius: 14, backgroundColor: 'rgba(6,182,212,0.08)', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-    motionLine:      { width: 58, height: 6, borderRadius: 99, backgroundColor: ACCENT, opacity: 0.9, marginVertical: 5 },
-    motionDot:       { width: 18, height: 18, borderRadius: 9, backgroundColor: TEXT },
-    drillLabel:      { color: TEXT, fontSize: 17, fontWeight: '800' },
-    drillSub:        { color: MUTED, fontSize: 13, marginTop: 5 },
-    suggestedChip:   { alignSelf: 'flex-start', backgroundColor: 'rgba(6,182,212,0.12)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 6 },
-    suggestedText:   { color: ACCENT, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
     foot:            { color: MUTED, fontSize: 15, marginTop: 8 },
 });

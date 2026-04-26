@@ -18,11 +18,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { API_BASE } from '../../services/api';
 import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 
-const BG      = '#0a0e1a';
-const SURFACE = '#111827';
-const CYAN    = '#06b6d4';
-const TEXT    = '#f9fafb';
-const MUTED   = '#9ca3af';
+const BG      = '#FBFBF8';
+const SURFACE = '#FFFFFF';
+const CYAN    = '#FC4C02';
+const TEXT    = '#242428';
+const MUTED   = '#9CA3AF';
 const AMBER   = '#f59e0b';
 const RED     = '#ef4444';
 const BORDER  = 'rgba(255,255,255,0.08)';

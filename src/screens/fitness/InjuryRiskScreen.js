@@ -18,11 +18,11 @@ import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 import { api } from '../../services/api';
 
 const C = {
-    bg:      '#0a0e1a',
-    surface: '#111827',
-    cyan:    '#06b6d4',
-    text:    '#f9fafb',
-    muted:   '#9ca3af',
+    bg:      '#FBFBF8',
+    surface: '#FFFFFF',
+    cyan:    '#FC4C02',
+    text:    '#242428',
+    muted:   '#9CA3AF',
     warning: '#f59e0b',
     red:     '#ef4444',
     green:   '#10b981',

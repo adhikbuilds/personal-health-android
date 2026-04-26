@@ -192,7 +192,7 @@ const s = StyleSheet.create({
     meta:          { color: C.muted, fontSize: 12, marginBottom: 20, textAlign: 'center' },
 
     joinBtn:       { flexDirection: 'row', backgroundColor: C.cyan, borderRadius: 14, height: 54, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-    joinBtnText:   { color: '#0a0e1a', fontSize: 16, fontWeight: '800' },
+    joinBtnText:   { color: '#FBFBF8', fontSize: 16, fontWeight: '800' },
     skipBtn:       { alignItems: 'center', padding: 14 },
     skipText:      { color: C.muted, fontSize: 14 },
 

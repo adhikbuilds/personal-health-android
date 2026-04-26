@@ -11,11 +11,11 @@ import { API_BASE } from '../../services/api';
 import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 
 const C = {
-    bg:     '#0a0e1a',
-    surf:   '#111827',
-    cyan:   '#06b6d4',
-    text:   '#f9fafb',
-    muted:  '#9ca3af',
+    bg:     '#FBFBF8',
+    surf:   '#FFFFFF',
+    cyan:   '#FC4C02',
+    text:   '#242428',
+    muted:  '#9CA3AF',
     border: 'rgba(255,255,255,0.08)',
     red:    '#ef4444',
 };
@@ -162,7 +162,7 @@ const s = StyleSheet.create({
     infoText: { fontSize: 13, color: C.muted },
 
     acceptBtn:     { backgroundColor: C.cyan, borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
-    acceptBtnText: { fontSize: 16, fontWeight: '800', color: '#001018' },
+    acceptBtnText: { fontSize: 16, fontWeight: '800', color: '#FBFBF8' },
 
     cancelLink: { alignItems: 'center', marginTop: 14 },
     cancelText: { fontSize: 13, color: C.muted },
