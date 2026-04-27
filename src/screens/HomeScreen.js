@@ -29,6 +29,7 @@ const { width: W } = Dimensions.get('window');
 export default function HomeScreen({ navigation }) {
     const ins = useSafeAreaInsets();
     const { userData, fitnessScore } = useUser();
+    const [loading, setLoading] = useState(true);
     const [online, setOnline] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
     const [tracker, setTracker] = useState(DAILY_TRACKER_DEFAULTS);
@@ -64,19 +65,27 @@ export default function HomeScreen({ navigation }) {
         date: new Date().toISOString().slice(0, 10),
     });
 
-    const load = () => {
+    const load = async () => {
         AsyncStorage.getItem(TK).then(r => { if (r) try { setTracker(JSON.parse(r)); } catch (_) {} });
         api.ping().then(ok => setOnline(!!ok));
         const aid = userData.avatarId;
-        if (!aid) return;
-        api.getDailyTracker(aid).then(r => {
-            if (r?.tracker && Object.keys(r.tracker).length > 0) setTracker(_backendToTracker(r));
-        }).catch(() => {});
-        api.getAdvancedMetrics(aid, 60).then(m => { if (m) setMetrics(m); });
-        api.getWeeklySummary(aid, 7).then(r => { if (r?.athlete_id) setWeeklySummary(r); }).catch(() => {});
-        api.getAthleteInbox(aid, 5).then(r => { if (r?.broadcasts) setInbox(r.broadcasts); }).catch(() => {});
+        if (!aid) { setLoading(false); return; }
+        try {
+            const [dt, m, ws, ib] = await Promise.all([
+                api.getDailyTracker(aid).catch(() => null),
+                api.getAdvancedMetrics(aid, 60).catch(() => null),
+                api.getWeeklySummary(aid, 7).catch(() => null),
+                api.getAthleteInbox(aid, 5).catch(() => null),
+            ]);
+            if (dt?.tracker && Object.keys(dt.tracker).length > 0) setTracker(_backendToTracker(dt));
+            if (m) setMetrics(m);
+            if (ws?.athlete_id) setWeeklySummary(ws);
+            if (ib?.broadcasts) setInbox(ib.broadcasts);
+        } finally {
+            setLoading(false);
+        }
     };
-    useEffect(load, []);
+    useEffect(() => { load(); }, []);
     useEffect(() => {
         AsyncStorage.setItem(TK, JSON.stringify(tracker)).catch(() => {});
         const aid = userData.avatarId;
@@ -98,6 +107,14 @@ export default function HomeScreen({ navigation }) {
     const trendPct = metrics?.trend_pct ?? 0;
     const momentum = metrics?.momentum ?? 0;
     const acwr = metrics?.acwr?.acwr ?? 0;
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ color: '#334155', fontSize: 12, fontWeight: '800', letterSpacing: 2, fontFamily: T.MONO }}>LOADING...</Text>
+            </View>
+        );
+    }
 
     const tickerItems = [
         { label: 'BPI',    value: fmtInt(userData.bpi || 0), delta: trendPct },
@@ -239,7 +256,7 @@ export default function HomeScreen({ navigation }) {
                         <FieldRow label="BPI.......... BIO-PASSPORT INDEX" value={fmtInt(userData.bpi || 0)} color={C.text} />
                         <FieldRow label="SES.......... COMPLETED SESSIONS" value={fmtInt(userData.sessions || 0)} color="#E8E8E8" />
                         <FieldRow label="STK.......... TRAINING STREAK" value={`${fmtInt(userData.streak || 0)} DAY`} color={C.good} />
-                        {metrics && (
+                        {metrics ? (
                             <>
                                 <FieldRow label="RDY.......... COMPETITION READINESS" value={fmt(metrics.readiness?.score, 1)} color={bandColor(metrics.readiness?.band)} />
                                 <FieldRow label="     .BAND" value={`[${(metrics.readiness?.band || '--').toUpperCase()}]`} color={bandColor(metrics.readiness?.band)} dim size="sm" />
@@ -250,6 +267,10 @@ export default function HomeScreen({ navigation }) {
                                 <FieldRow label="INT.......... LAST SESSION INTENSITY" value={fmt(metrics.latest_intensity, 1)} color={C.info} />
                                 <FieldRow label="FAT.......... FATIGUE INDEX" value={fmt(metrics.fatigue?.index, 2)} color={bandColor(metrics.fatigue?.band)} />
                             </>
+                        ) : (
+                            <View style={{ padding: 16, alignItems: 'center' }}>
+                                <Text style={{ color: '#475569', fontSize: 12, fontFamily: T.MONO }}>Complete a session to see metrics</Text>
+                            </View>
                         )}
                     </Panel>
                 </Fade>

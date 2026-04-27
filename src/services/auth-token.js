@@ -7,6 +7,7 @@
 let _accessToken = null;
 let _refreshHandler = null;   // async () => boolean — returns true if refresh succeeded
 let _logoutHandler  = null;   // async () => void   — clears tokens + bumps state
+let _refreshPromise = null;   // deduplicates concurrent refresh attempts
 
 export function getAccessToken() {
     return _accessToken;
@@ -26,11 +27,17 @@ export function setRefreshHandler(fn) {
 
 export async function triggerRefresh() {
     if (!_refreshHandler) return false;
-    try {
-        return await _refreshHandler();
-    } catch (_) {
-        return false;
-    }
+    if (_refreshPromise) return _refreshPromise;
+    _refreshPromise = (async () => {
+        try {
+            return await _refreshHandler();
+        } catch (_) {
+            return false;
+        } finally {
+            _refreshPromise = null;
+        }
+    })();
+    return _refreshPromise;
 }
 
 export function setLogoutHandler(fn) {
