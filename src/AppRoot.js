@@ -17,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { UserProvider } from './context/UserContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ErrorBoundary from './ErrorBoundary';
+import OfflineBanner from './components/OfflineBanner';
 import { C, T, P } from './styles/colors';
 
 import HomeScreen from './screens/HomeScreen';
@@ -154,6 +155,7 @@ export default function AppRoot() {
             <StatusBar style="light" backgroundColor="transparent" translucent />
             <ErrorBoundary>
                 <AuthProvider>
+                    <OfflineBanner />
                     <NavigationContainer>
                         <AuthGate showToast={showToast} />
                     </NavigationContainer>

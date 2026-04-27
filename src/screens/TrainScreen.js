@@ -79,6 +79,9 @@ export default function TrainScreen({ showToast, navigation, route }) {
             }
         }).catch(() => {});
     }, []);
+    const mountedRef = useRef(true);
+    const pollFailures = useRef(0);
+    const POLL_MAX_FAILURES = 5;
     const isCapturingRef = useRef(false); // prevents overlapping captures
     const lastPhaseRef = useRef(null);
     const analysisModeRef = useRef('idle');
@@ -99,8 +102,10 @@ export default function TrainScreen({ showToast, navigation, route }) {
             setPermission({ granted: status === 'granted' });
         });
         return () => {
+            mountedRef.current = false;
             if (intervalRef.current) clearInterval(intervalRef.current);
             if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+            if (resultIntervalRef.current) clearInterval(resultIntervalRef.current);
             if (wsStreamRef.current) {
                 try { wsStreamRef.current.close(); } catch (_) {}
                 wsStreamRef.current = null;
@@ -189,6 +194,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
         try {
             wsStreamRef.current = api.connectFrameStream(sid, {
                 onResult: async (msg) => {
+                    if (!mountedRef.current) return;
                     if (msg.form_score == null || msg.form_score <= 0) return;
                     const fn = msg.frame_num ?? -1;
                     if (fn >= 0 && fn <= lastProcessedFrameRef.current) return;
@@ -231,6 +237,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
                             frame.tflite_confidence = tf.confidence;
                         }
                     } catch (_) { /* on-device is best-effort */ }
+                    if (!mountedRef.current) return;
                     setMetrics(frame);
                     lastGoodMetricsRef.current = frame;
                     setAnalysisMode('real');
@@ -252,7 +259,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
         // ── FRAME CAPTURE ────────────────────────────────────────────────────
         const captureAndSend = async () => {
             try {
-                if (!cameraRef.current || isCapturingRef.current || !sessionRef.current) return;
+                if (!mountedRef.current || !cameraRef.current || isCapturingRef.current || !sessionRef.current) return;
                 isCapturingRef.current = true;
 
                 if (cameraEngine === CAMERA_ENGINES.VISION && VisionCameraComp) {
@@ -303,10 +310,19 @@ export default function TrainScreen({ showToast, navigation, route }) {
 
         // ── RESULT POLLING LOOP (every 3s) ─────────────────────────────────
         // Polls /latest-result → when AI finishes, real metrics appear in UI.
+        pollFailures.current = 0;
         resultIntervalRef.current = setInterval(async () => {
-            if (!sessionRef.current) return;
+            if (!sessionRef.current || !mountedRef.current) return;
+            if (pollFailures.current >= POLL_MAX_FAILURES) {
+                clearInterval(resultIntervalRef.current);
+                resultIntervalRef.current = null;
+                console.warn('[TRAIN] polling circuit breaker tripped after', POLL_MAX_FAILURES, 'failures');
+                return;
+            }
             try {
                 const result = await api.getLatestResult(sessionRef.current);
+                if (!mountedRef.current) return;
+                pollFailures.current = 0;
                 if (result?.pose_detected && result.form_score > 0) {
                     const fn = result.frame_num ?? -1;
                     if (fn >= 0 && fn <= lastProcessedFrameRef.current) return;
@@ -368,10 +384,9 @@ export default function TrainScreen({ showToast, navigation, route }) {
                     }
                 }
             } catch (e) {
-                // Backend unreachable — try on-device classifier on the
-                // last known joint angles so the HUD keeps moving even when
-                // we're offline. The model expects 18 features; if angles
-                // are missing we just show stale data instead of zeros.
+                pollFailures.current++;
+                console.warn(`[TRAIN] poll failure ${pollFailures.current}/${POLL_MAX_FAILURES}:`, e?.message);
+                if (!mountedRef.current) return;
                 const angles = lastGoodMetricsRef.current;
                 if (angles && classifierReady()) {
                     const offline = await classifyForm(angles, sport);
@@ -412,6 +427,7 @@ export default function TrainScreen({ showToast, navigation, route }) {
         if (sessionRef.current) {
             sum = await api.endSession(sessionRef.current);
         }
+        if (!mountedRef.current) return;
         const xpEarned = sum?.xp_earned ?? (Math.floor(avgScore * 1.5) + 50);
         const peakScore = sum?.peak_form_score ?? Math.max(...scoreHistory, 0);
         const peakVj = sum?.peak_jump_height_cm ?? 0;

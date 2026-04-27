@@ -15,8 +15,8 @@ import { getAccessToken, triggerRefresh, triggerLogout } from './auth-token';
 // Direct to FastAPI backend
 export const API_BASE = BASE_URL;
 
-// WebSocket direct to FastAPI (no proxy — proxy causes issues with WS paths)
-const WS_BASE_RESOLVED = `ws://${BACKEND_HOST}:${FASTAPI_PORT}`;
+// WebSocket direct to FastAPI — uses WS_BASE from constants (ws:// in dev, wss:// in prod)
+const WS_BASE_RESOLVED = WS_URL;
 
 // ─── Request dedup + tiny response cache ────────────────────────────────────
 //
@@ -197,29 +197,59 @@ export const api = {
         body: JSON.stringify({ image_b64: imageB64 }),
     }),
 
-    /** rPPG heart rate: WebSocket stream. Sends image frames, receives BPM/HRV metrics. */
-    connectRPPGLiveStream: (sessionId, onMessage, onError, onClose) => {
+    /** rPPG heart rate: WebSocket stream with auto-reconnect. */
+    connectRPPGLiveStream: (sessionId, onMessage, onError, onClose, { maxRetries = 5 } = {}) => {
         const _wsToken = getAccessToken();
-        const _wsSep = `${WS_BASE_RESOLVED}/rppg/live-stream/${sessionId}`.includes('?') ? '&' : '?';
-        const wsUrl = _wsToken
-            ? `${WS_BASE_RESOLVED}/rppg/live-stream/${sessionId}${_wsSep}token=${_wsToken}`
-            : `${WS_BASE_RESOLVED}/rppg/live-stream/${sessionId}`;
-        console.log(`[WS-RPPG] Connecting: ${wsUrl}`);
+        const _baseUrl = `${WS_BASE_RESOLVED}/rppg/live-stream/${sessionId}`;
+        const wsUrl = _wsToken ? `${_baseUrl}?token=${_wsToken}` : _baseUrl;
 
-        const ws = new WebSocket(wsUrl);
-        ws.onopen  = () => console.log(`[WS-RPPG] Connected: session ${sessionId}`);
-        ws.onmessage = (e) => {
-            try { onMessage(JSON.parse(e.data)); } catch (_) {}
+        let ws = null;
+        let closed = false;
+        let retries = 0;
+        let reconnectTimer = null;
+
+        const connect = () => {
+            ws = new WebSocket(wsUrl);
+            ws.onopen = () => {
+                console.log(`[WS-RPPG] connected: ${sessionId}`);
+                retries = 0;
+            };
+            ws.onmessage = (e) => {
+                try { onMessage(JSON.parse(e.data)); } catch (_) {}
+            };
+            ws.onerror = (e) => {
+                console.warn('[WS-RPPG] error:', e?.message);
+            };
+            ws.onclose = () => {
+                if (closed) {
+                    console.log('[WS-RPPG] closed (intentional)');
+                    if (onClose) onClose();
+                    return;
+                }
+                retries++;
+                if (retries > maxRetries) {
+                    console.warn(`[WS-RPPG] giving up after ${maxRetries} retries`);
+                    if (onError) onError(new Error('max_retries_exceeded'));
+                    if (onClose) onClose();
+                    return;
+                }
+                const delay = Math.min(1000 * Math.pow(2, retries - 1), 8000);
+                console.log(`[WS-RPPG] reconnecting in ${delay}ms (attempt ${retries}/${maxRetries})`);
+                reconnectTimer = setTimeout(connect, delay);
+            };
         };
-        ws.onerror = (e) => {
-            console.warn('[WS-RPPG] Error:', e.message);
-            if (onError) onError(e);
+
+        connect();
+
+        return {
+            get readyState() { return ws?.readyState ?? WebSocket.CLOSED; },
+            send(data) { if (!closed && ws?.readyState === WebSocket.OPEN) ws.send(data); },
+            close() {
+                closed = true;
+                if (reconnectTimer) clearTimeout(reconnectTimer);
+                try { ws?.close(); } catch (_) {}
+            },
         };
-        ws.onclose = () => {
-            console.log('[WS-RPPG] Closed');
-            if (onClose) onClose();
-        };
-        return ws;
     },
 
     /** End session, returns summary with avg_form_score, xp_earned, etc. */
@@ -437,74 +467,72 @@ export const api = {
      *  Returns { send(b64), close() }. The backend pushes back analysis
      *  results via onResult({ form_score, form_quality, primary_feedback,
      *  phase, knee_angle_l, hip_angle_l, trunk_lean, ... }). */
-    connectFrameStream: (sessionId, { onResult, onError, onClose, onPing } = {}) => {
+    connectFrameStream: (sessionId, { onResult, onError, onClose, onPing, maxRetries = 5 } = {}) => {
         const _wsToken = getAccessToken();
         const _baseUrl = `${WS_BASE_RESOLVED}/ws/session/${sessionId}/frames-jpeg`;
         const wsUrl = _wsToken ? `${_baseUrl}?token=${_wsToken}` : _baseUrl;
-        const ws = new WebSocket(wsUrl);
+
+        let ws = null;
         let closed = false;
-        ws.onopen  = () => console.log(`[WS-FRAMES] connected: ${sessionId}`);
-        ws.onmessage = (e) => {
-            let msg = null;
-            try { msg = JSON.parse(e.data); } catch (_) { return; }
-            if (!msg || typeof msg !== 'object') return;
-            if (msg.type === 'result' && onResult) onResult(msg);
-            else if (msg.type === 'ping' && onPing) onPing(msg);
-            else if (msg.type === 'error' && onError) onError(new Error(msg.code || 'ws_error'));
+        let retries = 0;
+        let reconnectTimer = null;
+
+        const connect = () => {
+            ws = new WebSocket(wsUrl);
+            ws.onopen = () => {
+                console.log(`[WS-FRAMES] connected: ${sessionId}`);
+                retries = 0;
+            };
+            ws.onmessage = (e) => {
+                let msg = null;
+                try { msg = JSON.parse(e.data); } catch (_) { return; }
+                if (!msg || typeof msg !== 'object') return;
+                if (msg.type === 'result' && onResult) onResult(msg);
+                else if (msg.type === 'ping' && onPing) onPing(msg);
+                else if (msg.type === 'error' && onError) onError(new Error(msg.code || 'ws_error'));
+            };
+            ws.onerror = (e) => {
+                console.warn('[WS-FRAMES] error:', e?.message);
+            };
+            ws.onclose = () => {
+                if (closed) {
+                    console.log('[WS-FRAMES] closed (intentional)');
+                    if (onClose) onClose();
+                    return;
+                }
+                retries++;
+                if (retries > maxRetries) {
+                    console.warn(`[WS-FRAMES] giving up after ${maxRetries} retries`);
+                    if (onError) onError(new Error('max_retries_exceeded'));
+                    if (onClose) onClose();
+                    return;
+                }
+                const delay = Math.min(1000 * Math.pow(2, retries - 1), 8000);
+                console.log(`[WS-FRAMES] reconnecting in ${delay}ms (attempt ${retries}/${maxRetries})`);
+                reconnectTimer = setTimeout(connect, delay);
+            };
         };
-        ws.onerror = (e) => {
-            console.warn('[WS-FRAMES] error:', e?.message);
-            if (onError) onError(e);
-        };
-        ws.onclose = () => {
-            closed = true;
-            console.log('[WS-FRAMES] closed');
-            if (onClose) onClose();
-        };
+
+        connect();
+
         return {
             send(b64, ts = Date.now()) {
-                if (closed || ws.readyState !== WebSocket.OPEN) return false;
-                try {
-                    ws.send(JSON.stringify({ image_b64: b64, ts }));
-                    return true;
-                } catch (_) { return false; }
+                if (closed || !ws || ws.readyState !== WebSocket.OPEN) return false;
+                try { ws.send(JSON.stringify({ image_b64: b64, ts })); return true; }
+                catch (_) { return false; }
             },
             sendBinary(arrayBuffer) {
-                if (closed || ws.readyState !== WebSocket.OPEN) return false;
-                try {
-                    ws.send(arrayBuffer);
-                    return true;
-                } catch (_) { return false; }
+                if (closed || !ws || ws.readyState !== WebSocket.OPEN) return false;
+                try { ws.send(arrayBuffer); return true; }
+                catch (_) { return false; }
             },
             close() {
                 closed = true;
-                try { ws.close(); } catch (_) { /* ignore */ }
+                if (reconnectTimer) clearTimeout(reconnectTimer);
+                try { ws?.close(); } catch (_) {}
             },
-            isOpen() { return !closed && ws.readyState === WebSocket.OPEN; },
+            isOpen() { return !closed && ws?.readyState === WebSocket.OPEN; },
         };
-    },
-
-    // DEPRECATED: No screen uses this. Candidate for removal.
-    connectLiveStream: (sessionId, onMessage, onError, onClose) => {
-        const _wsToken = getAccessToken();
-        const _baseUrl = `${WS_BASE_RESOLVED}/session/${sessionId}/live-stream`;
-        const wsUrl = _wsToken ? `${_baseUrl}?token=${_wsToken}` : _baseUrl;
-        console.log(`[WS-STREAM] Connecting: ${wsUrl}`);
-
-        const ws = new WebSocket(wsUrl);
-        ws.onopen  = () => console.log(`[WS-STREAM] Connected: session ${sessionId}`);
-        ws.onmessage = (e) => {
-            try { onMessage(JSON.parse(e.data)); } catch (_) {}
-        };
-        ws.onerror = (e) => {
-            console.warn('[WS-STREAM] Error:', e.message);
-            if (onError) onError(e);
-        };
-        ws.onclose = () => {
-            console.log('[WS-STREAM] Closed');
-            if (onClose) onClose();
-        };
-        return ws;
     },
 };
 
