@@ -10,6 +10,7 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
+import { getAccessToken } from '../services/auth-token';
 
 import { C, T } from '../styles/colors';
 import {
@@ -248,7 +249,8 @@ export default function RPPGScreen({ navigation, route }) {
         setSaved(false);
 
         if (RPPGStream && RPPGEmitter) {
-            const wsUrl = `${api.getWsBase()}/rppg/live-stream/${sid}`;
+            const _rpToken = getAccessToken();
+            const wsUrl = `${api.getWsBase()}/rppg/live-stream/${sid}${_rpToken ? '?token=' + _rpToken : ''}`;
 
             resultSubRef.current = RPPGEmitter.addListener('onRPPGResult', (r) => {
                 handleResult(r);

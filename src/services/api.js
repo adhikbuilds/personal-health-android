@@ -199,7 +199,11 @@ export const api = {
 
     /** rPPG heart rate: WebSocket stream. Sends image frames, receives BPM/HRV metrics. */
     connectRPPGLiveStream: (sessionId, onMessage, onError, onClose) => {
-        const wsUrl = `${WS_BASE_RESOLVED}/rppg/live-stream/${sessionId}`;
+        const _wsToken = getAccessToken();
+        const _wsSep = `${WS_BASE_RESOLVED}/rppg/live-stream/${sessionId}`.includes('?') ? '&' : '?';
+        const wsUrl = _wsToken
+            ? `${WS_BASE_RESOLVED}/rppg/live-stream/${sessionId}${_wsSep}token=${_wsToken}`
+            : `${WS_BASE_RESOLVED}/rppg/live-stream/${sessionId}`;
         console.log(`[WS-RPPG] Connecting: ${wsUrl}`);
 
         const ws = new WebSocket(wsUrl);
@@ -434,7 +438,9 @@ export const api = {
      *  results via onResult({ form_score, form_quality, primary_feedback,
      *  phase, knee_angle_l, hip_angle_l, trunk_lean, ... }). */
     connectFrameStream: (sessionId, { onResult, onError, onClose, onPing } = {}) => {
-        const wsUrl = `${WS_BASE_RESOLVED}/ws/session/${sessionId}/frames-jpeg`;
+        const _wsToken = getAccessToken();
+        const _baseUrl = `${WS_BASE_RESOLVED}/ws/session/${sessionId}/frames-jpeg`;
+        const wsUrl = _wsToken ? `${_baseUrl}?token=${_wsToken}` : _baseUrl;
         const ws = new WebSocket(wsUrl);
         let closed = false;
         ws.onopen  = () => console.log(`[WS-FRAMES] connected: ${sessionId}`);
@@ -480,7 +486,9 @@ export const api = {
 
     // DEPRECATED: No screen uses this. Candidate for removal.
     connectLiveStream: (sessionId, onMessage, onError, onClose) => {
-        const wsUrl = `${WS_BASE_RESOLVED}/session/${sessionId}/live-stream`;
+        const _wsToken = getAccessToken();
+        const _baseUrl = `${WS_BASE_RESOLVED}/session/${sessionId}/live-stream`;
+        const wsUrl = _wsToken ? `${_baseUrl}?token=${_wsToken}` : _baseUrl;
         console.log(`[WS-STREAM] Connecting: ${wsUrl}`);
 
         const ws = new WebSocket(wsUrl);
