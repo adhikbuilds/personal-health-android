@@ -7,6 +7,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { C } from '../../styles/colors';
 import api from '../../services/api';
+import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 
 const tap = () => { try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} };
 
@@ -45,31 +46,41 @@ function MiniBar({ values = [], color = C.cyan, barHeight = 40 }) {
 }
 
 export default function WellnessScreen({ navigation, route }) {
-    const athleteId = route.params?.athleteId || 'athlete_01';
+    const [athleteId, setAthleteId] = useState(route.params?.athleteId || null);
     const [scoreData, setScoreData] = useState(null);
     const [trends, setTrends] = useState(null);
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
     const [sleepExpanded, setSleepExpanded] = useState(false);
 
-    const load = useCallback(async () => {
+    useEffect(() => {
+        if (!athleteId) {
+            getOrCreateAnonymousAthleteId().then(setAthleteId).catch(() => setAthleteId(null));
+        }
+    }, []);
+
+    const load = useCallback(async (id) => {
+        if (!id) return;
         setLoading(true);
+        setError(false);
         try {
             const [scoreRes, trendsRes, histRes] = await Promise.all([
-                api.get(`/athlete/${athleteId}/wellness/score`),
-                api.get(`/athlete/${athleteId}/wellness/trends?period=weekly`),
-                api.get(`/athlete/${athleteId}/wellness`),
+                api.get(`/athlete/${id}/wellness/score`),
+                api.get(`/athlete/${id}/wellness/trends?period=weekly`),
+                api.get(`/athlete/${id}/wellness`),
             ]);
             setScoreData(scoreRes);
             setTrends(trendsRes);
             setHistory(histRes?.entries || []);
         } catch (e) {
             console.warn('[WellnessScreen] load error', e);
+            setError(true);
         }
         setLoading(false);
-    }, [athleteId]);
+    }, []);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => { if (athleteId) load(athleteId); }, [athleteId, load]);
 
     const score = scoreData?.wellness_score;
     const hasData = score != null;
@@ -107,7 +118,16 @@ export default function WellnessScreen({ navigation, route }) {
                 <View style={{ width: 60 }} />
             </View>
 
-            {loading ? <ActivityIndicator color={C.cyan} style={{ marginTop: 40 }} /> : (
+            {loading ? <ActivityIndicator color={C.cyan} style={{ marginTop: 40 }} /> : error ? (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+                    <Text style={{ color: C.muted, fontSize: 14, marginBottom: 16, textAlign: 'center' }}>
+                        Could not load wellness data.
+                    </Text>
+                    <TouchableOpacity onPress={() => load(athleteId)} style={{ backgroundColor: C.cyan, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}>
+                        <Text style={{ color: '#FBFBF8', fontWeight: '700' }}>Retry</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : (
                 <ScrollView contentContainerStyle={{ padding: 14 }}>
                     {/* Score */}
                     <View style={s.scoreSection}>
@@ -149,7 +169,7 @@ export default function WellnessScreen({ navigation, route }) {
                         activeOpacity={0.8}
                         onPress={() => {
                             tap();
-                            navigation.navigate('WellnessLogForm', { athleteId, prefill: scoreData });
+                            navigation.navigate('WellnessLogForm', { athleteId: athleteId ?? undefined, prefill: scoreData });
                         }}
                     >
                         <Text style={[s.ctaText, hasData ? { color: C.cyan } : { color: '#FBFBF8' }]}>

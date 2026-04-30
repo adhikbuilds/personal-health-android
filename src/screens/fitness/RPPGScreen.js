@@ -8,11 +8,13 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
+    View, Text, StyleSheet, TouchableOpacity,
     Dimensions, Animated, Easing, StatusBar, ScrollView
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Svg, { Polyline, Line } from 'react-native-svg';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 
 const { width: W } = Dimensions.get('window');
@@ -304,13 +306,21 @@ export default function RPPGScreen({ navigation, route }) {
         startCapture();
     }, [sessionId, startCapture]);
 
-    const stopMeasuring = useCallback(() => {
+    const stopMeasuring = useCallback((finalBpm, finalHrv, finalQuality) => {
         runningRef.current = false;
         setRunning(false);
         stopCapture();
         if (wsRef.current) {
             wsRef.current.close();
             wsRef.current = null;
+        }
+        if (finalBpm > 0) {
+            AsyncStorage.setItem('@latest_hr_reading', JSON.stringify({
+                bpm: Math.round(finalBpm),
+                hrv_ms: Math.round(finalHrv || 0),
+                quality: finalQuality || 'fair',
+                recorded_at: new Date().toISOString(),
+            })).catch(() => {});
         }
     }, [stopCapture]);
 
@@ -354,7 +364,7 @@ export default function RPPGScreen({ navigation, route }) {
                 <SafeAreaView style={s.topBar}>
                     <TouchableOpacity
                         style={s.backBtn}
-                        onPress={() => { stopMeasuring(); navigation?.goBack(); }}
+                        onPress={() => { stopMeasuring(bpm, hrv, quality); navigation?.goBack(); }}
                     >
                         <Text style={s.backTxt}>← Back</Text>
                     </TouchableOpacity>
@@ -420,7 +430,7 @@ export default function RPPGScreen({ navigation, route }) {
                             <Text style={s.fabTxt}>START SCAN</Text>
                         </TouchableOpacity>
                     ) : (
-                        <TouchableOpacity style={[s.fab, { backgroundColor: T.red }]} onPress={stopMeasuring} activeOpacity={0.85}>
+                        <TouchableOpacity style={[s.fab, { backgroundColor: T.red }]} onPress={() => stopMeasuring(bpm, hrv, quality)} activeOpacity={0.85}>
                             <Text style={s.fabTxt}>STOP SCAN</Text>
                         </TouchableOpacity>
                     )}

@@ -18,15 +18,12 @@ import { DAILY_TRACKER_DEFAULTS, HOME_CONTENT_GRID } from '../../data/constants'
 
 // Map each tile's emoji to a clean Ionicons name (no rainbow palette)
 const TILE_ICONS = {
-    learn_sports:  'football-outline',
-    playfields:    'location-outline',
-    yoga:          'leaf-outline',
     nutrition:     'restaurant-outline',
+    playfields:    'location-outline',
     pe_lessons:    'school-outline',
     live_sessions: 'radio-outline',
-    quiz:          'help-circle-outline',
-    assignments:   'create-outline',
-    wellness:      'pulse-outline',
+    injury_risk:   'fitness-outline',
+    coach_inbox:   'chatbubble-outline',
 };
 
 // ─── Strava palette ─────────────────────────
@@ -154,10 +151,10 @@ export default function HomeScreen({ navigation, showToast }) {
 
                 {/* ── Primary 4 quick actions ──────── */}
                 <View style={styles.actionGrid}>
-                    <ActionTile icon="analytics-outline"  label="Metrics"      onPress={() => { tap(); navigation.jumpTo('Lab'); }} />
-                    <ActionTile icon="library-outline"    label="Academy"      onPress={() => { tap(); navigation.jumpTo('Academy'); }} />
+                    <ActionTile icon="pulse-outline"      label="Heart Rate"   onPress={() => { tap(); navigation.navigate('HeartRate'); }} />
+                    <ActionTile icon="barbell-outline"    label="Drills"       onPress={() => { tap(); navigation.navigate('DrillPicker'); }} />
                     <ActionTile icon="trophy-outline"     label="Fitness Test" onPress={() => { tap(); navigation.navigate('FitnessTest'); }} />
-                    <ActionTile icon="map-outline"        label="Map"          onPress={() => { tap(); navigation.jumpTo('Map'); }} />
+                    <ActionTile icon="leaf-outline"       label="Wellness"     onPress={() => { tap(); navigation.navigate('Wellness'); }} />
                 </View>
 
                 {/* ── Explore grid (Nutrition, Playfields, Yoga, Wellness…) ── */}

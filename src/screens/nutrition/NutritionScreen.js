@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { C } from '../../styles/colors';
 import api from '../../services/api';
+import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 import ProgressRing from '../../components/ProgressRing';
 
 const tap = () => { try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} };
@@ -37,31 +38,41 @@ function dateAdd(d, days) {
 }
 
 export default function NutritionScreen({ navigation, route }) {
-    const athleteId = route.params?.athleteId || 'athlete_01';
+    const [athleteId, setAthleteId] = useState(route.params?.athleteId || null);
     const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
     const [meals, setMeals] = useState({});
     const [summary, setSummary] = useState(null);
     const [recentMeals, setRecentMeals] = useState({});
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
     const [expanded, setExpanded] = useState({ breakfast: true, lunch: true, dinner: true, snack: true });
 
-    const loadData = useCallback(async () => {
+    useEffect(() => {
+        if (!athleteId) {
+            getOrCreateAnonymousAthleteId().then(setAthleteId).catch(() => {});
+        }
+    }, []);
+
+    const loadData = useCallback(async (id, d) => {
+        if (!id) return;
         setLoading(true);
+        setError(false);
         try {
             const [mealsRes, summaryRes] = await Promise.all([
-                api.get(`/athlete/${athleteId}/meals?date=${date}`),
-                api.get(`/athlete/${athleteId}/nutrition/summary?on_date=${date}`),
+                api.get(`/athlete/${id}/meals?date=${d}`),
+                api.get(`/athlete/${id}/nutrition/summary?on_date=${d}`),
             ]);
             setMeals(mealsRes?.meals || {});
             setSummary(summaryRes);
         } catch (e) {
             console.warn('[NutritionScreen] load error', e);
+            setError(true);
         } finally {
             setLoading(false);
         }
-    }, [athleteId, date]);
+    }, []);
 
-    useEffect(() => { loadData(); }, [loadData]);
+    useEffect(() => { if (athleteId) loadData(athleteId, date); }, [athleteId, date, loadData]);
 
     useEffect(() => {
         (async () => {
@@ -115,6 +126,15 @@ export default function NutritionScreen({ navigation, route }) {
 
             {loading ? (
                 <ActivityIndicator color={C.cyan} style={{ marginTop: 40 }} />
+            ) : error ? (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+                    <Text style={{ color: C.muted, fontSize: 14, marginBottom: 16, textAlign: 'center' }}>
+                        Could not load nutrition data.
+                    </Text>
+                    <TouchableOpacity onPress={() => athleteId && loadData(athleteId, date)} style={{ backgroundColor: C.cyan, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}>
+                        <Text style={{ color: '#FBFBF8', fontWeight: '700' }}>Retry</Text>
+                    </TouchableOpacity>
+                </View>
             ) : (
                 <ScrollView contentContainerStyle={{ padding: 14 }}>
                     {/* Summary or empty state */}

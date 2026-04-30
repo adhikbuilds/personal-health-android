@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, CameraView } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
-import { Audio } from 'expo-av';
 import api from '../../services/api';
 import { getOrCreateAnonymousAthleteId, hasCompletedOnboarding } from '../../services/deviceIdentity';
 import RestTimerOverlay from '../../components/RestTimerOverlay';
@@ -80,24 +80,11 @@ export default function TrainScreen({ navigation, route, showToast }) {
         setPermission({ granted: status === 'granted' });
     };
 
-    const setupAudio = async (urgent = false) => {
-        try {
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: false,
-                staysActiveInBackground: false,
-                playsInSilentModeIOS: false,
-                shouldDuckAndroid: true,
-                playThroughEarpieceAndroid: false,
-            });
-        } catch (_) {}
-    };
-
     const speakCue = async (text, urgency = 'normal') => {
         const now = Date.now();
         if (now - cueCooldownRef.current < 4000) return;
         cueCooldownRef.current = now;
         try {
-            await setupAudio(urgency === 'warning');
             await Speech.stop();
             Speech.speak(text, {
                 rate: 1.0,
@@ -135,7 +122,8 @@ export default function TrainScreen({ navigation, route, showToast }) {
         setSubtitle(onboardingMode ? 'do 3 reps' : 'audio is primary');
         setWarningCue('');
 
-        const session = await api.startSession(athleteId || 'athlete_01', sport);
+        if (!athleteId) { showToast?.('Loading athlete profile…'); return; }
+        const session = await api.startSession(athleteId, sport);
         const sid = session?.session_id;
         if (!sid) {
             showToast?.('Could not start session');
@@ -272,7 +260,7 @@ export default function TrainScreen({ navigation, route, showToast }) {
                         style={s.primaryBtn}
                         onPress={() => navigation.navigate('PlacementWizard', {
                             sport,
-                            athleteId: athleteId || 'athlete_01',
+                            athleteId,
                             onboardingMode,
                             overrideAfterSeconds: onboardingMode ? 10 : 15,
                         })}

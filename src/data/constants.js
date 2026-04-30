@@ -279,15 +279,12 @@ export const DAILY_TRACKER_DEFAULTS = {
 
 // ─── Home Content Grid (8 tiles) ─────────────────────────────────────────────
 export const HOME_CONTENT_GRID = [
-  { id: 'learn_sports',  label: 'Learn Sports',    emoji: '⚽', color: '#22c55e', route: 'LearnSports' },
+  { id: 'nutrition',     label: 'Nutrition',        emoji: '🥗', color: '#f97316', route: 'Nutrition' },
   { id: 'playfields',    label: 'Find Playfields',  emoji: '📍', color: '#FC4C02', route: 'Map' },
-  { id: 'yoga',          label: 'Yoga Centres',     emoji: '🧘', color: '#8b5cf6', route: null },
-  { id: 'nutrition',     label: 'Nutrition',        emoji: '🥗', color: '#f97316', route: 'Hub', routeParams: { section: 'nutrition' } },
   { id: 'pe_lessons',    label: 'PE Lessons',       emoji: '📚', color: '#eab308', route: 'Classes' },
   { id: 'live_sessions', label: 'Live Sessions',    emoji: '📡', color: '#ef4444', route: 'SocialFeed' },
-  { id: 'quiz',          label: 'Quiz',             emoji: '🧠', color: '#ec4899', route: null },
-  { id: 'assignments',   label: 'Assignments',      emoji: '📝', color: '#84cc16', route: null },
-  { id: 'wellness',      label: 'Wellness',         emoji: '💚', color: '#FC4C02', route: 'Wellness' },
+  { id: 'injury_risk',   label: 'Injury Risk',      emoji: '🦴', color: '#8b5cf6', route: 'InjuryRisk' },
+  { id: 'coach_inbox',   label: 'Coach Notes',      emoji: '💬', color: '#06b6d4', route: 'CoachInbox' },
 ];
 
 // ─── Featured Banners ─────────────────────────────────────────────────────────

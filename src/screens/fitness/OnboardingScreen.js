@@ -2,7 +2,8 @@
 // Step 0: sport picker (saves to athlete profile)
 // Step 1: drill picker (existing flow → PlacementWizard)
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, SafeAreaView, StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { getOrCreateAnonymousAthleteId, markOnboardingComplete } from '../../services/deviceIdentity';
@@ -95,7 +96,7 @@ export default function OnboardingScreen({ navigation }) {
     useEffect(() => {
         getOrCreateAnonymousAthleteId()
             .then(id => setAthleteId(id))
-            .catch(() => setAthleteId('athlete_01'));
+            .catch(() => {});
         fetchDrillsCatalog()
             .then(drills => setCatalog(drills && drills.length ? drills : null))
             .catch(() => setCatalog(null));
@@ -136,7 +137,7 @@ export default function OnboardingScreen({ navigation }) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         navigation.replace('PlacementWizard', {
             sport: drillKey,
-            athleteId: athleteId || 'athlete_01',
+            athleteId: athleteId ?? undefined,
             onboardingMode: true,
             overrideAfterSeconds: 10,
         });
