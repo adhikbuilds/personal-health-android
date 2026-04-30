@@ -315,14 +315,27 @@ export default function RPPGScreen({ navigation, route }) {
             wsRef.current = null;
         }
         if (finalBpm > 0) {
-            AsyncStorage.setItem('@latest_hr_reading', JSON.stringify({
-                bpm: Math.round(finalBpm),
-                hrv_ms: Math.round(finalHrv || 0),
-                quality: finalQuality || 'fair',
-                recorded_at: new Date().toISOString(),
-            })).catch(() => {});
+            // Prefer backend-computed result (averaged over full session) over last frame's value
+            api.getRPPGResult(sessionId).then(result => {
+                const bpm  = (result?.bpm  > 0 ? result.bpm  : finalBpm);
+                const hrv  = (result?.hrv_ms   != null ? result.hrv_ms   : finalHrv);
+                const qual = (result?.signal_quality   ?? finalQuality) || 'fair';
+                AsyncStorage.setItem('@latest_hr_reading', JSON.stringify({
+                    bpm: Math.round(bpm),
+                    hrv_ms: Math.round(hrv || 0),
+                    quality: qual,
+                    recorded_at: new Date().toISOString(),
+                })).catch(() => {});
+            }).catch(() => {
+                AsyncStorage.setItem('@latest_hr_reading', JSON.stringify({
+                    bpm: Math.round(finalBpm),
+                    hrv_ms: Math.round(finalHrv || 0),
+                    quality: finalQuality || 'fair',
+                    recorded_at: new Date().toISOString(),
+                })).catch(() => {});
+            });
         }
-    }, [stopCapture]);
+    }, [stopCapture, sessionId]);
 
     // ── Permission ────────────────────────────────────────────────────────────
     if (!permission) return <View style={s.bg} />;
