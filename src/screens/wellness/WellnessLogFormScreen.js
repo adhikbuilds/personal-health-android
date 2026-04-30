@@ -1,11 +1,12 @@
 // WellnessLogFormScreen — WN-21 (morning check-in input form)
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
     SafeAreaView, ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import { C } from '../../styles/colors';
 import api from '../../services/api';
+import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 
 function SliderRow({ label, value, onChange, min = 1, max = 10, lowLabel = '', highLabel = '' }) {
     const steps = Array.from({ length: max - min + 1 }, (_, i) => min + i);
@@ -35,9 +36,15 @@ function SliderRow({ label, value, onChange, min = 1, max = 10, lowLabel = '', h
 }
 
 export default function WellnessLogFormScreen({ navigation, route }) {
-    const athleteId = route.params?.athleteId || 'athlete_01';
     const prefill = route.params?.prefill;
+    const [athleteId, setAthleteId] = useState(route.params?.athleteId || null);
     const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        if (!athleteId) {
+            getOrCreateAnonymousAthleteId().then(setAthleteId).catch(() => {});
+        }
+    }, []);
 
     const [bedtime, setBedtime] = useState(prefill?.sleep?.bedtime || '23:00');
     const [wakeTime, setWakeTime] = useState(prefill?.sleep?.wake_time || '07:00');

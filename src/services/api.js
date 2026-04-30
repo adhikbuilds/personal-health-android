@@ -12,16 +12,14 @@ import {
     API_TIMEOUT,
 } from '../constants';
 
-// On Android phone: use proxy (avoids Windows Firewall & AP isolation).
-// On iOS simulator / browser: hit FastAPI directly.
+// Android phone and iOS/browser both hit FastAPI directly on port 8082.
 export const API_BASE = Platform.OS === 'android'
-    ? BASE_FROM_CONSTANTS                        // http://BACKEND_HOST:8083
-    : `http://localhost:${FASTAPI_PORT}`;        // Direct (emulator/browser)
+    ? BASE_FROM_CONSTANTS                        // http://BACKEND_HOST:8082
+    : `http://localhost:${FASTAPI_PORT}`;
 
-// WebSocket through the Node.js proxy to avoid AP isolation on university networks.
-// Proxy rewrites ws://HOST:8083/ws/rppg/... → ws://localhost:8082/rppg/...
+// WebSocket: direct to FastAPI on 8082 (no proxy needed — LAN connection works).
 const WS_BASE_RESOLVED = Platform.OS === 'android'
-    ? `ws://${BACKEND_HOST}:${PROXY_PORT}/ws`    // ws://BACKEND_HOST:8083/ws (proxied)
+    ? `ws://${BACKEND_HOST}:${FASTAPI_PORT}`     // ws://BACKEND_HOST:8082
     : `ws://localhost:${FASTAPI_PORT}`;
 
 // ─── Core fetch helper ───────────────────────────────────────────────────────

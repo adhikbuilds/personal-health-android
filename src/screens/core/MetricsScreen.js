@@ -2,12 +2,16 @@
 // Tabs (Physical/Technical/Cognitive) · spider chart · simple metric rows.
 // Preserves useUser, METRICS_DB, navigation to InjuryRisk.
 
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Polygon, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { useUser } from '../../context/UserContext';
 import { METRICS_DB } from '../../data/constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../../services/api';
+import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 
 // ─── Strava palette ─────────────────────────
 const ORANGE  = '#FC4C02';
@@ -132,10 +136,37 @@ function MetricRow({ metric, isLive }) {
 export default function MetricsScreen({ navigation }) {
     const { userData = {}, dataMode } = useUser();
     const [activeTab, setActiveTab] = useState('physical');
+    const [liveMetrics, setLiveMetrics] = useState(null);
+    const [latestHR, setLatestHR] = useState(null);
     const bpi = userData.bpi ?? 12450;
     const isLive = dataMode !== 'mock';
+
+    useEffect(() => {
+        AsyncStorage.getItem('@latest_hr_reading').then(raw => {
+            if (raw) { try { setLatestHR(JSON.parse(raw)); } catch (_) {} }
+        }).catch(() => {});
+        getOrCreateAnonymousAthleteId().then(async (id) => {
+            try {
+                const progress = await api.get(`/athlete/${id}/progress?days=30`);
+                const weakJoints = await api.get(`/athlete/${id}/weak-joints?days=30`);
+                if (progress?.sessions_in_period > 0) {
+                    setLiveMetrics({ progress, weakJoints: weakJoints?.weak_joints || [] });
+                }
+            } catch (_) {}
+        }).catch(() => {});
+    }, []);
+
     const stats = userData.stats || [];
-    const spiderData = stats.map((x) => x.A ?? 0).slice(0, 3).concat([50, 50, 50]).slice(0, 3);
+    const spiderData = (() => {
+        if (liveMetrics?.progress) {
+            const p = liveMetrics.progress;
+            const formScore = p.score_trend?.avg ?? 50;
+            const consistency = Math.min(100, Math.round((p.sessions_in_period / 30) * 100 * 3));
+            const xpNorm = Math.min(100, Math.round((p.xp_trend?.avg ?? 0) / 30));
+            return [formScore, consistency, xpNorm];
+        }
+        return stats.map((x) => x.A ?? 0).slice(0, 3).concat([50, 50, 50]).slice(0, 3);
+    })();
 
     return (
         <SafeAreaView style={s.safe}>
@@ -168,6 +199,14 @@ export default function MetricsScreen({ navigation }) {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+                {/* Latest HR reading */}
+                {latestHR && (
+                    <View style={s.hrBadge}>
+                        <Text style={s.hrBpm}>{latestHR.bpm} <Text style={s.hrUnit}>BPM</Text></Text>
+                        <Text style={s.hrSub}>HRV {latestHR.hrv_ms}ms · {latestHR.quality} · {new Date(latestHR.recorded_at).toLocaleDateString()}</Text>
+                    </View>
+                )}
+
                 {/* Spider Chart */}
                 <Text style={s.sectionLabel}>CAPABILITY OVERVIEW</Text>
                 <View style={s.chartCard}>
@@ -176,9 +215,19 @@ export default function MetricsScreen({ navigation }) {
 
                 {/* Metric rows */}
                 <Text style={[s.sectionLabel, { marginTop: 24 }]}>DETAILED METRICS</Text>
-                {(METRICS_DB[activeTab] || []).map((m) => (
-                    <MetricRow key={m.id} metric={m} isLive={isLive} />
-                ))}
+                {(METRICS_DB[activeTab] || []).map((m) => {
+                    let metric = m;
+                    if (m.id === 't3' && liveMetrics?.progress?.score_trend?.avg > 0) {
+                        const p = liveMetrics.progress;
+                        const series = p.score_trend?.series || [];
+                        metric = {
+                            ...m,
+                            you: Math.round(p.score_trend.avg),
+                            history: series.slice(-3).map(Math.round),
+                        };
+                    }
+                    return <MetricRow key={m.id} metric={metric} isLive={isLive || !!liveMetrics} />;
+                })}
 
                 {/* Injury risk entry — Strava-clean callout */}
                 <Text style={[s.sectionLabel, { marginTop: 24 }]}>RISK ANALYSIS</Text>
@@ -287,6 +336,12 @@ const s = StyleSheet.create({
     sparkBarWrap: { flex: 1, alignItems: 'center' },
     sparkBar: { width: 16, borderRadius: 2 },
     sparkVal: { fontSize: 9, color: GRAY, marginTop: 4, fontWeight: '600' },
+
+    // HR badge
+    hrBadge: { backgroundColor: BG, borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 12, marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    hrBpm: { fontSize: 22, fontWeight: '800', color: DARK },
+    hrUnit: { fontSize: 12, fontWeight: '600', color: GRAY },
+    hrSub: { fontSize: 11, color: GRAY },
 
     // Callout
     calloutCard: {

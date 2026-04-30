@@ -1,59 +1,66 @@
-// LearnSportsScreen — Full Sports Library
-// View A: 18-sport grid
-// View B: Video gallery for selected sport (passed as route.params.sport)
+// LearnSportsScreen — Video gallery for a selected sport
+// Opened from AcademyScreen with route.params.sport pre-selected.
 import React, { useState } from 'react';
 import {
-    View, Text, StyleSheet, SafeAreaView, ScrollView,
-    TouchableOpacity, FlatList, Linking, Dimensions,
+    View, Text, StyleSheet, SafeAreaView,
+    TouchableOpacity, FlatList, Linking, Dimensions, StatusBar,
 } from 'react-native';
-import { C } from '../../styles/colors';
+import { Ionicons } from '@expo/vector-icons';
 import { SPORTS_LIBRARY } from '../../data/constants';
 
 const { width: SW } = Dimensions.get('window');
 const CARD_W = (SW - 48) / 2;
 
-// ─── Sport Grid Card ──────────────────────────────────────────────────────────
-function SportCard({ sport, onPress }) {
-    return (
-        <TouchableOpacity style={[sg.sportCard, { borderColor: sport.color + '40' }]} onPress={() => onPress(sport)} activeOpacity={0.82}>
-            <View style={[sg.sportIconWrap, { backgroundColor: sport.color + '18' }]}>
-                <Text style={sg.sportEmoji}>{sport.emoji}</Text>
-            </View>
-            <Text style={sg.sportName}>{sport.name}</Text>
-            <Text style={sg.sportCount}>{sport.videoCount} videos</Text>
-        </TouchableOpacity>
-    );
-}
+const ORANGE = '#FC4C02';
+const DARK   = '#242428';
+const GRAY   = '#6D6D78';
+const DIM    = '#9CA3AF';
+const LIGHT  = '#F7F7FA';
+const BORDER = '#E6E6EA';
+const BG     = '#FFFFFF';
 
 // ─── Video Thumbnail Card ─────────────────────────────────────────────────────
-function VideoCard({ video, sport, onPress }) {
+function VideoCard({ video, onPress }) {
     return (
-        <TouchableOpacity style={[vg.videoCard, { borderColor: sport.color + '30' }]} onPress={() => onPress(video)} activeOpacity={0.85}>
-            <View style={[vg.thumb, { backgroundColor: sport.color + '20' }]}>
-                <Text style={vg.thumbEmoji}>{sport.emoji}</Text>
+        <TouchableOpacity style={vg.videoCard} onPress={() => onPress(video)} activeOpacity={0.85}>
+            <View style={vg.thumb}>
+                <Ionicons name="videocam-outline" size={32} color={DIM} />
                 <View style={vg.playBtn}>
-                    <Text style={vg.playIcon}>▶</Text>
+                    <Ionicons name="play" size={14} color="#fff" />
                 </View>
-                <View style={[vg.durationBadge, { backgroundColor: sport.color }]}>
+                <View style={vg.durationBadge}>
                     <Text style={vg.durationText}>{video.duration}</Text>
                 </View>
-                <TouchableOpacity style={vg.starBtn}>
-                    <Text style={{ fontSize: 14 }}>☆</Text>
-                </TouchableOpacity>
             </View>
             <Text style={vg.videoTitle} numberOfLines={2}>{video.title}</Text>
         </TouchableOpacity>
     );
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function LearnSportsScreen({ navigation, route }) {
-    const selectedSport = route?.params?.sport || null;
-    const [viewingSport, setViewingSport] = useState(selectedSport);
+    const sport = route?.params?.sport || null;
 
-    const handleSportPress = (sport) => {
-        setViewingSport(sport);
-    };
+    // If opened without a sport context, go back — Academy tab is the entry point
+    if (!sport) {
+        return (
+            <SafeAreaView style={s.safe}>
+                <StatusBar barStyle="dark-content" />
+                <View style={s.topbar}>
+                    <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
+                        <Ionicons name="arrow-back" size={20} color={DARK} />
+                    </TouchableOpacity>
+                    <Text style={s.title}>Sports Library</Text>
+                    <View style={{ width: 40 }} />
+                </View>
+                <View style={s.empty}>
+                    <Ionicons name="library-outline" size={36} color={DIM} />
+                    <Text style={s.emptyText}>Browse sports from the Academy tab</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    const videos = sport.videos || generateMockVideos(sport);
 
     const handleVideoPress = (video) => {
         if (video.youtubeId) {
@@ -61,65 +68,43 @@ export default function LearnSportsScreen({ navigation, route }) {
         }
     };
 
-    // ── Sport Grid View ────────────────────────────────────────────────────
-    if (!viewingSport) {
-        return (
-            <SafeAreaView style={sg.safe}>
-                <View style={sg.topbar}>
-                    <TouchableOpacity style={sg.backBtn} onPress={() => navigation.goBack()}>
-                        <Text style={sg.backText}>‹ Back</Text>
-                    </TouchableOpacity>
-                    <Text style={sg.title}>Learn Sports</Text>
-                    <View style={{ width: 60 }} />
-                </View>
-                <FlatList
-                    data={SPORTS_LIBRARY}
-                    keyExtractor={item => item.id}
-                    numColumns={2}
-                    contentContainerStyle={sg.grid}
-                    columnWrapperStyle={{ gap: 12 }}
-                    renderItem={({ item }) => (
-                        <SportCard sport={item} onPress={handleSportPress} />
-                    )}
-                    showsVerticalScrollIndicator={false}
-                />
-            </SafeAreaView>
-        );
-    }
-
-    // ── Video Gallery View ─────────────────────────────────────────────────
-    const videos = viewingSport.videos || generateMockVideos(viewingSport);
-
     return (
-        <SafeAreaView style={sg.safe}>
-            <View style={sg.topbar}>
-                <TouchableOpacity style={sg.backBtn} onPress={() => setViewingSport(null)}>
-                    <Text style={sg.backText}>‹ Back</Text>
+        <SafeAreaView style={s.safe}>
+            <StatusBar barStyle="dark-content" />
+
+            <View style={s.topbar}>
+                <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
+                    <Ionicons name="arrow-back" size={20} color={DARK} />
                 </TouchableOpacity>
-                <Text style={sg.title}>{viewingSport.name}</Text>
-                <View style={[sg.countBadge, { backgroundColor: viewingSport.color + '20' }]}>
-                    <Text style={[sg.countText, { color: viewingSport.color }]}>
-                        {viewingSport.videoCount} videos
-                    </Text>
+                <View style={{ flex: 1 }}>
+                    <Text style={s.eyebrow}>{sport.category?.toUpperCase() || 'SPORT'}</Text>
+                    <Text style={s.title}>{sport.name}</Text>
+                </View>
+                <View style={s.countBadge}>
+                    <Text style={s.countText}>{sport.videoCount} videos</Text>
                 </View>
             </View>
 
             <FlatList
                 data={videos}
-                keyExtractor={item => item.id}
+                keyExtractor={(item) => item.id}
                 numColumns={2}
-                contentContainerStyle={sg.grid}
+                contentContainerStyle={s.grid}
                 columnWrapperStyle={{ gap: 12 }}
                 renderItem={({ item }) => (
-                    <VideoCard video={item} sport={viewingSport} onPress={handleVideoPress} />
+                    <VideoCard video={item} onPress={handleVideoPress} />
                 )}
                 showsVerticalScrollIndicator={false}
+                ListFooterComponent={() => (
+                    <View style={s.footer}>
+                        <Text style={s.footerText}>More drills & videos coming soon</Text>
+                    </View>
+                )}
             />
         </SafeAreaView>
     );
 }
 
-// Generate placeholder videos for sports without real data
 function generateMockVideos(sport) {
     const titles = [
         `${sport.name} — Basics & Fundamentals`,
@@ -139,33 +124,26 @@ function generateMockVideos(sport) {
     }));
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-const sg = StyleSheet.create({
-    safe:      { flex: 1, backgroundColor: C.bg },
-    topbar:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, paddingTop: 12 },
-    backBtn:   { padding: 4 },
-    backText:  { color: C.cyan, fontSize: 16, fontWeight: '700' },
-    title:     { fontSize: 18, fontWeight: '900', color: C.text },
-    countBadge:{ borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 },
-    countText: { fontSize: 11, fontWeight: '800' },
-    grid:      { padding: 16, paddingBottom: 30 },
-
-    // Sport cards
-    sportCard:   { width: CARD_W, backgroundColor: C.surf, borderRadius: 18, padding: 16, alignItems: 'center', borderWidth: 1 },
-    sportIconWrap:{ width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-    sportEmoji:  { fontSize: 32 },
-    sportName:   { fontSize: 13, fontWeight: '800', color: C.text, textAlign: 'center', marginBottom: 4 },
-    sportCount:  { fontSize: 10, color: C.muted, fontWeight: '600' },
+const s = StyleSheet.create({
+    safe:    { flex: 1, backgroundColor: BG },
+    topbar:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
+    backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: LIGHT, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+    eyebrow: { fontSize: 10, fontWeight: '800', color: ORANGE, letterSpacing: 0.8 },
+    title:   { fontSize: 20, fontWeight: '800', color: DARK, letterSpacing: -0.4 },
+    countBadge: { backgroundColor: LIGHT, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: BORDER },
+    countText:  { fontSize: 11, fontWeight: '700', color: GRAY },
+    grid:    { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 100 },
+    empty:   { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    emptyText: { fontSize: 14, color: GRAY, fontWeight: '600' },
+    footer:  { marginTop: 16, backgroundColor: LIGHT, borderRadius: 8, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed' },
+    footerText: { fontSize: 12, color: GRAY, fontWeight: '600' },
 });
 
 const vg = StyleSheet.create({
-    videoCard:  { width: CARD_W, backgroundColor: C.surf, borderRadius: 16, overflow: 'hidden', borderWidth: 1 },
-    thumb:      { width: '100%', height: 100, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-    thumbEmoji: { fontSize: 40, opacity: 0.5 },
-    playBtn:    { position: 'absolute', width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
-    playIcon:   { color: '#fff', fontSize: 14, marginLeft: 2 },
-    durationBadge: { position: 'absolute', bottom: 6, left: 6, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+    videoCard:  { width: CARD_W, backgroundColor: BG, borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, marginBottom: 0 },
+    thumb:      { width: '100%', height: 90, backgroundColor: LIGHT, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+    playBtn:    { position: 'absolute', width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+    durationBadge: { position: 'absolute', bottom: 6, left: 6, backgroundColor: ORANGE, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
     durationText:  { color: '#fff', fontSize: 9, fontWeight: '800' },
-    starBtn:       { position: 'absolute', bottom: 6, right: 6 },
-    videoTitle: { fontSize: 11, color: C.textSub, fontWeight: '600', padding: 8, lineHeight: 15 },
+    videoTitle: { fontSize: 11, color: DARK, fontWeight: '600', padding: 8, lineHeight: 15 },
 });

@@ -12,7 +12,7 @@ const RECENT_KEY = '@meal_recent_foods';
 const MAX_RECENT = 20;
 
 export default function MealLogScreen({ navigation, route }) {
-    const { athleteId = 'athlete_01', date, slot, quickFoodId, quickQty } = route.params || {};
+    const { athleteId, date, slot, quickFoodId, quickQty } = route.params || {};
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [recentFoods, setRecentFoods] = useState([]);

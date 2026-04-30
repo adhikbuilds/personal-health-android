@@ -8,9 +8,10 @@ import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
+// expo-blur removed — BlurView is unreliable in Expo Go on Android
 import * as Haptics from 'expo-haptics';
 import { UserProvider } from './src/context/UserContext';
+import { AuthProvider } from './src/context/AuthContext';
 import { registerForPushNotifications, addNotificationTapListener } from './src/services/pushNotifications';
 import { getOrCreateAnonymousAthleteId, ensureDeviceAuth } from './src/services/deviceIdentity';
 
@@ -52,6 +53,8 @@ import NutritionScreen     from './src/screens/nutrition/NutritionScreen';
 import MealLogScreen       from './src/screens/nutrition/MealLogScreen';
 import NutritionGoalsScreen from './src/screens/nutrition/NutritionGoalsScreen';
 import NotificationsScreen from './src/screens/core/NotificationsScreen';
+import LoginScreen    from './src/screens/auth/LoginScreen';
+import RegisterScreen from './src/screens/auth/RegisterScreen';
 import { hasCompletedOnboarding } from './src/services/deviceIdentity';
 
 const Tab   = createBottomTabNavigator();
@@ -112,9 +115,6 @@ function TabNavigator({ showToast }) {
                     <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{route.name}</Text>
                 ),
                 tabBarStyle:  styles.tabBar,
-                tabBarBackground: () => (
-                    <BlurView intensity={70} tint="light" style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.95)' }} />
-                ),
                 tabBarActiveTintColor: ORANGE,
                 tabBarInactiveTintColor: MUTED,
                 headerShown:  false,
@@ -281,6 +281,10 @@ function AppNavigator({ showToast }) {
                 options={{ animation: 'slide_from_right' }}
             />
 
+            {/* Auth screens */}
+            <Stack.Screen name="Login"    component={LoginScreen}    options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="Register" component={RegisterScreen} options={{ animation: 'slide_from_right' }} />
+
             {/* Invite deep-link — personalhealth://invite/:token */}
             <Stack.Screen
                 name="InviteJoin"
@@ -328,12 +332,14 @@ export default function App() {
     return (
         <SafeAreaProvider>
             <StatusBar style="dark" backgroundColor={BG} />
+            <AuthProvider>
             <UserProvider>
                 <NavigationContainer ref={navigationRef} linking={linking}>
                     <AppNavigator showToast={showToast} />
                 </NavigationContainer>
                 <ToastOverlay message={toastMsg} />
             </UserProvider>
+            </AuthProvider>
         </SafeAreaProvider>
     );
 }
@@ -341,7 +347,7 @@ export default function App() {
 const styles = StyleSheet.create({
     launch: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     tabBar: {
-        backgroundColor: 'transparent',                  // BlurView paints the bg
+        backgroundColor: BG,
         borderTopColor:  BORDER,
         borderTopWidth:  StyleSheet.hairlineWidth,
         height:          76,                              // taller — clears safe-area on most phones

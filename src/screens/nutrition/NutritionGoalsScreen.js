@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { C } from '../../styles/colors';
 import api from '../../services/api';
+import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 
 const FIELDS = [
     { key: 'daily_calories', label: 'Daily Calories', unit: 'kcal', min: 800, max: 6000 },
@@ -16,7 +17,7 @@ const FIELDS = [
 ];
 
 export default function NutritionGoalsScreen({ navigation, route }) {
-    const athleteId = route.params?.athleteId || 'athlete_01';
+    const [athleteId, setAthleteId] = useState(route.params?.athleteId || null);
     const [values, setValues] = useState({
         daily_calories: '2400', protein_g: '120', carbs_g: '300', fat_g: '60', fiber_g: '30',
     });
@@ -24,6 +25,13 @@ export default function NutritionGoalsScreen({ navigation, route }) {
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
+        if (!athleteId) {
+            getOrCreateAnonymousAthleteId().then(setAthleteId).catch(() => {});
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!athleteId) return;
         (async () => {
             try {
                 const res = await api.get(`/athlete/${athleteId}/nutrition/goals`);

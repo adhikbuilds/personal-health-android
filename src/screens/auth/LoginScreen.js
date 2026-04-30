@@ -1,66 +1,70 @@
-// LoginScreen — theme-aware (Bloomberg + Classic both supported via the
-// shared C/T/P tokens). Email + password, single submit, server error
-// surfacing, link to register.
-
 import React, { useState } from 'react';
 import {
-    View, Text, TextInput, Pressable, StyleSheet,
-    StatusBar, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
+    View, Text, TextInput, TouchableOpacity, StyleSheet,
+    SafeAreaView, StatusBar, KeyboardAvoidingView, Platform,
+    ScrollView, ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, T, P } from '../../styles/colors';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { TerminalScreen, Panel, Header, useLiveClock, SysBar, Footer, nowISO } from '../../components/terminal';
+
+const ORANGE = '#FC4C02';
+const DARK   = '#242428';
+const GRAY   = '#6D6D78';
+const DIM    = '#9CA3AF';
+const LIGHT  = '#F7F7FA';
+const BORDER = '#E6E6EA';
+const BG     = '#FFFFFF';
+const RED    = '#DC2626';
 
 function isEmail(s) {
     return typeof s === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 }
 
 export default function LoginScreen({ navigation }) {
-    const ins = useSafeAreaInsets();
-    const clock = useLiveClock();
     const { login } = useAuth();
-    const [email, setEmail]       = useState('');
+    const [email,    setEmail]    = useState('');
     const [password, setPassword] = useState('');
-    const [busy, setBusy]         = useState(false);
-    const [error, setError]       = useState(null);
+    const [busy,     setBusy]     = useState(false);
+    const [error,    setError]    = useState(null);
+    const [showPass, setShowPass] = useState(false);
 
     const canSubmit = isEmail(email) && password.length >= 8 && !busy;
 
     const onSubmit = async () => {
         setError(null);
-        if (!canSubmit) {
-            setError('Enter a valid email and an 8+ character password.');
-            return;
-        }
+        if (!canSubmit) { setError('Enter a valid email and 8+ character password.'); return; }
         setBusy(true);
         try {
-            await login(email, password);
-            // AuthGate will swap to the main stack automatically.
+            await login(email.trim(), password);
         } catch (e) {
-            setError(e?.message || 'Login failed.');
+            setError(e?.message || 'Login failed. Check your credentials.');
         } finally {
             setBusy(false);
         }
     };
 
     return (
-        <TerminalScreen style={{ paddingTop: ins.top }}>
-            <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent />
-            <SysBar online={null} identity="AUTH.LOGIN" clock={clock} />
-
+        <SafeAreaView style={s.safe}>
+            <StatusBar barStyle="dark-content" />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={{ paddingBottom: ins.bottom + 40 }} keyboardShouldPersistTaps="handled">
-                    <View style={s.hero}>
-                        <Text style={s.prompt}>{'> auth --login'}</Text>
-                        <Text style={s.title}>SIGN IN</Text>
-                        <Text style={s.sub}>BIO-PASSPORT · ATHLETE TERMINAL</Text>
+                <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+
+                    {/* Back */}
+                    <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
+                        <Ionicons name="arrow-back" size={20} color={DARK} />
+                    </TouchableOpacity>
+
+                    {/* Header */}
+                    <View style={s.header}>
+                        <Text style={s.eyebrow}>PERSONAL HEALTH</Text>
+                        <Text style={s.title}>Sign in</Text>
+                        <Text style={s.sub}>Track your form. Own your progress.</Text>
                     </View>
 
-                    <Panel>
-                        <Header title="CREDENTIALS" />
+                    {/* Fields */}
+                    <View style={s.card}>
                         <View style={s.field}>
-                            <Text style={s.label}>EMAIL</Text>
+                            <Text style={s.label}>Email</Text>
                             <TextInput
                                 style={s.input}
                                 value={email}
@@ -69,81 +73,92 @@ export default function LoginScreen({ navigation }) {
                                 autoCorrect={false}
                                 keyboardType="email-address"
                                 placeholder="you@example.com"
-                                placeholderTextColor={C.muted}
+                                placeholderTextColor={DIM}
                                 editable={!busy}
                                 returnKeyType="next"
                             />
                         </View>
-                        <View style={s.field}>
-                            <Text style={s.label}>PASSWORD</Text>
-                            <TextInput
-                                style={s.input}
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                placeholder="••••••••"
-                                placeholderTextColor={C.muted}
-                                editable={!busy}
-                                returnKeyType="go"
-                                onSubmitEditing={onSubmit}
-                            />
-                        </View>
-                        {error && (
-                            <View style={s.errBox}>
-                                <Text style={s.errText}>[ERR] {error}</Text>
+                        <View style={[s.field, { marginBottom: 0 }]}>
+                            <Text style={s.label}>Password</Text>
+                            <View style={s.inputRow}>
+                                <TextInput
+                                    style={[s.input, { flex: 1, borderRightWidth: 0, borderRadius: 0 }]}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry={!showPass}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    placeholder="••••••••"
+                                    placeholderTextColor={DIM}
+                                    editable={!busy}
+                                    returnKeyType="go"
+                                    onSubmitEditing={onSubmit}
+                                />
+                                <TouchableOpacity
+                                    style={s.eyeBtn}
+                                    onPress={() => setShowPass((v) => !v)}
+                                >
+                                    <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={GRAY} />
+                                </TouchableOpacity>
                             </View>
-                        )}
-                    </Panel>
+                        </View>
+                    </View>
 
-                    <Pressable
+                    {error && (
+                        <View style={s.errBox}>
+                            <Ionicons name="alert-circle-outline" size={14} color={RED} />
+                            <Text style={s.errText}>{error}</Text>
+                        </View>
+                    )}
+
+                    <TouchableOpacity
+                        style={[s.cta, !canSubmit && s.ctaDisabled]}
                         onPress={onSubmit}
                         disabled={!canSubmit}
-                        style={({ pressed }) => [s.cta, !canSubmit && s.ctaDisabled, pressed && canSubmit && { backgroundColor: C.surf }]}
+                        activeOpacity={0.85}
                     >
-                        {busy ? (
-                            <ActivityIndicator size="small" color={C.text} />
-                        ) : (
-                            <Text style={[s.ctaText, !canSubmit && { color: C.muted }]}>[SPACE] SIGN IN  ▸</Text>
-                        )}
-                    </Pressable>
+                        {busy
+                            ? <ActivityIndicator size="small" color="#fff" />
+                            : <Text style={s.ctaText}>Sign In</Text>
+                        }
+                    </TouchableOpacity>
 
-                    <Pressable onPress={() => navigation.navigate('Register')} style={s.altLink}>
-                        <Text style={s.altText}>NEW HERE? <Text style={{ color: C.text }}>CREATE ACCOUNT</Text></Text>
-                    </Pressable>
+                    <TouchableOpacity style={s.link} onPress={() => navigation.navigate('Register')}>
+                        <Text style={s.linkText}>Don't have an account? <Text style={s.linkBold}>Create one</Text></Text>
+                    </TouchableOpacity>
 
-                    <Footer lines={[
-                        { text: `BUILD.2.3.0 · ${nowISO()}` },
-                        { text: 'PROTOCOL HTTPS · BCRYPT(12) · JWT HS256', color: C.muted },
-                    ]} />
                 </ScrollView>
             </KeyboardAvoidingView>
-        </TerminalScreen>
+        </SafeAreaView>
     );
 }
 
 const s = StyleSheet.create({
-    hero:    { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12 },
-    prompt:  { fontSize: 11, color: C.textMid, fontFamily: T.MONO, fontWeight: '600' },
-    title:   { fontSize: 28, fontWeight: '700', color: C.white, fontFamily: T.MONO, letterSpacing: 1, marginTop: 8 },
-    sub:     { fontSize: 11, color: C.textMid, fontFamily: T.MONO, marginTop: 6, letterSpacing: 1 },
+    safe:   { flex: 1, backgroundColor: BG },
+    scroll: { flexGrow: 1, paddingHorizontal: 20, paddingBottom: 40 },
 
-    field:   { paddingHorizontal: 12, paddingVertical: 8 },
-    label:   { fontSize: 10, color: C.textMid, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
-    input:   {
-        fontSize: 14, color: C.white, fontFamily: T.MONO,
-        borderWidth: 1, borderColor: C.border, paddingHorizontal: 10, paddingVertical: 10,
-        backgroundColor: P.headerBg,
-    },
+    backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: LIGHT, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
 
-    errBox:  { paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: P.headerBg },
-    errText: { fontSize: 11, color: C.bad, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 0.5 },
+    header:  { marginTop: 24, marginBottom: 28 },
+    eyebrow: { fontSize: 10, fontWeight: '800', color: ORANGE, letterSpacing: 1.2, marginBottom: 8 },
+    title:   { fontSize: 28, fontWeight: '800', color: DARK, letterSpacing: -0.5 },
+    sub:     { fontSize: 14, color: GRAY, marginTop: 6 },
 
-    cta:        { margin: 16, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: C.text },
-    ctaDisabled:{ borderColor: C.border },
-    ctaText:    { color: C.text, fontFamily: T.MONO, fontSize: 13, fontWeight: '700', letterSpacing: 1.5 },
+    card:    { backgroundColor: LIGHT, borderRadius: 12, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginBottom: 16 },
+    field:   { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
+    label:   { fontSize: 11, fontWeight: '700', color: GRAY, letterSpacing: 0.5, marginBottom: 6 },
+    input:   { fontSize: 15, color: DARK, paddingVertical: 0, borderWidth: 1, borderColor: BORDER, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: BG },
+    inputRow:{ flexDirection: 'row' },
+    eyeBtn:  { width: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: BG, borderWidth: 1, borderColor: BORDER, borderTopRightRadius: 8, borderBottomRightRadius: 8 },
 
-    altLink:    { paddingVertical: 8, alignItems: 'center' },
-    altText:    { color: C.muted, fontFamily: T.MONO, fontSize: 11, letterSpacing: 1, fontWeight: '700' },
+    errBox:  { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: 8, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#FECACA' },
+    errText: { flex: 1, fontSize: 13, color: RED, fontWeight: '600' },
+
+    cta:         { backgroundColor: ORANGE, borderRadius: 10, paddingVertical: 15, alignItems: 'center', marginBottom: 14 },
+    ctaDisabled: { backgroundColor: DIM },
+    ctaText:     { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
+
+    link:     { alignItems: 'center', paddingVertical: 10 },
+    linkText: { fontSize: 13, color: GRAY },
+    linkBold: { color: ORANGE, fontWeight: '700' },
 });

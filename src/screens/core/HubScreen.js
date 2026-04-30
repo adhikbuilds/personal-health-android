@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../../context/UserContext';
+import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 import { NUTRITION_PLANS, PLAYFIELDS } from '../../data/constants';
 import api from '../../services/api';
 
@@ -227,11 +228,13 @@ export default function HubScreen({ showToast, navigation }) {
     const initials = String(name).split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 
     useEffect(() => {
+        let deviceId = null;
+        getOrCreateAnonymousAthleteId().then(id => { deviceId = id; }).catch(() => {});
         api.getLeaderboard?.().then((data) => {
             if (!data?.leaderboard) return;
-            const idx = data.leaderboard.findIndex((a) => a.id === 'athlete_01');
+            const idx = data.leaderboard.findIndex((a) => a.id === deviceId);
             if (idx >= 0) {
-                setRankData({ rank: idx + 1, total: data.total || data.leaderboard.length, tier: 'District' });
+                setRankData({ rank: idx + 1, total: data.total || data.leaderboard.length, tier: data.leaderboard[idx]?.tier || 'District' });
             }
         }).catch(() => {});
     }, []);
@@ -295,10 +298,24 @@ export default function HubScreen({ showToast, navigation }) {
                             Level {level} · {streak}-day streak
                         </Text>
                     </View>
-                    <View style={s.xpPill}>
+                    <TouchableOpacity
+                        style={s.xpPill}
+                        onPress={() => navigation.navigate('Login')}
+                        activeOpacity={0.7}
+                    >
                         <Text style={s.xpText}>{Number(xp).toLocaleString()} XP</Text>
-                    </View>
+                    </TouchableOpacity>
                 </View>
+                {/* Sign-in CTA for unauthenticated users */}
+                <TouchableOpacity
+                    style={s.signInBanner}
+                    onPress={() => navigation.navigate('Register')}
+                    activeOpacity={0.8}
+                >
+                    <Ionicons name="person-add-outline" size={16} color={ORANGE} />
+                    <Text style={s.signInBannerText}>Create a free account to sync your data across devices</Text>
+                    <Ionicons name="chevron-forward" size={14} color={ORANGE} />
+                </TouchableOpacity>
 
                 {/* Section tabs */}
                 <View style={s.tabRow}>
@@ -366,6 +383,21 @@ const s = StyleSheet.create({
         borderRadius: 50,
     },
     xpText: { fontSize: 11, fontWeight: '800', color: DARK, letterSpacing: 0.3 },
+
+    signInBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginHorizontal: 20,
+        marginBottom: 12,
+        backgroundColor: 'rgba(252,76,2,0.06)',
+        borderWidth: 1,
+        borderColor: 'rgba(252,76,2,0.2)',
+        borderRadius: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    signInBannerText: { flex: 1, fontSize: 12, color: DARK, fontWeight: '600' },
 
     // Tabs
     tabRow: {
