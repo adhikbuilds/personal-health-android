@@ -26,6 +26,16 @@ const SPORTS = [
     { key: 'cricket_bat', label: 'Cricket Bat' },
 ];
 
+// Phase transition that signals one completed rep per sport.
+const REP_TRANSITION = {
+    vertical_jump: { from: 'drive',      to: 'flight'  },
+    sprint:        { from: 'drive',      to: 'flight'  },
+    squat:         { from: 'bottom',     to: 'ascent'  },
+    push_up:       { from: 'bottom',     to: 'ascent'  },
+    javelin:       { from: 'drive',      to: 'release' },
+    cricket_bat:   { from: 'backswing',  to: 'swing'   },
+};
+
 export default function TrainScreen({ navigation, route, showToast }) {
     const autoStart = route?.params?.autoStart || false;
     const onboardingMode = route?.params?.onboardingMode || false;
@@ -156,7 +166,12 @@ export default function TrainScreen({ navigation, route, showToast }) {
                     if (payload.form_score > 0) setScore(Math.round(payload.form_score));
                     if (payload.phase) {
                         setPhase(payload.phase);
-                        if (lastPhaseRef.current === 'drive' && payload.phase === 'flight') {
+                        const transition = REP_TRANSITION[sport];
+                        if (
+                            transition &&
+                            lastPhaseRef.current === transition.from &&
+                            payload.phase === transition.to
+                        ) {
                             repCountRef.current += 1;
                             setRepCount(repCountRef.current);
                             if (repCountRef.current > 0 && repCountRef.current % 3 === 0) {
@@ -206,15 +221,22 @@ export default function TrainScreen({ navigation, route, showToast }) {
         setIsActive(false);
         Speech.stop();
         if (!sessionId) return;
-        await api.endSession(sessionId);
+
+        const [, repData] = await Promise.all([
+            api.endSession(sessionId),
+            api.getRepCount(sessionId).catch(() => null),
+        ]);
+
+        const finalRepCount = repData?.rep_count ?? repCountRef.current;
 
         const onboarded = await hasCompletedOnboarding().catch(() => true);
-        const route = onboarded ? 'ShareCard' : 'FirstScore';
+        const dest = onboarded ? 'ShareCard' : 'FirstScore';
 
-        navigation.replace(route, {
+        navigation.replace(dest, {
             sessionId,
             athleteId,
             onboardingMode,
+            repCount: finalRepCount,
         });
     };
 

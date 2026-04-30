@@ -277,6 +277,14 @@ export const api = {
         return response.url || `${API_BASE}${path}`;
     },
 
+    // ─── Rep counting ────────────────────────────────────────────────────
+    getRepCount: (sessionId) =>
+        fetchJSON(`/sessions/${encodeURIComponent(sessionId)}/rep-count`),
+
+    // ─── rPPG result (backend-computed final BPM/HRV) ───────────────────
+    getRPPGResult: (sessionId) =>
+        fetchJSON(`/rppg/result/${encodeURIComponent(sessionId)}`),
+
     // ─── Injury Risk (Flow 13) ───────────────────────────────────────────
     getInjuryRisk: (athleteId, days = 14) =>
         fetchJSON(`/injury-risk/${encodeURIComponent(athleteId)}?days=${days}`),

@@ -160,10 +160,13 @@ export default function MetricsScreen({ navigation }) {
     const spiderData = (() => {
         if (liveMetrics?.progress) {
             const p = liveMetrics.progress;
-            const formScore = p.score_trend?.avg ?? 50;
-            const consistency = Math.min(100, Math.round((p.sessions_in_period / 30) * 100 * 3));
-            const xpNorm = Math.min(100, Math.round((p.xp_trend?.avg ?? 0) / 30));
-            return [formScore, consistency, xpNorm];
+            // physical axis: avg form score (0-100)
+            const formScore = Math.min(100, p.avg_form_score ?? 50);
+            // technical axis: consistency (sessions this month, 10/mo = 100%)
+            const consistency = Math.min(100, Math.round((p.session_count / 10) * 100));
+            // cognitive axis: trend direction (50 = flat, 100 = +50% trend)
+            const trendScore = Math.min(100, Math.max(0, 50 + (p.form_trend_pct ?? 0)));
+            return [formScore, consistency, trendScore];
         }
         return stats.map((x) => x.A ?? 0).slice(0, 3).concat([50, 50, 50]).slice(0, 3);
     })();
@@ -217,17 +220,45 @@ export default function MetricsScreen({ navigation }) {
                 <Text style={[s.sectionLabel, { marginTop: 24 }]}>DETAILED METRICS</Text>
                 {(METRICS_DB[activeTab] || []).map((m) => {
                     let metric = m;
-                    if (m.id === 't3' && liveMetrics?.progress?.score_trend?.avg > 0) {
-                        const p = liveMetrics.progress;
-                        const series = p.score_trend?.series || [];
-                        metric = {
-                            ...m,
-                            you: Math.round(p.score_trend.avg),
-                            history: series.slice(-3).map(Math.round),
-                        };
+                    const p = liveMetrics?.progress;
+                    if (p) {
+                        const trend = (p.form_score_trend || []).map(d => Math.round(d.score));
+                        if (m.id === 't3' && p.avg_form_score > 0) {
+                            metric = {
+                                ...m,
+                                you: Math.round(p.avg_form_score),
+                                history: trend.slice(-3),
+                            };
+                        } else if (m.id === 'p2' && p.best_jump_cm > 0) {
+                            metric = { ...m, you: Math.round(p.best_jump_cm) };
+                        } else if (m.id === 'p1' && p.session_count > 0) {
+                            metric = { ...m, you: p.session_count, unit: 'sessions', label: 'Sessions (30d)', betterIs: 'higher', avg: 8 };
+                        }
                     }
                     return <MetricRow key={m.id} metric={metric} isLive={isLive || !!liveMetrics} />;
                 })}
+
+                {/* Weak joints from live analysis */}
+                {liveMetrics?.weakJoints?.length > 0 && (
+                    <>
+                        <Text style={[s.sectionLabel, { marginTop: 24 }]}>WEAK JOINTS DETECTED</Text>
+                        {liveMetrics.weakJoints.map((j, i) => (
+                            <View key={i} style={[s.metricRow, { marginBottom: 8 }]}>
+                                <View style={s.metricHead}>
+                                    <Text style={s.metricLabel}>{j.joint?.replace(/_/g, ' ')}</Text>
+                                    <View style={[s.trendPill, { backgroundColor: 'rgba(220,38,38,0.10)' }]}>
+                                        <Text style={[s.trendText, { color: ALERT }]}>
+                                            {j.deviation_deg != null ? `${Math.round(j.deviation_deg)}° off ideal` : 'needs work'}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <Text style={{ fontSize: 12, color: GRAY, lineHeight: 18 }}>
+                                    {j.recommendation || `Focus on ${j.joint?.replace(/_/g, ' ')} mobility and strength.`}
+                                </Text>
+                            </View>
+                        ))}
+                    </>
+                )}
 
                 {/* Injury risk entry — Strava-clean callout */}
                 <Text style={[s.sectionLabel, { marginTop: 24 }]}>RISK ANALYSIS</Text>
