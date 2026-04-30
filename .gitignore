@@ -18,6 +18,11 @@ node_modules/
 # ─── Expo Web ────────────────────────────────────────────────────────────────
 web-build/
 
+# ─── Release Keystore (NEVER commit) ─────────────────────────────────────────
+android/app/release.keystore
+*.keystore
+!android/app/debug.keystore
+
 # ─── Android Native Build ────────────────────────────────────────────────────
 # Gradle daemon cache and incremental build outputs (often hundreds of MB)
 android/.gradle/
