@@ -22,6 +22,7 @@ const SPORTS = [
     { key: 'vertical_jump', label: 'Vertical Jump' },
     { key: 'push_up', label: 'Push-up' },
     { key: 'squat', label: 'Squat' },
+    { key: 'pull_up', label: 'Pull-up' },
     { key: 'javelin', label: 'Javelin' },
     { key: 'cricket_bat', label: 'Cricket Bat' },
 ];
@@ -32,6 +33,7 @@ const REP_TRANSITION = {
     sprint:        { from: 'drive',      to: 'flight'  },
     squat:         { from: 'bottom',     to: 'ascent'  },
     push_up:       { from: 'bottom',     to: 'ascent'  },
+    pull_up:       { from: 'bottom',     to: 'ascent'  },
     javelin:       { from: 'drive',      to: 'release' },
     cricket_bat:   { from: 'backswing',  to: 'swing'   },
 };
@@ -54,6 +56,7 @@ export default function TrainScreen({ navigation, route, showToast }) {
     const [speechFailed, setSpeechFailed] = useState(false);
     const [restTimerVisible, setRestTimerVisible] = useState(false);
     const [restSeconds, setRestSeconds] = useState(60);
+    const [aiProcessing, setAiProcessing] = useState(false);
 
     const cameraRef = useRef(null);
     const captureIntervalRef = useRef(null);
@@ -64,6 +67,7 @@ export default function TrainScreen({ navigation, route, showToast }) {
     const lastPhaseRef = useRef(null);
     const autoEndedRef = useRef(false);
     const captureBusyRef = useRef(false);
+    const aiTimerRef = useRef(null);
 
     useEffect(() => {
         Camera.requestCameraPermissionsAsync().then(({ status }) => {
@@ -117,6 +121,7 @@ export default function TrainScreen({ navigation, route, showToast }) {
     const cleanupSession = () => {
         if (captureIntervalRef.current) clearInterval(captureIntervalRef.current);
         if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+        if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
         if (metricsWsRef.current) {
             try { metricsWsRef.current.close(); } catch (_) {}
         }
@@ -163,6 +168,8 @@ export default function TrainScreen({ navigation, route, showToast }) {
                 }
 
                 if (payload?.type === 'frame') {
+                    if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+                    setAiProcessing(false);
                     if (payload.form_score > 0) setScore(Math.round(payload.form_score));
                     if (payload.phase) {
                         setPhase(payload.phase);
@@ -201,6 +208,9 @@ export default function TrainScreen({ navigation, route, showToast }) {
                         image_b64: photo.base64,
                         sport,
                     });
+                    setAiProcessing(true);
+                    if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+                    aiTimerRef.current = setTimeout(() => setAiProcessing(false), 6000);
                 }
             } catch (_) {
             } finally {
@@ -311,8 +321,13 @@ export default function TrainScreen({ navigation, route, showToast }) {
             ) : null}
 
             <View style={s.centerScore}>
-                <Text style={s.score}>{score}</Text>
+                <Text style={[s.score, aiProcessing && { opacity: 0.55 }]}>{score}</Text>
                 <Text style={s.phase}>{phase}</Text>
+                {aiProcessing && (
+                    <View style={s.aiBadge}>
+                        <Text style={s.aiBadgeText}>AI analysing...</Text>
+                    </View>
+                )}
             </View>
 
             <View style={s.subtitleBar}>
@@ -371,4 +386,6 @@ const s = StyleSheet.create({
     repsCount: { color: MUTED, fontSize: 22, fontWeight: '800', marginTop: 8 },
     stopBtn: { position: 'absolute', left: 16, right: 16, bottom: 18, height: '28%', backgroundColor: 'rgba(17,24,39,0.92)', borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
     stopText: { color: TEXT, fontSize: 28, fontWeight: '900', textTransform: 'lowercase' },
+    aiBadge: { marginTop: 10, backgroundColor: 'rgba(17,24,39,0.85)', borderRadius: 20, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: 'rgba(252,76,2,0.3)' },
+    aiBadgeText: { color: ACCENT, fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
 });

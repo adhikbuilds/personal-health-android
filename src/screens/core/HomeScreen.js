@@ -2,7 +2,7 @@
 // One hero card · simple activity feed · 4 quick actions · single accent color.
 // Preserves all data hooks (useUser, api.ping, getNotifications, AsyncStorage tracker).
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
     View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView,
     StatusBar,
@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Pedometer } from 'expo-sensors';
 import { useUser } from '../../context/UserContext';
 import api from '../../services/api';
 import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
@@ -38,6 +39,7 @@ const SUCCESS = '#16A34A';
 const ALERT   = '#DC2626';
 
 const TODAY_KEY = `@daily_tracker_${new Date().toISOString().slice(0, 10)}`;
+const WATER_KEY = `@water_glasses_${new Date().toISOString().slice(0, 10)}`;
 const tap = () => { try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} };
 
 export default function HomeScreen({ navigation, showToast }) {
@@ -48,6 +50,9 @@ export default function HomeScreen({ navigation, showToast }) {
     const [fitnessScore, setFitnessScore] = useState(null);
     const [streak, setStreak]       = useState(0);
     const [recentSessions, setRecentSessions] = useState([]);
+    const [steps, setSteps]         = useState(null);
+    const [waterGlasses, setWaterGlasses] = useState(0);
+    const pedometerSub = useRef(null);
 
     const name = (displayName || user?.name || 'Athlete').toString();
 
@@ -56,7 +61,36 @@ export default function HomeScreen({ navigation, showToast }) {
         AsyncStorage.getItem(TODAY_KEY).then((raw) => {
             if (raw) { try { setTracker(JSON.parse(raw)); } catch (_) {} }
         });
+        AsyncStorage.getItem(WATER_KEY).then((raw) => {
+            if (raw) setWaterGlasses(parseInt(raw, 10) || 0);
+        });
     }, []);
+
+    // Step counter via Pedometer
+    useEffect(() => {
+        Pedometer.isAvailableAsync().then((available) => {
+            if (!available) { setSteps(-1); return; }
+            const now = new Date();
+            const start = new Date(now);
+            start.setHours(0, 0, 0, 0);
+            Pedometer.getStepCountAsync(start, now)
+                .then(result => setSteps(result.steps))
+                .catch(() => setSteps(-1));
+            pedometerSub.current = Pedometer.watchStepCount(result => {
+                setSteps(s => (s === -1 ? result.steps : (s || 0) + result.steps));
+            });
+        }).catch(() => setSteps(-1));
+        return () => { pedometerSub.current?.remove(); };
+    }, []);
+
+    const incrementWater = () => {
+        tap();
+        setWaterGlasses(prev => {
+            const next = prev + 1;
+            AsyncStorage.setItem(WATER_KEY, String(next)).catch(() => {});
+            return next;
+        });
+    };
 
     // API status + recent sessions
     useEffect(() => {
@@ -218,9 +252,22 @@ export default function HomeScreen({ navigation, showToast }) {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>TODAY</Text>
                     <View style={styles.chipsRow}>
-                        <CheckChip label="Sleep"  value={tracker?.sleep?.value || '—'} unit="hr" filled={!!tracker?.sleep?.value} />
-                        <CheckChip label="Water"  value={tracker?.water?.value || '—'} unit="ml" filled={!!tracker?.water?.value} />
-                        <CheckChip label="Energy" value={tracker?.energy?.value || '—'} unit="/5" filled={!!tracker?.energy?.value} />
+                        <CheckChip
+                            label="Steps"
+                            value={steps === null ? '…' : steps === -1 ? 'N/A' : steps.toLocaleString()}
+                            unit={steps > 0 ? 'steps' : ''}
+                            filled={steps > 0}
+                        />
+                        <TouchableOpacity onPress={incrementWater} activeOpacity={0.7}>
+                            <CheckChip
+                                label="Water"
+                                value={String(waterGlasses)}
+                                unit="glasses"
+                                filled={waterGlasses > 0}
+                                tappable
+                            />
+                        </TouchableOpacity>
+                        <CheckChip label="Sleep" value={tracker?.sleep?.value || '—'} unit="hr" filled={!!tracker?.sleep?.value} />
                     </View>
                     <TouchableOpacity
                         style={styles.checkinBtn}
@@ -273,14 +320,15 @@ function SessionRow({ session, onPress }) {
     );
 }
 
-function CheckChip({ label, value, unit, filled }) {
+function CheckChip({ label, value, unit, filled, tappable }) {
     return (
-        <View style={[styles.chip, filled && styles.chipFilled]}>
+        <View style={[styles.chip, filled && styles.chipFilled, tappable && styles.chipTappable]}>
             <Text style={[styles.chipLabel, filled && styles.chipLabelFilled]}>{label}</Text>
             <Text style={[styles.chipValue, filled && styles.chipValueFilled]}>
                 {value}
-                {value !== '—' && <Text style={styles.chipUnit}> {unit}</Text>}
+                {value !== '—' && value !== 'N/A' && value !== '…' && <Text style={styles.chipUnit}> {unit}</Text>}
             </Text>
+            {tappable && <Text style={styles.chipHint}>tap +1</Text>}
         </View>
     );
 }
@@ -473,11 +521,13 @@ const styles = StyleSheet.create({
         borderColor: BORDER,
     },
     chipFilled: { backgroundColor: 'rgba(252, 76, 2, 0.06)', borderColor: ORANGE },
+    chipTappable: { borderStyle: 'dashed' },
     chipLabel: { fontSize: 10, fontWeight: '700', color: GRAY, letterSpacing: 0.5 },
     chipLabelFilled: { color: ORANGE },
     chipValue: { fontSize: 18, fontWeight: '800', color: DIM, marginTop: 4 },
     chipValueFilled: { color: DARK },
     chipUnit: { fontSize: 11, fontWeight: '600', color: GRAY },
+    chipHint: { fontSize: 9, fontWeight: '700', color: ORANGE, marginTop: 4, opacity: 0.6 },
 
     checkinBtn: {
         flexDirection: 'row',
