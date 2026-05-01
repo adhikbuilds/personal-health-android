@@ -326,6 +326,48 @@ export const api = {
         return { send: (b64) => ws.readyState === 1 && ws.send(JSON.stringify({ type: 'frame', data: b64 })), close: () => ws.close() };
     },
 
+    // ─── Progress & analytics ────────────────────────────────────────────
+    getProgress: (athleteId, days = 30) =>
+        fetchJSON(`/progress/${encodeURIComponent(athleteId)}?days=${days}`),
+
+    getReadiness: (athleteId, days = 14) =>
+        fetchJSON(`/readiness/${encodeURIComponent(athleteId)}?days=${days}`),
+
+    getAdvancedMetrics: (athleteId, days = 30) =>
+        fetchJSON(`/athlete/${encodeURIComponent(athleteId)}/advanced-metrics?days=${days}`),
+
+    getLoadRecommendation: (athleteId) =>
+        fetchJSON(`/athlete/${encodeURIComponent(athleteId)}/load-recommendation`),
+
+    // ─── Scorecard & coaching inbox ──────────────────────────────────────
+    getScorecard: (sessionId) =>
+        fetchJSON(`/session/${encodeURIComponent(sessionId)}/scorecard`),
+
+    getAthleteInbox: (athleteId, limit = 5) =>
+        fetchJSON(`/inbox/athlete/${encodeURIComponent(athleteId)}?limit=${limit}`),
+
+    // ─── Streak, goals, recovery & personal bests ────────────────────────
+    getStreak: (athleteId) =>
+        fetchJSON(`/streak/${encodeURIComponent(athleteId)}`),
+
+    getGoals: (athleteId) =>
+        fetchJSON(`/athlete/${encodeURIComponent(athleteId)}/goals`),
+
+    updateGoals: (athleteId, goals) =>
+        fetchJSON(`/athlete/${encodeURIComponent(athleteId)}/goals`, {
+            method: 'PUT',
+            body: JSON.stringify(goals),
+        }),
+
+    getPersonalBests: (athleteId) =>
+        fetchJSON(`/athlete/${encodeURIComponent(athleteId)}/personal-bests`),
+
+    getRecoveryScore: (athleteId) =>
+        fetchJSON(`/athlete/${encodeURIComponent(athleteId)}/recovery/score`),
+
+    getRecoveryRecommendation: (athleteId) =>
+        fetchJSON(`/athlete/${encodeURIComponent(athleteId)}/recovery/recommendation`),
+
     // ─── Generic REST helpers ────────────────────────────────────────────
     get:   (path)         => fetchJSON(path),
     post:  (path, body)   => fetchJSON(path, { method: 'POST',  body: JSON.stringify(body) }),
