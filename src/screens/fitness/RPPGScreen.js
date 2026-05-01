@@ -52,6 +52,13 @@ function qualityColor(q) {
     return T.muted;
 }
 
+function qualityBorderColor(q) {
+    if (q === 'excellent' || q === 'good') return '#22c55e';
+    if (q === 'fair' || q === 'warmup') return '#facc15';
+    if (q === 'poor') return '#f97316';
+    return 'rgba(255,255,255,0.15)';
+}
+
 // ─── Animated BPM Ring ───────────────────────────────────────────────────────
 function BPMRing({ bpm, quality }) {
     const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -366,7 +373,7 @@ export default function RPPGScreen({ navigation, route }) {
             <StatusBar barStyle="light-content" backgroundColor="#000" />
 
             {/* ── Top Half: Camera ── */}
-            <View style={s.camWrap}>
+            <View style={[s.camWrap, { borderBottomColor: qualityBorderColor(quality), borderBottomWidth: 3 }]}>
                 <CameraView
                     ref={cameraRef}
                     style={StyleSheet.absoluteFill}
