@@ -4,13 +4,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View, Text, StyleSheet, SafeAreaView, ScrollView,
-    TouchableOpacity, TextInput, Animated, Dimensions,
+    TouchableOpacity, TextInput, Animated, Dimensions, Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { C, LEVEL_COLORS, LEVEL_LABELS } from '../styles/colors';
-import { computeFitnessScore, FITNESS_TEST_BANDS } from '../data/constants';
-import { useUser } from '../context/UserContext';
-import api from '../services/api';
+import { C, LEVEL_COLORS, LEVEL_LABELS } from '../../styles/colors';
+import { computeFitnessScore, FITNESS_TEST_BANDS } from '../../data/constants';
+import { useUser } from '../../context/UserContext';
+import api from '../../services/api';
 
 const HISTORY_KEY = '@fitness_test_history';
 const { width: SW } = Dimensions.get('window');
@@ -42,7 +42,7 @@ function LevelBand({ score, level }) {
                     ['Can do better', '#eab308'],
                     ['Good', '#84cc16'],
                     ['Very Good', '#22c55e'],
-                    ['Athletic', '#06b6d4'],
+                    ['Athletic', '#FC4C02'],
                     ['Excellent', '#8b5cf6'],
                 ].map(([lbl, clr]) => (
                     <View key={lbl} style={lb.legendItem}>
@@ -88,6 +88,10 @@ function RunTimer({ onTimeSet }) {
     const [elapsed, setElapsed] = useState(0);
     const [done, setDone] = useState(false);
     const interval = useRef(null);
+
+    useEffect(() => {
+        return () => { if (interval.current) clearInterval(interval.current); };
+    }, []);
 
     const start = () => {
         setRunning(true);
@@ -143,7 +147,7 @@ function RunTimer({ onTimeSet }) {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function FitnessTestScreen({ navigation }) {
     const { userData, updateFitnessScore } = useUser();
-    const [step, setStep] = useState('intro'); // intro | bmi | fitness | results
+    const [step, setStep] = useState('intro'); // intro | bmi | results
     const [saving, setSaving] = useState(false);
 
     // Inputs
@@ -167,6 +171,10 @@ export default function FitnessTestScreen({ navigation }) {
         const r = parseFloat(reachCm);
         const t = runSeconds || parseFloat(runInput) || 0;
         if (!h || !w || !r || !t) return;
+        if (h < 50 || h > 250) { Alert.alert('Invalid Input', 'Height must be between 50–250 cm.'); return; }
+        if (w < 10 || w > 300) { Alert.alert('Invalid Input', 'Weight must be between 10–300 kg.'); return; }
+        if (r < 0 || r > 60)  { Alert.alert('Invalid Input', 'Sit & Reach must be between 0–60 cm.'); return; }
+        if (t < 30 || t > 900) { Alert.alert('Invalid Input', 'Run time must be between 30–900 seconds.'); return; }
         const result = computeFitnessScore(w / Math.pow(h / 100, 2), r, t);
         setResults(result);
         setStep('results');
@@ -232,7 +240,7 @@ export default function FitnessTestScreen({ navigation }) {
                     <Text style={s.introEmoji}>🏃</Text>
                     <Text style={s.introTitle}>Take your Fitness Test</Text>
                     <Text style={s.introDesc}>
-                        {userData.name} · {new Date().getFullYear() - 2005} Yrs
+                        {userData.name}
                     </Text>
                     <Text style={s.introBody}>
                         This standardised test measures your fitness level across three areas — BMI, flexibility, and stamina — and gives you an overall score from L1 to L7.
@@ -261,11 +269,11 @@ export default function FitnessTestScreen({ navigation }) {
     }
 
     // ── BMI + FLEXIBILITY + RUN ──────────────────────────────────────────
-    if (step === 'bmi' || step === 'fitness') {
+    if (step === 'bmi') {
         return (
             <SafeAreaView style={s.safe}>
                 <View style={s.topbar}>
-                    <TouchableOpacity onPress={() => step === 'bmi' ? setStep('intro') : setStep('bmi')}>
+                    <TouchableOpacity onPress={() => setStep('intro')}>
                         <Text style={s.back}>‹ Back</Text>
                     </TouchableOpacity>
                     <Text style={s.title}>Take your Fitness Test</Text>

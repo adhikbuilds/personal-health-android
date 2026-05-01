@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const C = {
-    bg: '#0f172a', surf: '#1e293b', deep: '#0d1829', cyan: '#06b6d4',
+    bg: '#FBFBF8', surf: '#FFFFFF', deep: '#F7F7FA', cyan: '#FC4C02',
     orange: '#f97316', green: '#22c55e', red: '#ef4444',
-    muted: '#64748b', text: '#f1f5f9', border: 'rgba(255,255,255,0.08)',
+    muted: '#9CA3AF', text: '#242428', border: 'rgba(255,255,255,0.08)',
 };
 
 const DUMMY_FIELDS = [

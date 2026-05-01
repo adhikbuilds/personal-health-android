@@ -2,13 +2,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     View, Text, StyleSheet, SafeAreaView, FlatList,
-    TouchableOpacity, ScrollView, RefreshControl,
+    TouchableOpacity, ScrollView, RefreshControl, Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { C } from '../styles/colors';
-import { MOCK_FEED_POSTS, TRENDING_CREATORS } from '../data/constants';
-import { useUser } from '../context/UserContext';
-import api from '../services/api';
+import { C } from '../../styles/colors';
+import { MOCK_FEED_POSTS, TRENDING_CREATORS } from '../../data/constants';
+import { useUser } from '../../context/UserContext';
+import api from '../../services/api';
 
 const FOLLOWED_KEY = '@followed_creators';
 const TABS = ['For You', 'Following'];
@@ -40,7 +40,7 @@ function CreatorChip({ creator, followed, onFollow }) {
     );
 }
 
-function PostCard({ post, onLike, liked }) {
+function PostCard({ post, onLike, liked, onMore }) {
     return (
         <View style={pc.card}>
             <View style={pc.header}>
@@ -56,7 +56,7 @@ function PostCard({ post, onLike, liked }) {
                         </View>
                     </View>
                 </View>
-                <TouchableOpacity style={pc.moreBtn}>
+                <TouchableOpacity style={pc.moreBtn} onPress={() => onMore?.(post)}>
                     <Text style={pc.moreText}>···</Text>
                 </TouchableOpacity>
             </View>
@@ -93,36 +93,63 @@ export default function SocialFeedScreen({ navigation }) {
     const [followed, setFollowed]   = useState({});
     const [liked, setLiked]         = useState({});
     const [refreshing, setRefreshing] = useState(false);
+    const [loading, setLoading]     = useState(true);
+
+    const athleteId = userData?.avatarId;
+
+    const loadFeed = useCallback(async (feedTab) => {
+        if (!athleteId) return;
+        try {
+            const data = await api.getFeed(athleteId, feedTab === 'For You' ? 'for_you' : 'following');
+            const arr = Array.isArray(data) ? data : data?.posts;
+            if (arr?.length) setPosts(arr);
+        } catch {
+            // keep current posts (mock or previous fetch)
+        }
+    }, [athleteId]);
 
     useEffect(() => {
         AsyncStorage.getItem(FOLLOWED_KEY).then(raw => {
             if (raw) { try { setFollowed(JSON.parse(raw)); } catch (_) {} }
         });
-        api.getTrendingCreators().then(data => { if (data?.length) setCreators(data); });
+        Promise.all([
+            api.getTrendingCreators().then(data => {
+                const arr = Array.isArray(data) ? data : data?.creators;
+                if (arr?.length) setCreators(arr);
+            }).catch(() => {}),
+            loadFeed(tab),
+        ]).finally(() => setLoading(false));
     }, []);
+
+    useEffect(() => {
+        loadFeed(tab);
+    }, [tab, loadFeed]);
 
     const handleFollow = useCallback((creatorId) => {
         setFollowed(prev => {
             const next = { ...prev, [creatorId]: !prev[creatorId] };
             AsyncStorage.setItem(FOLLOWED_KEY, JSON.stringify(next)).catch(() => {});
-            api.followCreator(userData.avatarId, creatorId).catch(() => {});
+            if (athleteId) api.followCreator(athleteId, creatorId).catch(() => {});
             return next;
         });
-    }, [userData.avatarId]);
+    }, [athleteId]);
 
     const handleLike = useCallback((postId) => {
         setLiked(prev => ({ ...prev, [postId]: !prev[postId] }));
-    }, []);
+        // Optimistically clap on backend
+        if (athleteId) api.post(`/athlete/${athleteId}/clap/${postId}`).catch(() => {});
+    }, [athleteId]);
 
     const handleRefresh = useCallback(() => {
         setRefreshing(true);
-        api.getFeed(userData.avatarId, tab === 'For You' ? 'for_you' : 'following').then(data => {
-            if (data?.length) setPosts(data);
-        }).finally(() => setRefreshing(false));
-    }, [userData.avatarId, tab]);
+        loadFeed(tab).finally(() => setRefreshing(false));
+    }, [tab, loadFeed]);
 
+    const followedHandles = new Set(
+        creators.filter(c => followed[c.id]).map(c => c.handle)
+    );
     const filtered = tab === 'Following'
-        ? posts.filter(p => p.isFollowing || followed[p.id])
+        ? posts.filter(p => p.isFollowing || followedHandles.has(p.handle))
         : posts;
 
     return (
@@ -139,7 +166,7 @@ export default function SocialFeedScreen({ navigation }) {
                         </TouchableOpacity>
                     ))}
                 </View>
-                <TouchableOpacity style={s.createBtn}>
+                <TouchableOpacity style={s.createBtn} onPress={() => Alert.alert('Create Post', 'Post creation coming soon!')}>
                     <Text style={s.createIcon}>✏️</Text>
                 </TouchableOpacity>
             </View>
@@ -170,7 +197,7 @@ export default function SocialFeedScreen({ navigation }) {
                         {/* FOLLOW section header */}
                         <View style={s.followHeader}>
                             <Text style={s.followHeaderText}>FOLLOW</Text>
-                            <TouchableOpacity>
+                            <TouchableOpacity onPress={() => setTab('Following')}>
                                 <Text style={s.expandBtn}>⤢</Text>
                             </TouchableOpacity>
                         </View>
@@ -181,12 +208,26 @@ export default function SocialFeedScreen({ navigation }) {
                         post={item}
                         liked={!!liked[item.id]}
                         onLike={handleLike}
+                        onMore={(post) => Alert.alert(post.author, 'Report, Mute, or Block', [
+                            { text: 'Report', style: 'destructive' },
+                            { text: 'Mute' },
+                            { text: 'Cancel', style: 'cancel' },
+                        ])}
                     />
                 )}
                 ListEmptyComponent={() => (
                     <View style={s.empty}>
-                        <Text style={s.emptyEmoji}>📭</Text>
-                        <Text style={s.emptyText}>No posts yet. Follow some creators!</Text>
+                        <Text style={s.emptyEmoji}>👥</Text>
+                        <Text style={s.emptyTitle}>Your huddle + coach's roster post here</Text>
+                        <Text style={s.emptyText}>PBs, milestones, coach notes. Add your coach to see activity.</Text>
+                        <TouchableOpacity
+                            style={s.emptyBtn}
+                            onPress={() => {
+                                try { navigation.navigate('ShareCard', { sessionId: 'dummy' }); } catch {}
+                            }}
+                        >
+                            <Text style={s.emptyBtnText}>Invite your coach</Text>
+                        </TouchableOpacity>
                     </View>
                 )}
             />
@@ -214,7 +255,10 @@ const s = StyleSheet.create({
     expandBtn:     { fontSize: 16, color: C.muted },
     empty:         { alignItems: 'center', paddingTop: 60, paddingBottom: 40 },
     emptyEmoji:    { fontSize: 48, marginBottom: 12 },
-    emptyText:     { fontSize: 14, color: C.muted, fontWeight: '600' },
+    emptyTitle:    { fontSize: 16, fontWeight: '800', color: C.text, marginBottom: 6, paddingHorizontal: 20, textAlign: 'center' },
+    emptyText:     { fontSize: 14, color: C.muted, fontWeight: '600', marginBottom: 16, paddingHorizontal: 20, textAlign: 'center' },
+    emptyBtn:      { backgroundColor: C.cyan, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
+    emptyBtnText:  { color: C.bg, fontSize: 14, fontWeight: '700' },
 });
 
 const av = StyleSheet.create({

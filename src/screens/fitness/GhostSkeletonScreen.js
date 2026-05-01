@@ -22,14 +22,14 @@ import {
 } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
 import Svg, { Line, Circle, Text as SvgText } from 'react-native-svg';
-import api from '../services/api';
+import api from '../../services/api';
 
 const { width: W, height: H } = Dimensions.get('window');
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 const C = {
-    bg: '#0f172a', cyan: '#06b6d4', green: '#22c55e',
-    orange: '#f97316', red: '#ef4444', text: '#f1f5f9', muted: '#64748b',
+    bg: '#FBFBF8', cyan: '#FC4C02', green: '#22c55e',
+    orange: '#f97316', red: '#ef4444', text: '#242428', muted: '#9CA3AF',
     yellow: '#facc15',
 };
 
@@ -450,6 +450,7 @@ export default function GhostSkeletonScreen({ navigation, route }) {
                     style={[s.startBtn, !calibReady && s.startBtnOff]}
                     onPress={handleStart}
                     activeOpacity={0.85}
+                    disabled={!calibReady}
                 >
                     <Text style={[s.btnText, !calibReady && { color: 'rgba(0,0,0,0.5)' }]}>
                         {calibReady ? '🚀 Start Session' : phase === 'countdown' ? 'Positioning...' : 'Calibrating...'}

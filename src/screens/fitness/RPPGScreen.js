@@ -8,31 +8,33 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
+    View, Text, StyleSheet, TouchableOpacity,
     Dimensions, Animated, Easing, StatusBar, ScrollView
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Svg, { Polyline, Line } from 'react-native-svg';
-import api from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../../services/api';
 
 const { width: W } = Dimensions.get('window');
 const WF_H = 80;
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
 const T = {
-    bg: '#060a12',
-    surf: '#0d1526',
-    card: '#111a2e',
+    bg: '#FBFBF8',
+    surf: '#FFFFFF',
+    card: '#FFFFFF',
     border: 'rgba(255,255,255,0.07)',
-    cyan: '#06b6d4',
+    cyan: '#FC4C02',
     green: '#22c55e',
     orange: '#f97316',
     red: '#ef4444',
     yellow: '#facc15',
     purple: '#a78bfa',
-    text: '#f1f5f9',
-    muted: '#64748b',
-    dim: '#1e293b',
+    text: '#242428',
+    muted: '#9CA3AF',
+    dim: '#FFFFFF',
 };
 
 function bpmColor(bpm) {
@@ -48,6 +50,13 @@ function qualityColor(q) {
     if (q === 'good') return T.cyan;
     if (q === 'fair') return T.yellow;
     return T.muted;
+}
+
+function qualityBorderColor(q) {
+    if (q === 'excellent' || q === 'good') return '#22c55e';
+    if (q === 'fair' || q === 'warmup') return '#facc15';
+    if (q === 'poor') return '#f97316';
+    return 'rgba(255,255,255,0.15)';
 }
 
 // ─── Animated BPM Ring ───────────────────────────────────────────────────────
@@ -217,7 +226,7 @@ export default function RPPGScreen({ navigation, route }) {
     const [framesIn, setFrames] = useState(0);
     const [errMsg, setErr] = useState('');
     const [history, setHistory] = useState([]);
-    const [frameFlash, setFrameFlash] = useState(0);
+    const [frameFlash, setFrameFlash] = useState(false);
     const wsRef = useRef(null);
     const lastUpdateRef = useRef(0);
 
@@ -251,7 +260,8 @@ export default function RPPGScreen({ navigation, route }) {
                         image_b64: photo.base64,
                         ts: Date.now() / 1000.0,
                     }));
-                    setFrameFlash(Date.now());
+                    setFrameFlash(true);
+                    setTimeout(() => setFrameFlash(false), 150);
                     setFrames(prev => prev + 1);
                 }
             } catch (_) {
@@ -303,7 +313,7 @@ export default function RPPGScreen({ navigation, route }) {
         startCapture();
     }, [sessionId, startCapture]);
 
-    const stopMeasuring = useCallback(() => {
+    const stopMeasuring = useCallback((finalBpm, finalHrv, finalQuality) => {
         runningRef.current = false;
         setRunning(false);
         stopCapture();
@@ -311,7 +321,28 @@ export default function RPPGScreen({ navigation, route }) {
             wsRef.current.close();
             wsRef.current = null;
         }
-    }, [stopCapture]);
+        if (finalBpm > 0) {
+            // Prefer backend-computed result (averaged over full session) over last frame's value
+            api.getRPPGResult(sessionId).then(result => {
+                const bpm  = (result?.bpm  > 0 ? result.bpm  : finalBpm);
+                const hrv  = (result?.hrv_ms   != null ? result.hrv_ms   : finalHrv);
+                const qual = (result?.signal_quality   ?? finalQuality) || 'fair';
+                AsyncStorage.setItem('@latest_hr_reading', JSON.stringify({
+                    bpm: Math.round(bpm),
+                    hrv_ms: Math.round(hrv || 0),
+                    quality: qual,
+                    recorded_at: new Date().toISOString(),
+                })).catch(() => {});
+            }).catch(() => {
+                AsyncStorage.setItem('@latest_hr_reading', JSON.stringify({
+                    bpm: Math.round(finalBpm),
+                    hrv_ms: Math.round(finalHrv || 0),
+                    quality: finalQuality || 'fair',
+                    recorded_at: new Date().toISOString(),
+                })).catch(() => {});
+            });
+        }
+    }, [stopCapture, sessionId]);
 
     // ── Permission ────────────────────────────────────────────────────────────
     if (!permission) return <View style={s.bg} />;
@@ -342,7 +373,7 @@ export default function RPPGScreen({ navigation, route }) {
             <StatusBar barStyle="light-content" backgroundColor="#000" />
 
             {/* ── Top Half: Camera ── */}
-            <View style={s.camWrap}>
+            <View style={[s.camWrap, { borderBottomColor: qualityBorderColor(quality), borderBottomWidth: 3 }]}>
                 <CameraView
                     ref={cameraRef}
                     style={StyleSheet.absoluteFill}
@@ -353,7 +384,7 @@ export default function RPPGScreen({ navigation, route }) {
                 <SafeAreaView style={s.topBar}>
                     <TouchableOpacity
                         style={s.backBtn}
-                        onPress={() => { stopMeasuring(); navigation?.goBack(); }}
+                        onPress={() => { stopMeasuring(bpm, hrv, quality); navigation?.goBack(); }}
                     >
                         <Text style={s.backTxt}>← Back</Text>
                     </TouchableOpacity>
@@ -419,7 +450,7 @@ export default function RPPGScreen({ navigation, route }) {
                             <Text style={s.fabTxt}>START SCAN</Text>
                         </TouchableOpacity>
                     ) : (
-                        <TouchableOpacity style={[s.fab, { backgroundColor: T.red }]} onPress={stopMeasuring} activeOpacity={0.85}>
+                        <TouchableOpacity style={[s.fab, { backgroundColor: T.red }]} onPress={() => stopMeasuring(bpm, hrv, quality)} activeOpacity={0.85}>
                             <Text style={s.fabTxt}>STOP SCAN</Text>
                         </TouchableOpacity>
                     )}
