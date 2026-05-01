@@ -93,37 +93,57 @@ export default function SocialFeedScreen({ navigation }) {
     const [followed, setFollowed]   = useState({});
     const [liked, setLiked]         = useState({});
     const [refreshing, setRefreshing] = useState(false);
+    const [loading, setLoading]     = useState(true);
+
+    const athleteId = userData?.avatarId;
+
+    const loadFeed = useCallback(async (feedTab) => {
+        if (!athleteId) return;
+        try {
+            const data = await api.getFeed(athleteId, feedTab === 'For You' ? 'for_you' : 'following');
+            const arr = Array.isArray(data) ? data : data?.posts;
+            if (arr?.length) setPosts(arr);
+        } catch {
+            // keep current posts (mock or previous fetch)
+        }
+    }, [athleteId]);
 
     useEffect(() => {
         AsyncStorage.getItem(FOLLOWED_KEY).then(raw => {
             if (raw) { try { setFollowed(JSON.parse(raw)); } catch (_) {} }
         });
-        api.getTrendingCreators().then(data => {
-            const arr = Array.isArray(data) ? data : data?.creators;
-            if (arr?.length) setCreators(arr);
-        });
+        Promise.all([
+            api.getTrendingCreators().then(data => {
+                const arr = Array.isArray(data) ? data : data?.creators;
+                if (arr?.length) setCreators(arr);
+            }).catch(() => {}),
+            loadFeed(tab),
+        ]).finally(() => setLoading(false));
     }, []);
+
+    useEffect(() => {
+        loadFeed(tab);
+    }, [tab, loadFeed]);
 
     const handleFollow = useCallback((creatorId) => {
         setFollowed(prev => {
             const next = { ...prev, [creatorId]: !prev[creatorId] };
             AsyncStorage.setItem(FOLLOWED_KEY, JSON.stringify(next)).catch(() => {});
-            api.followCreator(userData.avatarId, creatorId).catch(() => {});
+            if (athleteId) api.followCreator(athleteId, creatorId).catch(() => {});
             return next;
         });
-    }, [userData.avatarId]);
+    }, [athleteId]);
 
     const handleLike = useCallback((postId) => {
         setLiked(prev => ({ ...prev, [postId]: !prev[postId] }));
-    }, []);
+        // Optimistically clap on backend
+        if (athleteId) api.post(`/athlete/${athleteId}/clap/${postId}`).catch(() => {});
+    }, [athleteId]);
 
     const handleRefresh = useCallback(() => {
         setRefreshing(true);
-        api.getFeed(userData.avatarId, tab === 'For You' ? 'for_you' : 'following').then(data => {
-            const arr = Array.isArray(data) ? data : data?.posts;
-            if (arr?.length) setPosts(arr);
-        }).finally(() => setRefreshing(false));
-    }, [userData.avatarId, tab]);
+        loadFeed(tab).finally(() => setRefreshing(false));
+    }, [tab, loadFeed]);
 
     const followedHandles = new Set(
         creators.filter(c => followed[c.id]).map(c => c.handle)
