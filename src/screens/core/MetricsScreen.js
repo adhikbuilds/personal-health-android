@@ -138,6 +138,8 @@ export default function MetricsScreen({ navigation }) {
     const [activeTab, setActiveTab] = useState('physical');
     const [liveMetrics, setLiveMetrics] = useState(null);
     const [latestHR, setLatestHR] = useState(null);
+    const [recovery, setRecovery] = useState(null);
+    const [personalBests, setPersonalBests] = useState(null);
     const bpi = userData.bpi ?? 12450;
     const isLive = dataMode !== 'mock';
 
@@ -146,13 +148,20 @@ export default function MetricsScreen({ navigation }) {
             if (raw) { try { setLatestHR(JSON.parse(raw)); } catch (_) {} }
         }).catch(() => {});
         getOrCreateAnonymousAthleteId().then(async (id) => {
-            try {
-                const progress = await api.get(`/athlete/${id}/progress?days=30`);
-                const weakJoints = await api.get(`/athlete/${id}/weak-joints?days=30`);
-                if (progress?.sessions_in_period > 0) {
-                    setLiveMetrics({ progress, weakJoints: weakJoints?.weak_joints || [] });
-                }
-            } catch (_) {}
+            const results = await Promise.allSettled([
+                api.getProgress(id, 30),
+                api.getWeakJoints(id, 30),
+                api.getRecoveryScore(id),
+                api.getPersonalBests(id),
+            ]);
+            const [prog, wj, rec, pbs] = results.map(r =>
+                r.status === 'fulfilled' ? r.value : null
+            );
+            if (prog?.session_count > 0) {
+                setLiveMetrics({ progress: prog, weakJoints: wj?.weak_joints || [] });
+            }
+            if (rec) setRecovery(rec);
+            if (pbs?.has_data) setPersonalBests(pbs);
         }).catch(() => {});
     }, []);
 
@@ -257,6 +266,61 @@ export default function MetricsScreen({ navigation }) {
                                 </Text>
                             </View>
                         ))}
+                    </>
+                )}
+
+                {/* Recovery readiness */}
+                {recovery && (
+                    <>
+                        <Text style={[s.sectionLabel, { marginTop: 24 }]}>RECOVERY READINESS</Text>
+                        <View style={s.recoveryCard}>
+                            <View style={s.recoveryHeader}>
+                                <View>
+                                    <Text style={s.recoveryScore}>{Math.round(recovery.score || 0)}</Text>
+                                    <Text style={s.recoveryUnit}>/ 100</Text>
+                                </View>
+                                <View style={s.recoveryRight}>
+                                    <View style={[s.recoveryBadge, {
+                                        backgroundColor: recovery.score >= 70 ? 'rgba(22,163,74,0.10)' :
+                                            recovery.score >= 40 ? 'rgba(234,179,8,0.10)' : 'rgba(220,38,38,0.10)',
+                                    }]}>
+                                        <Text style={[s.recoveryBadgeText, {
+                                            color: recovery.score >= 70 ? SUCCESS :
+                                                recovery.score >= 40 ? '#CA8A04' : ALERT,
+                                        }]}>
+                                            {(recovery.recommendation || recovery.zone || 'moderate').replace(/_/g, ' ').toUpperCase()}
+                                        </Text>
+                                    </View>
+                                    <Text style={s.recoveryLabel}>ACWR {recovery.acwr != null ? Number(recovery.acwr).toFixed(2) : '--'}</Text>
+                                </View>
+                            </View>
+                        </View>
+                    </>
+                )}
+
+                {/* Personal bests */}
+                {personalBests && (
+                    <>
+                        <Text style={[s.sectionLabel, { marginTop: 24 }]}>CAREER PERSONAL BESTS</Text>
+                        <View style={s.pbCard}>
+                            {[
+                                { label: 'Best Form Score', value: personalBests.best_form_score?.value != null ? `${Number(personalBests.best_form_score.value).toFixed(1)}` : '--', unit: 'pts', date: personalBests.best_form_score?.date },
+                                { label: 'Best Jump Height', value: personalBests.best_jump_height_cm?.value != null ? `${Number(personalBests.best_jump_height_cm.value).toFixed(1)}` : '--', unit: 'cm', date: personalBests.best_jump_height_cm?.date },
+                                { label: 'Best Rep Count', value: personalBests.best_reps_single_session?.value != null ? String(personalBests.best_reps_single_session.value) : '--', unit: 'reps', date: personalBests.best_reps_single_session?.date },
+                            ].map((pb, i) => (
+                                <View key={i} style={[s.pbRow, i > 0 && { borderTopWidth: 1, borderTopColor: BORDER }]}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.pbLabel}>{pb.label}</Text>
+                                        {pb.date ? <Text style={s.pbDate}>{pb.date}</Text> : null}
+                                    </View>
+                                    <Text style={s.pbValue}>{pb.value} <Text style={s.pbUnit}>{pb.unit}</Text></Text>
+                                </View>
+                            ))}
+                            <View style={[s.pbRow, { borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: LIGHT, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }]}>
+                                <Text style={[s.pbLabel, { color: GRAY }]}>Career sessions</Text>
+                                <Text style={[s.pbValue, { color: GRAY }]}>{personalBests.total_sessions}</Text>
+                            </View>
+                        </View>
                     </>
                 )}
 
@@ -394,4 +458,22 @@ const s = StyleSheet.create({
     },
     calloutTitle: { fontSize: 14, fontWeight: '700', color: DARK },
     calloutSub: { fontSize: 11, color: GRAY, marginTop: 2 },
+
+    // Recovery card
+    recoveryCard: { backgroundColor: BG, borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 16, marginBottom: 8 },
+    recoveryHeader: { flexDirection: 'row', alignItems: 'center' },
+    recoveryScore: { fontSize: 44, fontWeight: '800', color: DARK, letterSpacing: -1 },
+    recoveryUnit: { fontSize: 12, color: GRAY, fontWeight: '600', marginTop: 2 },
+    recoveryRight: { flex: 1, alignItems: 'flex-end' },
+    recoveryBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 50, marginBottom: 6 },
+    recoveryBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+    recoveryLabel: { fontSize: 11, color: GRAY, fontWeight: '600' },
+
+    // Personal bests card
+    pbCard: { backgroundColor: BG, borderWidth: 1, borderColor: BORDER, borderRadius: 8, marginBottom: 8, overflow: 'hidden' },
+    pbRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
+    pbLabel: { fontSize: 13, fontWeight: '700', color: DARK },
+    pbDate: { fontSize: 10, color: GRAY, marginTop: 2 },
+    pbValue: { fontSize: 22, fontWeight: '800', color: ORANGE, letterSpacing: -0.5 },
+    pbUnit: { fontSize: 11, color: GRAY, fontWeight: '500' },
 });
