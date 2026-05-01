@@ -54,12 +54,14 @@ export default function ProgressScreen() {
     const [readiness, setReadiness] = useState(null);
     const [advanced, setAdvanced] = useState(null);
     const [loadRec, setLoadRec] = useState(null);
+    const [streak, setStreak] = useState(null);
+    const [goals, setGoals] = useState(null);
 
     const load = useCallback(async () => {
         if (!athleteId) { setLoading(false); return; }
         setLoading(true);
         try {
-            const [prog, wj, ir, rd, adv, lr, ping] = await Promise.all([
+            const results = await Promise.allSettled([
                 api.getProgress(athleteId, days),
                 api.getWeakJoints(athleteId, days),
                 api.getInjuryRisk(athleteId, Math.min(days, 14)),
@@ -67,7 +69,12 @@ export default function ProgressScreen() {
                 api.getAdvancedMetrics(athleteId, days),
                 api.getLoadRecommendation(athleteId),
                 api.ping(),
+                api.getStreak(athleteId),
+                api.getGoals(athleteId),
             ]);
+            const [prog, wj, ir, rd, adv, lr, ping, stk, gls] = results.map(r =>
+                r.status === 'fulfilled' ? r.value : null
+            );
             setProgress(prog);
             setWeakJoints(wj);
             setInjuryRisk(ir);
@@ -75,6 +82,8 @@ export default function ProgressScreen() {
             setAdvanced(adv);
             setLoadRec(lr);
             setOnline(!!ping);
+            setStreak(stk);
+            setGoals(gls);
         } finally {
             setLoading(false);
         }
@@ -108,6 +117,7 @@ export default function ProgressScreen() {
         { label: 'REPS',    value: fmtInt(progress?.total_reps || 0) },
         { label: 'JUMP',    value: fmt(progress?.best_jump_cm || 0, 1) + 'CM', color: C.info },
         { label: 'ACWR',    value: fmt(advanced?.acwr?.acwr || 0, 2), color: bandColor(advanced?.acwr?.band) },
+        { label: 'STREAK',  value: String(streak?.current_streak || 0) + 'D', color: streak?.active_today ? C.good : C.muted },
     ];
 
     return (
@@ -394,6 +404,52 @@ export default function ProgressScreen() {
                     </Fade>
                 )}
 
+                {/* Streak panel */}
+                {streak && (
+                    <Fade delay={480}>
+                        <Panel>
+                            <Header title="TRAINING STREAK" right={
+                                <HdrMeta color={streak.active_today ? C.good : C.muted}>
+                                    [{streak.active_today ? 'ACTIVE' : 'INACTIVE'}]
+                                </HdrMeta>
+                            } />
+                            <Triad items={[
+                                { label: 'CURRENT', value: String(streak.current_streak || 0) + 'D', color: streak.active_today ? C.good : C.text },
+                                { label: 'LONGEST', value: String(streak.longest_streak || 0) + 'D', color: C.info },
+                                { label: 'LAST.ACT', value: streak.last_active_date ? String(streak.last_active_date).slice(5) : '--', color: C.textSub },
+                            ]} />
+                        </Panel>
+                    </Fade>
+                )}
+
+                {/* Goals panel */}
+                {goals?.goals?.length > 0 && (
+                    <Fade delay={500}>
+                        <Panel>
+                            <Header title="WEEKLY GOALS" right={
+                                <HdrMeta color={C.info}>
+                                    {goals.goals.filter(g => g.achieved).length}/{goals.goals.length} DONE
+                                </HdrMeta>
+                            } />
+                            {goals.goals.map((g, i) => {
+                                const pct = Math.min(100, g.progress_pct || 0);
+                                const col = g.achieved ? C.good : pct >= 60 ? C.warn : C.bad;
+                                return (
+                                    <View key={i} style={s.goalRow}>
+                                        <Text style={[s.goalLabel, { color: C.textSub }]}>
+                                            {String(g.type || g.key || `GOAL.${i + 1}`).toUpperCase().replace('_', '.')}
+                                        </Text>
+                                        <View style={s.goalBarBg}>
+                                            <View style={[s.goalBarFill, { width: `${pct}%`, backgroundColor: col }]} />
+                                        </View>
+                                        <Text style={[s.goalPct, { color: col }]}>{Math.round(pct)}%</Text>
+                                    </View>
+                                );
+                            })}
+                        </Panel>
+                    </Fade>
+                )}
+
                 <Footer lines={[
                     { text: `END OF REPORT · ${nowISO()}` },
                     { text: `RANGE ${days}D · ATHLETE ${userTag}` },
@@ -428,4 +484,10 @@ const s = StyleSheet.create({
     readyBody:  { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 14 },
     readyBig:   { fontSize: 72, fontWeight: '700', fontFamily: T.MONO, letterSpacing: -3, lineHeight: 66 },
     readyMax:   { fontSize: 14, color: C.muted, fontFamily: T.MONO, marginLeft: 10, marginBottom: 6, fontWeight: '600' },
+
+    goalRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#0A0A0A' },
+    goalLabel:  { fontSize: 10, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 0.8, width: 110 },
+    goalBarBg:  { flex: 1, height: 4, backgroundColor: '#1A1A1A', marginHorizontal: 8, borderRadius: 2, overflow: 'hidden' },
+    goalBarFill:{ height: '100%', borderRadius: 2 },
+    goalPct:    { fontSize: 10, fontFamily: T.MONO, fontWeight: '700', width: 36, textAlign: 'right', letterSpacing: 0.5 },
 });
