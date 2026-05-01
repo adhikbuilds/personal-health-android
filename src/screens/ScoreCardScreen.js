@@ -56,6 +56,7 @@ export default function ScoreCardScreen({ navigation, route }) {
     const [card, setCard] = useState(null);
     const [reps, setReps] = useState(null);
     const [inbox, setInbox] = useState([]);
+    const [pbs, setPbs] = useState(null);
     const [loading, setLoading] = useState(true);
     const [clapped, setClapped] = useState(false);
     const [clapCount, setClapCount] = useState(0);
@@ -69,15 +70,20 @@ export default function ScoreCardScreen({ navigation, route }) {
         let mounted = true;
         setLoading(true);
         // Don't blank out card while refetching — keeps the UI from flashing.
-        Promise.all([
-            api.getScorecard(sessionId).catch(() => null),
-            api.getRepCount(sessionId).catch(() => null),
-            api.getAthleteInbox(athleteId, 5).catch(() => null),
-        ]).then(([sc, rep, inb]) => {
+        Promise.allSettled([
+            api.getScorecard(sessionId),
+            api.getRepCount(sessionId),
+            api.getAthleteInbox(athleteId, 5),
+            api.getPersonalBests(athleteId),
+        ]).then((results) => {
             if (!mounted) return;
+            const [sc, rep, inb, pbData] = results.map(r =>
+                r.status === 'fulfilled' ? r.value : null
+            );
             setCard(sc);
             setReps(rep);
             setInbox(inb?.broadcasts || []);
+            setPbs(pbData);
             setLoading(false);
         });
         return () => { mounted = false; };
@@ -360,6 +366,47 @@ export default function ScoreCardScreen({ navigation, route }) {
                     </Fade>
                 )}
 
+                {/* Personal bests comparison */}
+                {pbs?.has_data && (
+                    <Fade delay={200}>
+                        <Panel>
+                            <Header title="VS. PERSONAL BESTS" right={<HdrMeta color={C.info}>CAREER</HdrMeta>} />
+                            <View style={s.pbRow}>
+                                <Text style={s.pbLabel}>FORM.SCORE</Text>
+                                <Text style={s.pbThis}>{fmt(sc, 1)}</Text>
+                                <Text style={s.pbSep}>/</Text>
+                                <Text style={[s.pbBest, { color: C.info }]}>{fmt(pbs.best_form_score?.value || 0, 1)}</Text>
+                                {sc >= (pbs.best_form_score?.value || 0) && (
+                                    <Text style={[s.pbBadge, { color: C.good }]}>PB</Text>
+                                )}
+                            </View>
+                            <Rule />
+                            <View style={s.pbRow}>
+                                <Text style={s.pbLabel}>JUMP.HEIGHT</Text>
+                                <Text style={s.pbThis}>{fmt(card.peak_jump_height_cm || 0, 1)}</Text>
+                                <Text style={s.pbSep}>/</Text>
+                                <Text style={[s.pbBest, { color: C.info }]}>{fmt(pbs.best_jump_height_cm?.value || 0, 1)}</Text>
+                                {(card.peak_jump_height_cm || 0) >= (pbs.best_jump_height_cm?.value || 0) && (
+                                    <Text style={[s.pbBadge, { color: C.good }]}>PB</Text>
+                                )}
+                            </View>
+                            <Rule />
+                            <View style={s.pbRow}>
+                                <Text style={s.pbLabel}>REPS</Text>
+                                <Text style={s.pbThis}>{fmtInt(repCount)}</Text>
+                                <Text style={s.pbSep}>/</Text>
+                                <Text style={[s.pbBest, { color: C.info }]}>{fmtInt(pbs.best_reps_single_session?.value || 0)}</Text>
+                                {repCount >= (pbs.best_reps_single_session?.value || 1) && repCount > 0 && (
+                                    <Text style={[s.pbBadge, { color: C.good }]}>PB</Text>
+                                )}
+                            </View>
+                            <Rule />
+                            <FieldRow label="CAREER.SESSIONS......" value={fmtInt(pbs.total_sessions || 0)} color={C.textSub} size="sm" />
+                            <FieldRow label="CAREER.REPS........." value={fmtInt(pbs.total_reps || 0)} color={C.textSub} size="sm" />
+                        </Panel>
+                    </Fade>
+                )}
+
                 <Footer lines={[
                     { text: `END OF REPORT · ${nowISO()}` },
                     { text: `SESSION ${String(sessionId || '').slice(0, 8).toUpperCase()} · EXPORT READY` },
@@ -417,4 +464,11 @@ const s = StyleSheet.create({
 
     clapBtn:    { paddingVertical: 12, alignItems: 'center', borderTopWidth: 0 },
     clapText:   { fontFamily: T.MONO, fontSize: 12, fontWeight: '700', letterSpacing: 2 },
+
+    pbRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8 },
+    pbLabel:    { fontSize: 10, fontFamily: T.MONO, fontWeight: '700', color: '#666', letterSpacing: 0.8, width: 110 },
+    pbThis:     { fontSize: 16, fontFamily: T.MONO, fontWeight: '700', color: '#E8E8E8', width: 52, textAlign: 'right' },
+    pbSep:      { fontSize: 12, fontFamily: T.MONO, color: '#333', marginHorizontal: 6 },
+    pbBest:     { fontSize: 16, fontFamily: T.MONO, fontWeight: '700', width: 52 },
+    pbBadge:    { fontSize: 9, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 1.5, marginLeft: 8, paddingHorizontal: 5, paddingVertical: 2, borderWidth: 1, borderColor: '#2A5' },
 });
