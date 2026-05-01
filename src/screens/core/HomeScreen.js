@@ -92,20 +92,24 @@ export default function HomeScreen({ navigation, showToast }) {
         });
     };
 
-    // API status + recent sessions
+    const [weeklyGoals, setWeeklyGoals] = useState(null);
+
+    // API status + recent sessions + goals
     useEffect(() => {
         api.ping().then((ok) => setApiStatus(ok ? 'online' : 'offline')).catch(() => setApiStatus('offline'));
         getOrCreateAnonymousAthleteId().then(async (id) => {
             try {
-                const progress = await api.getAthleteProgress?.(id);
-                if (progress?.sessions?.length) {
-                    setRecentSessions(progress.sessions.slice(-4).reverse());
+                const [progress, s, goals] = await Promise.allSettled([
+                    api.getAthleteProgress?.(id),
+                    api.getStreaks?.(id),
+                    api.get(`/athlete/${id}/goals`),
+                ]);
+                if (progress.status === 'fulfilled') {
+                    if (progress.value?.sessions?.length) setRecentSessions(progress.value.sessions.slice(-4).reverse());
+                    if (progress.value?.avg_form_score) setFitnessScore({ score: Math.round(progress.value.avg_form_score), label: 'Form Score' });
                 }
-                if (progress?.avg_form_score) {
-                    setFitnessScore({ score: Math.round(progress.avg_form_score), label: 'Form Score' });
-                }
-                const s = await api.getStreaks?.(id);
-                if (s?.current_streak != null) setStreak(s.current_streak);
+                if (s.status === 'fulfilled' && s.value?.current_streak != null) setStreak(s.value.current_streak);
+                if (goals.status === 'fulfilled') setWeeklyGoals(goals.value);
             } catch (_) {}
         }).catch(() => {});
     }, []);
@@ -247,6 +251,34 @@ export default function HomeScreen({ navigation, showToast }) {
                         ))
                     )}
                 </View>
+
+                {/* ── Weekly goals ────────────────── */}
+                {weeklyGoals && (
+                    <View style={styles.section}>
+                        <View style={styles.sectionHead}>
+                            <Text style={styles.sectionTitle}>THIS WEEK</Text>
+                            <Text style={[styles.sectionLink, { color: weeklyGoals.overall_pct >= 80 ? SUCCESS : ORANGE }]}>
+                                {weeklyGoals.overall_pct}% complete
+                            </Text>
+                        </View>
+                        <View style={styles.goalsCard}>
+                            {(weeklyGoals.goals || []).slice(0, 3).map((g) => (
+                                <View key={g.type} style={styles.goalRow}>
+                                    <Text style={styles.goalLabel}>{g.label}</Text>
+                                    <View style={styles.goalBarBg}>
+                                        <View style={[styles.goalBarFill, {
+                                            width: `${g.pct}%`,
+                                            backgroundColor: g.status === 'achieved' ? SUCCESS : (g.pct >= 60 ? ORANGE : ALERT),
+                                        }]} />
+                                    </View>
+                                    <Text style={[styles.goalPct, { color: g.status === 'achieved' ? SUCCESS : GRAY }]}>
+                                        {g.current}/{g.target} {g.unit}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                )}
 
                 {/* ── Today's check-in chips ───────── */}
                 <View style={styles.section}>
@@ -528,6 +560,14 @@ const styles = StyleSheet.create({
     chipValueFilled: { color: DARK },
     chipUnit: { fontSize: 11, fontWeight: '600', color: GRAY },
     chipHint: { fontSize: 9, fontWeight: '700', color: ORANGE, marginTop: 4, opacity: 0.6 },
+
+    // Goals widget
+    goalsCard: { backgroundColor: LIGHT, borderRadius: 8, padding: 14, borderWidth: 1, borderColor: BORDER, gap: 10 },
+    goalRow: { gap: 4 },
+    goalLabel: { fontSize: 11, fontWeight: '700', color: GRAY, letterSpacing: 0.3 },
+    goalBarBg: { height: 5, backgroundColor: BORDER, borderRadius: 3, overflow: 'hidden' },
+    goalBarFill: { height: '100%', borderRadius: 3 },
+    goalPct: { fontSize: 10, fontWeight: '600' },
 
     checkinBtn: {
         flexDirection: 'row',
