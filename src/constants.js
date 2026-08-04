@@ -1,17 +1,23 @@
 /**
  * Personal Health — Backend Constants
  * ======================================
- * Set your Wi-Fi IP in app.json under expo.extra.backendHost.
+ * Set your machine's Wi-Fi IP via the BACKEND_HOST env var (e.g. in .env);
+ * app.config.js reads it and exposes it as expo.extra.backendHost.
  *
- *   app.json:  "extra": { "backendHost": "192.168.x.x" }
+ *   .env:  BACKEND_HOST=192.168.x.x
+ *
+ * Do NOT set this in app.json — Expo resolves app.config.js and ignores
+ * app.json entirely, so anything set there has no effect.
  *
  * PROXY_PORT (8083)  → personal-health-frontend Node.js proxy (recommended)
  * FASTAPI_PORT (8082) → personal-health-backend FastAPI direct
  */
 import Constants from 'expo-constants';
 
-// Your machine's Wi-Fi IP — set via app.json extra.backendHost
-// Falls back to 10.0.2.2 (Android emulator localhost) if not set
+// Resolved by app.config.js from BACKEND_HOST, defaulting to 'localhost' in
+// dev. The 10.0.2.2 fallback (Android emulator's alias for the host machine)
+// is effectively unreachable because app.config.js always supplies a value —
+// kept only as a guard if expoConfig is unavailable.
 export const BACKEND_HOST =
     Constants.expoConfig?.extra?.backendHost || '10.0.2.2';
 
