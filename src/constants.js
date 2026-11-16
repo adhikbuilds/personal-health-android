@@ -4,7 +4,7 @@
  * Set your machine's Wi-Fi IP via the BACKEND_HOST env var (e.g. in .env);
  * app.config.js reads it and exposes it as expo.extra.backendHost.
  *
- *   .env:  BACKEND_HOST=192.168.x.x
+ *   .env:  BACKEND_HOST=<your-machine-lan-ip>
  *
  * Do NOT set this in app.json — Expo resolves app.config.js and ignores
  * app.json entirely, so anything set there has no effect.
