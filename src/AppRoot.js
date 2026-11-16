@@ -1,4 +1,4 @@
-// ActiveBharat — App Root
+// Personal Health — App Root
 // Auth gate decides which navigator to render:
 //   - status === 'loading'   → splash (token bootstrap in progress)
 //   - status === 'unauthed'  → AuthNavigator (Login + Register)
@@ -7,7 +7,7 @@
 // Required lazily by App.js AFTER the active theme has been applied so all
 // screen modules below capture the right token values in their StyleSheets.
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -51,7 +51,9 @@ function ToastOverlay({ message, onDismiss }) {
             accessibilityRole="alert"
             accessibilityLabel={message}
         >
-            <Text style={styles.toastText} numberOfLines={2}>{message}</Text>
+            <Text style={styles.toastText} numberOfLines={2}>
+                {message}
+            </Text>
             <Text style={styles.toastClose}>✕</Text>
         </Pressable>
     );
@@ -60,9 +62,7 @@ function ToastOverlay({ message, onDismiss }) {
 function TabLabel({ focused, name }) {
     return (
         <View style={styles.tabLabelWrap}>
-            <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>
-                {TAB_LABELS[name]}
-            </Text>
+            <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{TAB_LABELS[name]}</Text>
             <View style={[styles.tabUnderline, focused && styles.tabUnderlineActive]} />
         </View>
     );
@@ -75,16 +75,15 @@ function TabNavigator({ showToast }) {
             screenOptions={({ route }) => ({
                 tabBarIcon: () => null,
                 tabBarLabel: ({ focused }) => <TabLabel focused={focused} name={route.name} />,
-                tabBarStyle: [styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) + 4, height: 56 + Math.max(insets.bottom, 8) }],
+                tabBarStyle: [
+                    styles.tabBar,
+                    { paddingBottom: Math.max(insets.bottom, 8) + 4, height: 56 + Math.max(insets.bottom, 8) },
+                ],
                 headerShown: false,
             })}
         >
-            <Tab.Screen name="Home">
-                {(props) => <HomeScreen {...props} showToast={showToast} />}
-            </Tab.Screen>
-            <Tab.Screen name="Train">
-                {(props) => <TrainScreen {...props} showToast={showToast} />}
-            </Tab.Screen>
+            <Tab.Screen name="Home">{(props) => <HomeScreen {...props} showToast={showToast} />}</Tab.Screen>
+            <Tab.Screen name="Train">{(props) => <TrainScreen {...props} showToast={showToast} />}</Tab.Screen>
             <Tab.Screen name="Progress" component={ProgressScreen} />
             <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
@@ -94,21 +93,33 @@ function TabNavigator({ showToast }) {
 function AppNavigator({ showToast }) {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Tabs">
-                {(props) => <TabNavigator {...props} showToast={showToast} />}
-            </Stack.Screen>
-            <Stack.Screen name="GhostSkeleton" component={GhostSkeletonScreen}
-                options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
-            <Stack.Screen name="HeartRate" component={RPPGScreen}
-                options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
-            <Stack.Screen name="TrainingPlan" component={TrainingPlanScreen}
-                options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="ScoreCard" component={ScoreCardScreen}
-                options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
-            <Stack.Screen name="FitnessTest" component={FitnessTestScreen}
-                options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="Nutrition" component={NutritionScreen}
-                options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="Tabs">{(props) => <TabNavigator {...props} showToast={showToast} />}</Stack.Screen>
+            <Stack.Screen
+                name="GhostSkeleton"
+                component={GhostSkeletonScreen}
+                options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }}
+            />
+            <Stack.Screen
+                name="HeartRate"
+                component={RPPGScreen}
+                options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }}
+            />
+            <Stack.Screen
+                name="TrainingPlan"
+                component={TrainingPlanScreen}
+                options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+                name="ScoreCard"
+                component={ScoreCardScreen}
+                options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }}
+            />
+            <Stack.Screen
+                name="FitnessTest"
+                component={FitnessTestScreen}
+                options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen name="Nutrition" component={NutritionScreen} options={{ animation: 'slide_from_right' }} />
         </Stack.Navigator>
     );
 }
@@ -117,8 +128,7 @@ function AuthNavigator() {
     return (
         <AuthStack.Navigator screenOptions={{ headerShown: false }}>
             <AuthStack.Screen name="Login" component={LoginScreen} />
-            <AuthStack.Screen name="Register" component={RegisterScreen}
-                options={{ animation: 'slide_from_right' }} />
+            <AuthStack.Screen name="Register" component={RegisterScreen} options={{ animation: 'slide_from_right' }} />
         </AuthStack.Navigator>
     );
 }
@@ -176,22 +186,27 @@ const styles = StyleSheet.create({
         paddingTop: 6,
         elevation: 0,
     },
-    tabLabelWrap:    { alignItems: 'center', justifyContent: 'center' },
-    tabLabel:        { fontSize: 10, fontWeight: '700', color: P.tabBarOff, letterSpacing: 1.5, fontFamily: T.MONO },
-    tabLabelActive:  { color: P.tabBarOn },
-    tabUnderline:    { height: 2, width: 18, marginTop: 4, backgroundColor: 'transparent' },
+    tabLabelWrap: { alignItems: 'center', justifyContent: 'center' },
+    tabLabel: { fontSize: 10, fontWeight: '700', color: P.tabBarOff, letterSpacing: 1.5, fontFamily: T.MONO },
+    tabLabelActive: { color: P.tabBarOn },
+    tabUnderline: { height: 2, width: 18, marginTop: 4, backgroundColor: 'transparent' },
     tabUnderlineActive: { backgroundColor: P.tabBarOn },
     toast: {
-        position: 'absolute', left: 16, right: 16,
+        position: 'absolute',
+        left: 16,
+        right: 16,
         backgroundColor: P.toastBg,
-        borderWidth: 1, borderColor: P.toastBrd,
-        padding: 12, paddingRight: 36,
-        flexDirection: 'row', alignItems: 'center',
+        borderWidth: 1,
+        borderColor: P.toastBrd,
+        padding: 12,
+        paddingRight: 36,
+        flexDirection: 'row',
+        alignItems: 'center',
         elevation: 99,
     },
-    toastText:  { color: P.toastFg, fontWeight: '700', fontSize: 11, letterSpacing: 1.5, fontFamily: T.MONO, flex: 1 },
+    toastText: { color: P.toastFg, fontWeight: '700', fontSize: 11, letterSpacing: 1.5, fontFamily: T.MONO, flex: 1 },
     toastClose: { color: P.toastFg, fontSize: 14, fontWeight: '700', position: 'absolute', right: 14, top: 10 },
 
-    splash:     { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: P.screenBg },
+    splash: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: P.screenBg },
     splashText: { color: C.text, fontFamily: T.MONO, fontSize: 11, letterSpacing: 2, fontWeight: '700', marginTop: 16 },
 });

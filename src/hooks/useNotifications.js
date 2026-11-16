@@ -24,58 +24,75 @@ export function useNotifications({ athleteId: propId = null, autoGenerate = true
 
     useEffect(() => {
         if (!propId) {
-            getOrCreateAnonymousAthleteId().then(id => {
-                if (mountedRef.current) setAthleteId(id);
-            }).catch(() => {});
+            getOrCreateAnonymousAthleteId()
+                .then((id) => {
+                    if (mountedRef.current) setAthleteId(id);
+                })
+                .catch(() => {});
         }
     }, [propId]);
 
-    const fetchNotifications = useCallback(async (id) => {
-        if (!id) return;
-        try {
-            if (autoGenerate) {
-                api.post(`/notifications/generate/${id}`).catch(() => {});
+    const fetchNotifications = useCallback(
+        async (id) => {
+            if (!id) return;
+            try {
+                if (autoGenerate) {
+                    api.post(`/notifications/generate/${id}`).catch(() => {});
+                }
+                const data = await api.get(`/athlete/${id}/notifications?limit=20`);
+                if (!mountedRef.current) return;
+                const items = data?.notifications || [];
+                setNotifications(items);
+                setUnreadCount(items.filter((n) => !n.read).length);
+            } catch {
+                // silent — bell stays at last known count
+            } finally {
+                if (mountedRef.current) setLoading(false);
             }
-            const data = await api.get(`/athlete/${id}/notifications?limit=20`);
-            if (!mountedRef.current) return;
-            const items = data?.notifications || [];
-            setNotifications(items);
-            setUnreadCount(items.filter(n => !n.read).length);
-        } catch {
-            // silent — bell stays at last known count
-        } finally {
-            if (mountedRef.current) setLoading(false);
-        }
-    }, [autoGenerate]);
+        },
+        [autoGenerate],
+    );
 
     useEffect(() => {
         if (!athleteId) return;
         fetchNotifications(athleteId);
         timerRef.current = setInterval(() => fetchNotifications(athleteId), POLL_INTERVAL_MS);
-        return () => { if (timerRef.current) clearInterval(timerRef.current); };
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
     }, [athleteId, fetchNotifications]);
 
-    const markRead = useCallback(async (notificationIds = []) => {
-        if (!athleteId) return;
-        try {
-            await api.post(`/athlete/${athleteId}/notifications/read`, {
-                notification_ids: notificationIds,
-            });
-            setNotifications(prev =>
-                prev.map(n => notificationIds.includes(n.id) ? { ...n, read: true } : n)
-            );
-            setUnreadCount(prev => Math.max(0, prev - notificationIds.length));
-        } catch {}
-    }, [athleteId]);
+    const markRead = useCallback(
+        async (notificationIds = []) => {
+            if (!athleteId) return;
+            try {
+                await api.post(`/athlete/${athleteId}/notifications/read`, {
+                    notification_ids: notificationIds,
+                });
+                setNotifications((prev) =>
+                    prev.map((n) => (notificationIds.includes(n.id) ? { ...n, read: true } : n)),
+                );
+                setUnreadCount((prev) => Math.max(0, prev - notificationIds.length));
+            } catch {}
+        },
+        [athleteId],
+    );
 
     const markAllRead = useCallback(async () => {
         if (!athleteId) return;
         try {
             await api.post(`/athlete/${athleteId}/notifications/read`, { all: true });
-            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+            setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
             setUnreadCount(0);
         } catch {}
     }, [athleteId]);
 
-    return { notifications, unreadCount, loading, fetchNotifications: () => fetchNotifications(athleteId), markRead, markAllRead };
+    return {
+        notifications,
+        unreadCount,
+        loading,
+        fetchNotifications: () => fetchNotifications(athleteId),
+        markRead,
+        markAllRead,
+    };
 }

@@ -72,7 +72,7 @@ export function StatTriad({ items = [] }) {
 
 export function Chip({ label, color = C.accent, bg = 'rgba(198,255,61,0.10)', style }) {
     return (
-        <View style={[s.chip, { backgroundColor: bg, borderColor: color + '44' }, style]}>
+        <View style={[s.chip, { backgroundColor: bg, borderColor: `${color}44` }, style]}>
             <Text style={[s.chipText, { color }]}>{label}</Text>
         </View>
     );
@@ -105,11 +105,7 @@ export function ListRow({ title, caption, accent, onPress, right }) {
                 <Text style={s.rowTitle}>{title}</Text>
                 {caption && <Text style={s.rowCaption}>{caption}</Text>}
             </View>
-            {right ? (
-                right
-            ) : (
-                <Text style={[s.rowArrow, { color: accent || C.textMid }]}>→</Text>
-            )}
+            {right ? right : <Text style={[s.rowArrow, { color: accent || C.textMid }]}>→</Text>}
         </Pressable>
     );
 }
@@ -125,17 +121,23 @@ const s = StyleSheet.create({
         overflow: 'hidden',
     },
     cardAccent: {
-        position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 3,
     },
 
     sectionHead: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         marginBottom: 12,
     },
 
-    statLeft:   { alignItems: 'flex-start' },
+    statLeft: { alignItems: 'flex-start' },
     statCenter: { alignItems: 'center' },
-    statRight:  { alignItems: 'flex-end' },
+    statRight: { alignItems: 'flex-end' },
     caption: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginTop: 4, textTransform: 'uppercase' },
 
     triadRow: { flexDirection: 'row', alignItems: 'center' },
@@ -143,8 +145,10 @@ const s = StyleSheet.create({
     triadDivider: { width: 1, height: 40, backgroundColor: C.border },
 
     chip: {
-        paddingHorizontal: 10, paddingVertical: 4,
-        borderRadius: 16, borderWidth: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 16,
+        borderWidth: 1,
         alignSelf: 'flex-start',
     },
     chipText: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
@@ -154,9 +158,12 @@ const s = StyleSheet.create({
     textBtn: { fontSize: 12, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' },
 
     listRow: {
-        flexDirection: 'row', alignItems: 'center',
-        paddingVertical: 16, paddingHorizontal: 4,
-        borderBottomWidth: 1, borderBottomColor: C.border,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: C.border,
     },
     rowStroke: { width: 3, height: 28, borderRadius: 2, marginRight: 14 },
     rowTitle: { fontSize: 15, fontWeight: '700', color: C.text, letterSpacing: 0.2 },

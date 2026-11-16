@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, CameraView } from 'expo-camera';
-import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
 import api from '../../services/api';
 import { getOrCreateAnonymousAthleteId, hasCompletedOnboarding } from '../../services/deviceIdentity';
@@ -13,8 +12,8 @@ const SURFACE = '#FFFFFF';
 const TEXT = '#242428';
 const MUTED = '#9CA3AF';
 const ACCENT = '#FC4C02';
-const SUCCESS = '#10b981';
-const WARNING = '#f59e0b';
+const _SUCCESS = '#10b981';
+const _WARNING = '#f59e0b';
 const RED = '#ef4444';
 
 const SPORTS = [
@@ -29,13 +28,13 @@ const SPORTS = [
 
 // Phase transition that signals one completed rep per sport.
 const REP_TRANSITION = {
-    vertical_jump: { from: 'drive',      to: 'flight'  },
-    sprint:        { from: 'drive',      to: 'flight'  },
-    squat:         { from: 'bottom',     to: 'ascent'  },
-    push_up:       { from: 'bottom',     to: 'ascent'  },
-    pull_up:       { from: 'bottom',     to: 'ascent'  },
-    javelin:       { from: 'drive',      to: 'release' },
-    cricket_bat:   { from: 'backswing',  to: 'swing'   },
+    vertical_jump: { from: 'drive', to: 'flight' },
+    sprint: { from: 'drive', to: 'flight' },
+    squat: { from: 'bottom', to: 'ascent' },
+    push_up: { from: 'bottom', to: 'ascent' },
+    pull_up: { from: 'bottom', to: 'ascent' },
+    javelin: { from: 'drive', to: 'release' },
+    cricket_bat: { from: 'backswing', to: 'swing' },
 };
 
 export default function TrainScreen({ navigation, route, showToast }) {
@@ -73,9 +72,11 @@ export default function TrainScreen({ navigation, route, showToast }) {
         Camera.requestCameraPermissionsAsync().then(({ status }) => {
             setPermission({ granted: status === 'granted' });
         });
-        getOrCreateAnonymousAthleteId().then((id) => {
-            if (!athleteId) setAthleteId(id);
-        }).catch(() => {});
+        getOrCreateAnonymousAthleteId()
+            .then((id) => {
+                if (!athleteId) setAthleteId(id);
+            })
+            .catch(() => {});
 
         return () => {
             cleanupSession();
@@ -123,7 +124,9 @@ export default function TrainScreen({ navigation, route, showToast }) {
         if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
         if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
         if (metricsWsRef.current) {
-            try { metricsWsRef.current.close(); } catch (_) {}
+            try {
+                metricsWsRef.current.close();
+            } catch (_) {}
         }
     };
 
@@ -137,7 +140,10 @@ export default function TrainScreen({ navigation, route, showToast }) {
         setSubtitle(onboardingMode ? 'do 3 reps' : 'audio is primary');
         setWarningCue('');
 
-        if (!athleteId) { showToast?.('Loading athlete profile…'); return; }
+        if (!athleteId) {
+            showToast?.('Loading athlete profile…');
+            return;
+        }
         const session = await api.startSession(athleteId, sport);
         const sid = session?.session_id;
         if (!sid) {
@@ -174,11 +180,7 @@ export default function TrainScreen({ navigation, route, showToast }) {
                     if (payload.phase) {
                         setPhase(payload.phase);
                         const transition = REP_TRANSITION[sport];
-                        if (
-                            transition &&
-                            lastPhaseRef.current === transition.from &&
-                            payload.phase === transition.to
-                        ) {
+                        if (transition && lastPhaseRef.current === transition.from && payload.phase === transition.to) {
                             repCountRef.current += 1;
                             setRepCount(repCountRef.current);
                             if (repCountRef.current > 0 && repCountRef.current % 3 === 0) {
@@ -251,7 +253,11 @@ export default function TrainScreen({ navigation, route, showToast }) {
     };
 
     if (!permission) {
-        return <View style={s.center}><Text style={s.helper}>loading camera</Text></View>;
+        return (
+            <View style={s.center}>
+                <Text style={s.helper}>loading camera</Text>
+            </View>
+        );
     }
 
     if (!permission.granted) {
@@ -274,7 +280,11 @@ export default function TrainScreen({ navigation, route, showToast }) {
                 <View style={s.setupWrap}>
                     <Text style={s.kicker}>{onboardingMode ? 'first session' : 'pre-session'}</Text>
                     <Text style={s.title}>{onboardingMode ? 'Choose one drill.' : 'Choose your drill.'}</Text>
-                    <Text style={s.helper}>{onboardingMode ? 'Phone placement comes next. Then you start.' : 'Phone placement runs before the session starts.'}</Text>
+                    <Text style={s.helper}>
+                        {onboardingMode
+                            ? 'Phone placement comes next. Then you start.'
+                            : 'Phone placement runs before the session starts.'}
+                    </Text>
 
                     <View style={s.sportGrid}>
                         {SPORTS.map((item) => (
@@ -290,12 +300,14 @@ export default function TrainScreen({ navigation, route, showToast }) {
 
                     <TouchableOpacity
                         style={s.primaryBtn}
-                        onPress={() => navigation.navigate('PlacementWizard', {
-                            sport,
-                            athleteId,
-                            onboardingMode,
-                            overrideAfterSeconds: onboardingMode ? 10 : 15,
-                        })}
+                        onPress={() =>
+                            navigation.navigate('PlacementWizard', {
+                                sport,
+                                athleteId,
+                                onboardingMode,
+                                overrideAfterSeconds: onboardingMode ? 10 : 15,
+                            })
+                        }
                     >
                         <Text style={s.primaryBtnText}>place your phone</Text>
                     </TouchableOpacity>
@@ -352,7 +364,10 @@ export default function TrainScreen({ navigation, route, showToast }) {
                 sport={sport}
                 restSeconds={restSeconds}
                 onComplete={() => setRestTimerVisible(false)}
-                onStopSession={() => { setRestTimerVisible(false); endSession(); }}
+                onStopSession={() => {
+                    setRestTimerVisible(false);
+                    endSession();
+                }}
             />
         </View>
     );
@@ -362,19 +377,61 @@ const s = StyleSheet.create({
     safe: { flex: 1, backgroundColor: BG },
     center: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', padding: 24 },
     setupWrap: { flex: 1, padding: 24, backgroundColor: BG },
-    kicker: { color: ACCENT, fontSize: 14, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2, marginTop: 12 },
+    kicker: {
+        color: ACCENT,
+        fontSize: 14,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 1.2,
+        marginTop: 12,
+    },
     title: { color: TEXT, fontSize: 34, fontWeight: '900', marginTop: 10, letterSpacing: -0.8 },
     helper: { color: MUTED, fontSize: 16, lineHeight: 22, marginTop: 10 },
     sportGrid: { marginTop: 24, gap: 10 },
-    sportTile: { backgroundColor: SURFACE, borderRadius: 18, paddingVertical: 18, paddingHorizontal: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+    sportTile: {
+        backgroundColor: SURFACE,
+        borderRadius: 18,
+        paddingVertical: 18,
+        paddingHorizontal: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
+    },
     sportTileActive: { borderColor: ACCENT, backgroundColor: 'rgba(6,182,212,0.10)' },
     sportText: { color: TEXT, fontSize: 18, fontWeight: '800' },
-    primaryBtn: { backgroundColor: ACCENT, borderRadius: 999, marginTop: 24, paddingVertical: 18, alignItems: 'center' },
+    primaryBtn: {
+        backgroundColor: ACCENT,
+        borderRadius: 999,
+        marginTop: 24,
+        paddingVertical: 18,
+        alignItems: 'center',
+    },
     primaryBtnText: { color: '#FBFBF8', fontSize: 18, fontWeight: '900', textTransform: 'lowercase' },
     liveWrap: { flex: 1, backgroundColor: BG },
-    warningBar: { position: 'absolute', top: 52, left: 16, right: 16, zIndex: 6, backgroundColor: RED, borderRadius: 18, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center' },
+    warningBar: {
+        position: 'absolute',
+        top: 52,
+        left: 16,
+        right: 16,
+        zIndex: 6,
+        backgroundColor: RED,
+        borderRadius: 18,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        alignItems: 'center',
+    },
     warningText: { color: TEXT, fontSize: 36, fontWeight: '900', textAlign: 'center', lineHeight: 40 },
-    infoBar: { position: 'absolute', top: 52, left: 16, right: 16, zIndex: 5, backgroundColor: 'rgba(17,24,39,0.9)', borderRadius: 18, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center' },
+    infoBar: {
+        position: 'absolute',
+        top: 52,
+        left: 16,
+        right: 16,
+        zIndex: 5,
+        backgroundColor: 'rgba(17,24,39,0.9)',
+        borderRadius: 18,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        alignItems: 'center',
+    },
     infoText: { color: MUTED, fontSize: 18, fontWeight: '700', textAlign: 'center' },
     centerScore: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     score: { color: ACCENT, fontSize: 136, fontWeight: '900', lineHeight: 144 },
@@ -384,8 +441,28 @@ const s = StyleSheet.create({
     repsPrompt: { position: 'absolute', left: 16, right: 16, bottom: '34%', alignItems: 'center' },
     repsPromptText: { color: TEXT, fontSize: 44, fontWeight: '900', textTransform: 'lowercase' },
     repsCount: { color: MUTED, fontSize: 22, fontWeight: '800', marginTop: 8 },
-    stopBtn: { position: 'absolute', left: 16, right: 16, bottom: 18, height: '28%', backgroundColor: 'rgba(17,24,39,0.92)', borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+    stopBtn: {
+        position: 'absolute',
+        left: 16,
+        right: 16,
+        bottom: 18,
+        height: '28%',
+        backgroundColor: 'rgba(17,24,39,0.92)',
+        borderRadius: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
     stopText: { color: TEXT, fontSize: 28, fontWeight: '900', textTransform: 'lowercase' },
-    aiBadge: { marginTop: 10, backgroundColor: 'rgba(17,24,39,0.85)', borderRadius: 20, paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: 'rgba(252,76,2,0.3)' },
+    aiBadge: {
+        marginTop: 10,
+        backgroundColor: 'rgba(17,24,39,0.85)',
+        borderRadius: 20,
+        paddingVertical: 6,
+        paddingHorizontal: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(252,76,2,0.3)',
+    },
     aiBadgeText: { color: ACCENT, fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
 });

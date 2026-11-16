@@ -18,8 +18,7 @@ import Constants from 'expo-constants';
 // dev. The 10.0.2.2 fallback (Android emulator's alias for the host machine)
 // is effectively unreachable because app.config.js always supplies a value —
 // kept only as a guard if expoConfig is unavailable.
-export const BACKEND_HOST =
-    Constants.expoConfig?.extra?.backendHost || '10.0.2.2';
+export const BACKEND_HOST = Constants.expoConfig?.extra?.backendHost || '10.0.2.2';
 
 // Use the frontend proxy (recommended — avoids Windows Firewall issues)
 export const PROXY_PORT = 8083;

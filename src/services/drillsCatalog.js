@@ -19,10 +19,13 @@ export async function fetchDrillsCatalog(forceRefresh = false) {
         const response = await api.get('/drills/catalog');
         const drills = response.drills || [];
 
-        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
-            drills,
-            timestamp: Date.now(),
-        })).catch(() => {});
+        await AsyncStorage.setItem(
+            CACHE_KEY,
+            JSON.stringify({
+                drills,
+                timestamp: Date.now(),
+            }),
+        ).catch(() => {});
 
         return drills;
     } catch (error) {

@@ -1,6 +1,6 @@
 // Personal Health — Root App with Navigation
 // 6 tabs + stack screens organised by domain: core/, fitness/, social/, wellness/
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -16,68 +16,68 @@ import { registerForPushNotifications, addNotificationTapListener } from './src/
 import { getOrCreateAnonymousAthleteId, ensureDeviceAuth } from './src/services/deviceIdentity';
 
 // Core tabs
-import HomeScreen         from './src/screens/core/HomeScreen';
-import MetricsScreen      from './src/screens/core/MetricsScreen';
-import AcademyScreen      from './src/screens/core/AcademyScreen';
-import HubScreen          from './src/screens/core/HubScreen';
+import HomeScreen from './src/screens/core/HomeScreen';
+import MetricsScreen from './src/screens/core/MetricsScreen';
+import AcademyScreen from './src/screens/core/AcademyScreen';
+import HubScreen from './src/screens/core/HubScreen';
 
 // Fitness domain
-import TrainScreen         from './src/screens/fitness/TrainScreen';
+import TrainScreen from './src/screens/fitness/TrainScreen';
 import GhostSkeletonScreen from './src/screens/fitness/GhostSkeletonScreen';
-import RPPGScreen          from './src/screens/fitness/RPPGScreen';
-import FitnessTestScreen   from './src/screens/fitness/FitnessTestScreen';
-import OnboardingScreen    from './src/screens/fitness/OnboardingScreen';
+import RPPGScreen from './src/screens/fitness/RPPGScreen';
+import FitnessTestScreen from './src/screens/fitness/FitnessTestScreen';
+import OnboardingScreen from './src/screens/fitness/OnboardingScreen';
 import PlacementWizardScreen from './src/screens/fitness/PlacementWizardScreen';
-import DrillPickerScreen   from './src/screens/fitness/DrillPickerScreen';
-import FirstScoreScreen    from './src/screens/fitness/FirstScoreScreen';
-import ShareCardScreen     from './src/screens/fitness/ShareCardScreen';
-import InjuryRiskScreen    from './src/screens/fitness/InjuryRiskScreen';
+import DrillPickerScreen from './src/screens/fitness/DrillPickerScreen';
+import FirstScoreScreen from './src/screens/fitness/FirstScoreScreen';
+import ShareCardScreen from './src/screens/fitness/ShareCardScreen';
+import InjuryRiskScreen from './src/screens/fitness/InjuryRiskScreen';
 import ParentConsentScreen from './src/screens/fitness/ParentConsentScreen';
 
 // Social domain
-import MapScreen           from './src/screens/social/MapScreen';
-import FieldBookingScreen  from './src/screens/social/FieldBookingScreen';
-import LearnSportsScreen   from './src/screens/social/LearnSportsScreen';
-import GetActiveScreen     from './src/screens/social/GetActiveScreen';
-import ClassesScreen       from './src/screens/social/ClassesScreen';
-import SocialFeedScreen    from './src/screens/social/SocialFeedScreen';
-import CoachInboxScreen    from './src/screens/social/CoachInboxScreen';
-import InviteJoinScreen    from './src/screens/core/InviteJoinScreen';
+import MapScreen from './src/screens/social/MapScreen';
+import FieldBookingScreen from './src/screens/social/FieldBookingScreen';
+import LearnSportsScreen from './src/screens/social/LearnSportsScreen';
+import GetActiveScreen from './src/screens/social/GetActiveScreen';
+import ClassesScreen from './src/screens/social/ClassesScreen';
+import SocialFeedScreen from './src/screens/social/SocialFeedScreen';
+import CoachInboxScreen from './src/screens/social/CoachInboxScreen';
+import InviteJoinScreen from './src/screens/core/InviteJoinScreen';
 
 // Wellness domain
-import WellnessScreen            from './src/screens/wellness/WellnessScreen';
-import WellnessLogFormScreen     from './src/screens/wellness/WellnessLogFormScreen';
+import WellnessScreen from './src/screens/wellness/WellnessScreen';
+import WellnessLogFormScreen from './src/screens/wellness/WellnessLogFormScreen';
 
 // Nutrition domain
-import NutritionScreen     from './src/screens/nutrition/NutritionScreen';
-import MealLogScreen       from './src/screens/nutrition/MealLogScreen';
+import NutritionScreen from './src/screens/nutrition/NutritionScreen';
+import MealLogScreen from './src/screens/nutrition/MealLogScreen';
 import NutritionGoalsScreen from './src/screens/nutrition/NutritionGoalsScreen';
 import NotificationsScreen from './src/screens/core/NotificationsScreen';
-import LoginScreen    from './src/screens/auth/LoginScreen';
+import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 import { hasCompletedOnboarding } from './src/services/deviceIdentity';
 
-const Tab   = createBottomTabNavigator();
+const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 // Strava theme — matches frontend web app
 const ORANGE = '#FC4C02';
-const DARK   = '#242428';
-const MUTED  = '#9CA3AF';
-const BG     = '#FFFFFF';
-const CREAM  = '#FBFBF8';
+const _DARK = '#242428';
+const MUTED = '#9CA3AF';
+const BG = '#FFFFFF';
+const _CREAM = '#FBFBF8';
 const BORDER = '#E6E6EA';
 // Legacy alias kept so any inline reference still resolves to brand
-const CYAN   = ORANGE;
+const _CYAN = ORANGE;
 
 // AN-04: Vector tab icons (Ionicons), no emojis
 const TAB_ICONS = {
-    Home:    'home-outline',
-    Lab:     'analytics-outline',
-    Camera:  'videocam-outline',
+    Home: 'home-outline',
+    Lab: 'analytics-outline',
+    Camera: 'videocam-outline',
     Academy: 'library-outline',
-    Hub:     'person-outline',
-    Map:     'map-outline',
+    Hub: 'person-outline',
+    Map: 'map-outline',
 };
 
 // ─── Toast Overlay ────────────────────────────────────────────────────────────
@@ -114,25 +114,17 @@ function TabNavigator({ showToast }) {
                 tabBarLabel: ({ focused }) => (
                     <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{route.name}</Text>
                 ),
-                tabBarStyle:  styles.tabBar,
+                tabBarStyle: styles.tabBar,
                 tabBarActiveTintColor: ORANGE,
                 tabBarInactiveTintColor: MUTED,
-                headerShown:  false,
+                headerShown: false,
             })}
         >
-            <Tab.Screen name="Home">
-                {(props) => <HomeScreen {...props} showToast={showToast} />}
-            </Tab.Screen>
+            <Tab.Screen name="Home">{(props) => <HomeScreen {...props} showToast={showToast} />}</Tab.Screen>
             <Tab.Screen name="Lab" component={MetricsScreen} />
-            <Tab.Screen name="Camera">
-                {(props) => <TrainScreen {...props} showToast={showToast} />}
-            </Tab.Screen>
-            <Tab.Screen name="Academy">
-                {(props) => <AcademyScreen {...props} showToast={showToast} />}
-            </Tab.Screen>
-            <Tab.Screen name="Hub">
-                {(props) => <HubScreen {...props} showToast={showToast} />}
-            </Tab.Screen>
+            <Tab.Screen name="Camera">{(props) => <TrainScreen {...props} showToast={showToast} />}</Tab.Screen>
+            <Tab.Screen name="Academy">{(props) => <AcademyScreen {...props} showToast={showToast} />}</Tab.Screen>
+            <Tab.Screen name="Hub">{(props) => <HubScreen {...props} showToast={showToast} />}</Tab.Screen>
             <Tab.Screen name="Map" component={MapScreen} />
         </Tab.Navigator>
     );
@@ -145,14 +137,14 @@ function LaunchScreen({ navigation }) {
             if (!alive) return;
             navigation.reset({ index: 0, routes: [{ name: done ? 'Tabs' : 'Onboarding' }] });
         });
-        return () => { alive = false; };
+        return () => {
+            alive = false;
+        };
     }, [navigation]);
 
     return (
         <View style={[styles.launch, { backgroundColor: BG }]}>
-            <Text style={{ color: ORANGE, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>
-                PERSONAL HEALTH
-            </Text>
+            <Text style={{ color: ORANGE, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>PERSONAL HEALTH</Text>
         </View>
     );
 }
@@ -166,9 +158,7 @@ function AppNavigator({ showToast }) {
                 {(props) => <OnboardingScreen {...props} showToast={showToast} />}
             </Stack.Screen>
             {/* Main tab flow */}
-            <Stack.Screen name="Tabs">
-                {(props) => <TabNavigator {...props} showToast={showToast} />}
-            </Stack.Screen>
+            <Stack.Screen name="Tabs">{(props) => <TabNavigator {...props} showToast={showToast} />}</Stack.Screen>
             <Stack.Screen
                 name="DrillPicker"
                 component={DrillPickerScreen}
@@ -216,39 +206,19 @@ function AppNavigator({ showToast }) {
             <Stack.Screen name="GetActive">
                 {(props) => <GetActiveScreen {...props} showToast={showToast} />}
             </Stack.Screen>
-            <Stack.Screen
-                name="Classes"
-                component={ClassesScreen}
-                options={{ animation: 'slide_from_right' }}
-            />
-            <Stack.Screen
-                name="SocialFeed"
-                component={SocialFeedScreen}
-                options={{ animation: 'slide_from_right' }}
-            />
-            <Stack.Screen
-                name="CoachInbox"
-                component={CoachInboxScreen}
-                options={{ animation: 'slide_from_right' }}
-            />
+            <Stack.Screen name="Classes" component={ClassesScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="SocialFeed" component={SocialFeedScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="CoachInbox" component={CoachInboxScreen} options={{ animation: 'slide_from_right' }} />
 
             {/* Wellness domain — WN-20/21 */}
-            <Stack.Screen
-                name="Wellness"
-                component={WellnessScreen}
-                options={{ animation: 'slide_from_right' }}
-            />
+            <Stack.Screen name="Wellness" component={WellnessScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen
                 name="WellnessLogForm"
                 component={WellnessLogFormScreen}
                 options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
             />
             {/* Nutrition domain — WN-15/16/19 */}
-            <Stack.Screen
-                name="Nutrition"
-                component={NutritionScreen}
-                options={{ animation: 'slide_from_right' }}
-            />
+            <Stack.Screen name="Nutrition" component={NutritionScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen
                 name="MealLog"
                 component={MealLogScreen}
@@ -261,11 +231,7 @@ function AppNavigator({ showToast }) {
             />
 
             {/* Flow 13: Injury Risk — private, no share */}
-            <Stack.Screen
-                name="InjuryRisk"
-                component={InjuryRiskScreen}
-                options={{ animation: 'slide_from_right' }}
-            />
+            <Stack.Screen name="InjuryRisk" component={InjuryRiskScreen} options={{ animation: 'slide_from_right' }} />
 
             {/* Flow 14: Re-engagement Push UI */}
             <Stack.Screen
@@ -282,7 +248,7 @@ function AppNavigator({ showToast }) {
             />
 
             {/* Auth screens */}
-            <Stack.Screen name="Login"    component={LoginScreen}    options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="Login" component={LoginScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="Register" component={RegisterScreen} options={{ animation: 'slide_from_right' }} />
 
             {/* Invite deep-link — personalhealth://invite/:token */}
@@ -322,7 +288,7 @@ export default function App() {
         // 3. Wire notification-tap → navigation
         ensureDeviceAuth()
             .then(() => getOrCreateAnonymousAthleteId())
-            .then(athleteId => registerForPushNotifications(athleteId))
+            .then((athleteId) => registerForPushNotifications(athleteId))
             .catch((e) => console.warn('[App] device auth/push bootstrap failed', e?.message));
 
         const sub = addNotificationTapListener(navigationRef);
@@ -333,12 +299,12 @@ export default function App() {
         <SafeAreaProvider>
             <StatusBar style="dark" backgroundColor={BG} />
             <AuthProvider>
-            <UserProvider>
-                <NavigationContainer ref={navigationRef} linking={linking}>
-                    <AppNavigator showToast={showToast} />
-                </NavigationContainer>
-                <ToastOverlay message={toastMsg} />
-            </UserProvider>
+                <UserProvider>
+                    <NavigationContainer ref={navigationRef} linking={linking}>
+                        <AppNavigator showToast={showToast} />
+                    </NavigationContainer>
+                    <ToastOverlay message={toastMsg} />
+                </UserProvider>
             </AuthProvider>
         </SafeAreaProvider>
     );
@@ -348,35 +314,35 @@ const styles = StyleSheet.create({
     launch: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     tabBar: {
         backgroundColor: BG,
-        borderTopColor:  BORDER,
-        borderTopWidth:  StyleSheet.hairlineWidth,
-        height:          76,                              // taller — clears safe-area on most phones
-        paddingBottom:   12,
-        paddingTop:      8,
-        elevation:       8,
-        shadowColor:     '#000',
-        shadowOpacity:   0.06,
-        shadowOffset:    { width: 0, height: -2 },
-        shadowRadius:    8,
+        borderTopColor: BORDER,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        height: 76, // taller — clears safe-area on most phones
+        paddingBottom: 12,
+        paddingTop: 8,
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOpacity: 0.06,
+        shadowOffset: { width: 0, height: -2 },
+        shadowRadius: 8,
     },
-    tabIconWrap:   { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    tabIconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
     tabIconActive: { backgroundColor: 'rgba(252, 76, 2, 0.10)' },
-    tabIconText:   { fontSize: 18 },
-    tabLabel:      { fontSize: 10, fontWeight: '700', color: MUTED, marginTop: 2, letterSpacing: 0.3 },
-    tabLabelActive:{ color: ORANGE },
+    tabIconText: { fontSize: 18 },
+    tabLabel: { fontSize: 10, fontWeight: '700', color: MUTED, marginTop: 2, letterSpacing: 0.3 },
+    tabLabelActive: { color: ORANGE },
     toast: {
-        position:        'absolute',
-        left:            20,
-        right:           20,
+        position: 'absolute',
+        left: 20,
+        right: 20,
         backgroundColor: ORANGE,
-        borderRadius:    8,
-        padding:         14,
-        alignItems:      'center',
-        elevation:       99,
-        shadowColor:     ORANGE,
-        shadowOpacity:   0.4,
-        shadowOffset:    { width: 0, height: 4 },
-        shadowRadius:    14,
+        borderRadius: 8,
+        padding: 14,
+        alignItems: 'center',
+        elevation: 99,
+        shadowColor: ORANGE,
+        shadowOpacity: 0.4,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 14,
     },
     toastText: { color: '#fff', fontWeight: '700', fontSize: 12, letterSpacing: 0.5, textTransform: 'uppercase' },
 });

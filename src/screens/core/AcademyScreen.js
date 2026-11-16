@@ -1,25 +1,40 @@
 // AcademyScreen — Strava-clean rewrite
 // Sports library directory · single orange accent · no rainbow palette.
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-    View, Text, ScrollView, StyleSheet, TouchableOpacity,
-    SafeAreaView, FlatList, TextInput, StatusBar,
+    View,
+    Text,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    SafeAreaView,
+    FlatList,
+    TextInput,
+    StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SPORTS_LIBRARY } from '../../data/constants';
 
 // ─── Strava palette ─────────────────────────
 const ORANGE = '#FC4C02';
-const DARK   = '#242428';
-const GRAY   = '#6D6D78';
-const DIM    = '#9CA3AF';
-const LIGHT  = '#F7F7FA';
+const DARK = '#242428';
+const GRAY = '#6D6D78';
+const DIM = '#9CA3AF';
+const LIGHT = '#F7F7FA';
 const BORDER = '#E6E6EA';
-const BG     = '#FFFFFF';
+const BG = '#FFFFFF';
 
 const CATEGORIES = ['All', 'team', 'court', 'combat', 'track', 'aquatic', 'precision'];
-const CAT_LABELS = { All: 'All', team: 'Team', court: 'Court', combat: 'Combat', track: 'Track', aquatic: 'Aquatic', precision: 'Precision' };
+const CAT_LABELS = {
+    All: 'All',
+    team: 'Team',
+    court: 'Court',
+    combat: 'Combat',
+    track: 'Track',
+    aquatic: 'Aquatic',
+    precision: 'Precision',
+};
 
 function SportTile({ sport, onPress }) {
     return (
@@ -27,7 +42,9 @@ function SportTile({ sport, onPress }) {
             <View style={st.iconWrap}>
                 <Text style={st.emoji}>{sport.emoji}</Text>
             </View>
-            <Text style={st.name} numberOfLines={1}>{sport.name}</Text>
+            <Text style={st.name} numberOfLines={1}>
+                {sport.name}
+            </Text>
             <Text style={st.count}>{sport.videoCount} videos</Text>
         </TouchableOpacity>
     );
@@ -38,9 +55,8 @@ export default function AcademyScreen({ navigation }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearch, setShowSearch] = useState(false);
 
-    const filtered = (activeCategory === 'All'
-        ? SPORTS_LIBRARY
-        : SPORTS_LIBRARY.filter((sp) => sp.category === activeCategory)
+    const filtered = (
+        activeCategory === 'All' ? SPORTS_LIBRARY : SPORTS_LIBRARY.filter((sp) => sp.category === activeCategory)
     ).filter((sp) => !searchQuery || sp.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const handleSportPress = (sport) => {
@@ -59,7 +75,10 @@ export default function AcademyScreen({ navigation }) {
                 </View>
                 <TouchableOpacity
                     style={s.searchBtn}
-                    onPress={() => { setShowSearch((v) => !v); setSearchQuery(''); }}
+                    onPress={() => {
+                        setShowSearch((v) => !v);
+                        setSearchQuery('');
+                    }}
                     activeOpacity={0.7}
                 >
                     <Ionicons name={showSearch ? 'close' : 'search'} size={18} color={DARK} />
@@ -78,11 +97,7 @@ export default function AcademyScreen({ navigation }) {
             )}
 
             {/* Category pills */}
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={s.catScroll}
-            >
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.catScroll}>
                 {CATEGORIES.map((cat) => (
                     <TouchableOpacity
                         key={cat}
@@ -104,9 +119,7 @@ export default function AcademyScreen({ navigation }) {
                 numColumns={3}
                 contentContainerStyle={s.grid}
                 columnWrapperStyle={{ gap: 8 }}
-                renderItem={({ item }) => (
-                    <SportTile sport={item} onPress={handleSportPress} />
-                )}
+                renderItem={({ item }) => <SportTile sport={item} onPress={handleSportPress} />}
                 showsVerticalScrollIndicator={false}
                 ListFooterComponent={() => (
                     <View style={s.footer}>

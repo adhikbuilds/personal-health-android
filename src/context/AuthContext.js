@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 import api from '../services/api';
 import { setSecure, deleteSecure } from '../services/storage';
 
@@ -35,11 +35,7 @@ export function AuthProvider({ children }) {
         setAuthUser(null);
     };
 
-    return (
-        <AuthContext.Provider value={{ authUser, login, register, logout }}>
-            {children}
-        </AuthContext.Provider>
-    );
+    return <AuthContext.Provider value={{ authUser, login, register, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

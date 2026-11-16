@@ -1,7 +1,7 @@
 // InjuryRiskScreen — Flow 13: Private Injury Risk Analysis
 // This screen surfaces personal injury risk data to the athlete only.
 // No share button, no export. Consent-gated coach loop-in only.
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -11,22 +11,21 @@ import {
     ActivityIndicator,
     Modal,
     SafeAreaView,
-    Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 import { api } from '../../services/api';
 
 const C = {
-    bg:      '#FBFBF8',
+    bg: '#FBFBF8',
     surface: '#FFFFFF',
-    cyan:    '#FC4C02',
-    text:    '#242428',
-    muted:   '#9CA3AF',
+    cyan: '#FC4C02',
+    text: '#242428',
+    muted: '#9CA3AF',
     warning: '#f59e0b',
-    red:     '#ef4444',
-    green:   '#10b981',
-    border:  'rgba(255,255,255,0.08)',
+    red: '#ef4444',
+    green: '#10b981',
+    border: 'rgba(255,255,255,0.08)',
 };
 
 // Maps the backend "watch" band to "medium" for display purposes.
@@ -38,10 +37,14 @@ function normalisedRisk(raw) {
 
 function riskConfig(level) {
     switch (level) {
-        case 'low':     return { bg: C.green,   label: 'Low Risk',   icon: 'shield-checkmark' };
-        case 'medium':  return { bg: C.warning, label: 'Monitor',    icon: 'warning' };
-        case 'high':    return { bg: C.red,     label: 'High Risk',  icon: 'alert-circle' };
-        default:        return { bg: C.muted,   label: 'Unknown',    icon: 'help-circle' };
+        case 'low':
+            return { bg: C.green, label: 'Low Risk', icon: 'shield-checkmark' };
+        case 'medium':
+            return { bg: C.warning, label: 'Monitor', icon: 'warning' };
+        case 'high':
+            return { bg: C.red, label: 'High Risk', icon: 'alert-circle' };
+        default:
+            return { bg: C.muted, label: 'Unknown', icon: 'help-circle' };
     }
 }
 
@@ -94,12 +97,7 @@ function FlagRow({ flag }) {
 function CoachConfirmSheet({ visible, riskLevel, reason, onConfirm, onCancel }) {
     const summary = `${riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1)} risk detected. ${reason}`;
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="slide"
-            onRequestClose={onCancel}
-        >
+        <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
             <View style={s.sheetBackdrop}>
                 <View style={s.sheet}>
                     <Text style={s.sheetTitle}>Loop in your coach?</Text>
@@ -121,21 +119,18 @@ function CoachConfirmSheet({ visible, riskLevel, reason, onConfirm, onCancel }) 
 }
 
 export default function InjuryRiskScreen({ navigation }) {
-    const [loading, setLoading]             = useState(true);
-    const [error, setError]                 = useState(null);
-    const [riskData, setRiskData]           = useState(null);
-    const [weakJoints, setWeakJoints]       = useState([]);
-    const [sheetVisible, setSheetVisible]   = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [riskData, setRiskData] = useState(null);
+    const [weakJoints, setWeakJoints] = useState([]);
+    const [sheetVisible, setSheetVisible] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
             const athleteId = await getOrCreateAnonymousAthleteId();
-            const [risk, joints] = await Promise.all([
-                api.getInjuryRisk(athleteId),
-                api.getWeakJoints(athleteId),
-            ]);
+            const [risk, joints] = await Promise.all([api.getInjuryRisk(athleteId), api.getWeakJoints(athleteId)]);
             if (!risk) throw new Error('Could not fetch injury risk data.');
             setRiskData(risk);
             setWeakJoints(joints?.weak_joints || []);
@@ -146,7 +141,9 @@ export default function InjuryRiskScreen({ navigation }) {
         }
     }, []);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+    }, [load]);
 
     const handleCoachConfirm = useCallback(async () => {
         setSheetVisible(false);
@@ -182,10 +179,10 @@ export default function InjuryRiskScreen({ navigation }) {
         );
     }
 
-    const level   = normalisedRisk(riskData?.risk);
-    const cfg     = riskConfig(level);
-    const reason  = riskData?.reason || '';
-    const flags   = riskData?.flags  || [];
+    const level = normalisedRisk(riskData?.risk);
+    const cfg = riskConfig(level);
+    const reason = riskData?.reason || '';
+    const flags = riskData?.flags || [];
 
     return (
         <SafeAreaView style={s.safe}>
@@ -199,11 +196,7 @@ export default function InjuryRiskScreen({ navigation }) {
                 <View style={{ width: 40 }} />
             </View>
 
-            <ScrollView
-                style={s.scroll}
-                contentContainerStyle={s.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
+            <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Hero: risk badge */}
                 <View style={s.heroSection}>
                     <View style={[s.riskBadge, { backgroundColor: cfg.bg }]}>
@@ -227,7 +220,9 @@ export default function InjuryRiskScreen({ navigation }) {
                 {flags.length > 0 && (
                     <View style={s.section}>
                         <Text style={s.sectionHeading}>FLAGGED ISSUES</Text>
-                        {flags.map((f, i) => <FlagRow key={i} flag={f} />)}
+                        {flags.map((f, i) => (
+                            <FlagRow key={i} flag={f} />
+                        ))}
                     </View>
                 )}
 
@@ -246,9 +241,7 @@ export default function InjuryRiskScreen({ navigation }) {
                 {/* Private notice */}
                 <View style={s.privateNotice}>
                     <Ionicons name="lock-closed-outline" size={14} color={C.muted} style={s.lockIcon} />
-                    <Text style={s.privateText}>
-                        This analysis stays private. Only you can see it.
-                    </Text>
+                    <Text style={s.privateText}>This analysis stays private. Only you can see it.</Text>
                 </View>
             </ScrollView>
 
@@ -264,93 +257,93 @@ export default function InjuryRiskScreen({ navigation }) {
 }
 
 const s = StyleSheet.create({
-    safe:         { flex: 1, backgroundColor: C.bg },
-    center:       { alignItems: 'center', justifyContent: 'center' },
-    scroll:       { flex: 1 },
-    scrollContent:{ padding: 20, paddingBottom: 48 },
+    safe: { flex: 1, backgroundColor: C.bg },
+    center: { alignItems: 'center', justifyContent: 'center' },
+    scroll: { flex: 1 },
+    scrollContent: { padding: 20, paddingBottom: 48 },
 
     // Header
     header: {
-        flexDirection:  'row',
-        alignItems:     'center',
+        flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 12,
-        paddingVertical:   12,
+        paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: C.border,
     },
-    backBtn:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
     headerTitle: { fontSize: 17, fontWeight: '800', color: C.text },
 
     // Hero
     heroSection: { alignItems: 'center', marginBottom: 32 },
     riskBadge: {
-        flexDirection:  'row',
-        alignItems:     'center',
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: 28,
-        paddingVertical:   18,
-        borderRadius:   20,
-        marginBottom:   14,
+        paddingVertical: 18,
+        borderRadius: 20,
+        marginBottom: 14,
     },
-    riskIcon:  { marginRight: 10 },
+    riskIcon: { marginRight: 10 },
     riskLabel: { fontSize: 22, fontWeight: '900', color: '#fff' },
-    riskReason:{ fontSize: 14, color: C.muted, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
+    riskReason: { fontSize: 14, color: C.muted, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
 
     // Sections
-    section:        { marginBottom: 24 },
+    section: { marginBottom: 24 },
     sectionHeading: {
-        fontSize:      11,
-        fontWeight:    '800',
-        color:         C.muted,
+        fontSize: 11,
+        fontWeight: '800',
+        color: C.muted,
         letterSpacing: 2,
         textTransform: 'uppercase',
-        marginBottom:  12,
+        marginBottom: 12,
     },
 
     // Weak joint rows
     jointRow: {
         backgroundColor: C.surface,
-        borderRadius:    12,
-        padding:         14,
-        marginBottom:    10,
-        borderWidth:     1,
-        borderColor:     C.border,
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: C.border,
     },
-    jointHeader:  { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-    jointName:    { fontSize: 14, fontWeight: '700', color: C.text, textTransform: 'capitalize' },
-    jointDev:     { fontSize: 12, fontWeight: '700' },
+    jointHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    jointName: { fontSize: 14, fontWeight: '700', color: C.text, textTransform: 'capitalize' },
+    jointDev: { fontSize: 12, fontWeight: '700' },
     barTrack: {
-        height:        6,
+        height: 6,
         backgroundColor: 'rgba(255,255,255,0.08)',
-        borderRadius:  3,
-        overflow:      'hidden',
-        marginBottom:  6,
+        borderRadius: 3,
+        overflow: 'hidden',
+        marginBottom: 6,
     },
-    barFill:      { height: '100%', borderRadius: 3 },
+    barFill: { height: '100%', borderRadius: 3 },
     jointSamples: { fontSize: 11, color: C.muted },
 
     // Flag rows
     flagRow: {
-        flexDirection:   'row',
-        alignItems:      'flex-start',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
         backgroundColor: C.surface,
-        borderRadius:    12,
-        padding:         12,
-        marginBottom:    8,
-        borderWidth:     1,
-        borderColor:     C.border,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: C.border,
     },
     flagIcon: { marginRight: 10, marginTop: 1 },
     flagText: { flex: 1, fontSize: 14, color: C.text, lineHeight: 20 },
 
     // Coach loop-in (outline, not filled)
     coachBtn: {
-        flexDirection:   'row',
-        alignItems:      'center',
-        justifyContent:  'center',
-        borderWidth:     1,
-        borderColor:     'rgba(156,163,175,0.35)',
-        borderRadius:    12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(156,163,175,0.35)',
+        borderRadius: 12,
         paddingVertical: 14,
     },
     coachBtnIcon: { marginRight: 8 },
@@ -358,71 +351,71 @@ const s = StyleSheet.create({
 
     // Private notice
     privateNotice: {
-        flexDirection:   'row',
-        alignItems:      'center',
-        justifyContent:  'center',
-        marginTop:       8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 8,
         paddingHorizontal: 16,
     },
-    lockIcon:    { marginRight: 6 },
+    lockIcon: { marginRight: 6 },
     privateText: {
-        fontSize:    13,
-        color:       C.muted,
-        fontStyle:   'italic',
-        textAlign:   'center',
-        lineHeight:  18,
+        fontSize: 13,
+        color: C.muted,
+        fontStyle: 'italic',
+        textAlign: 'center',
+        lineHeight: 18,
     },
 
     // Loading / error
     loadingText: { color: C.muted, marginTop: 14, fontSize: 14 },
-    errorText:   { color: C.muted, marginTop: 14, fontSize: 14, textAlign: 'center', maxWidth: 260 },
+    errorText: { color: C.muted, marginTop: 14, fontSize: 14, textAlign: 'center', maxWidth: 260 },
     retryBtn: {
-        marginTop:       20,
-        borderWidth:     1,
-        borderColor:     C.cyan,
-        borderRadius:    10,
+        marginTop: 20,
+        borderWidth: 1,
+        borderColor: C.cyan,
+        borderRadius: 10,
         paddingHorizontal: 24,
-        paddingVertical:   10,
+        paddingVertical: 10,
     },
     retryText: { color: C.cyan, fontWeight: '700', fontSize: 14 },
 
     // Coach confirmation sheet
     sheetBackdrop: {
-        flex:            1,
+        flex: 1,
         backgroundColor: 'rgba(0,0,0,0.6)',
-        justifyContent:  'flex-end',
+        justifyContent: 'flex-end',
     },
     sheet: {
         backgroundColor: C.surface,
-        borderTopLeftRadius:  20,
+        borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
-        padding:         24,
-        paddingBottom:   36,
+        padding: 24,
+        paddingBottom: 36,
     },
-    sheetTitle:       { fontSize: 18, fontWeight: '900', color: C.text, marginBottom: 6 },
-    sheetSubtitle:    { fontSize: 13, color: C.muted, marginBottom: 14 },
+    sheetTitle: { fontSize: 18, fontWeight: '900', color: C.text, marginBottom: 6 },
+    sheetSubtitle: { fontSize: 13, color: C.muted, marginBottom: 14 },
     sheetSummaryBox: {
         backgroundColor: 'rgba(255,255,255,0.04)',
-        borderRadius:    10,
-        padding:         14,
-        marginBottom:    20,
-        borderWidth:     1,
-        borderColor:     C.border,
+        borderRadius: 10,
+        padding: 14,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: C.border,
     },
     sheetSummaryText: { fontSize: 14, color: C.text, lineHeight: 20, marginBottom: 6 },
     sheetSummaryNote: { fontSize: 12, color: C.muted, fontStyle: 'italic' },
     sheetConfirmBtn: {
         backgroundColor: C.cyan,
-        borderRadius:    12,
+        borderRadius: 12,
         paddingVertical: 14,
-        alignItems:      'center',
-        marginBottom:    10,
+        alignItems: 'center',
+        marginBottom: 10,
     },
     sheetConfirmText: { color: '#000', fontWeight: '800', fontSize: 15 },
     sheetCancelBtn: {
-        borderRadius:    12,
+        borderRadius: 12,
         paddingVertical: 12,
-        alignItems:      'center',
+        alignItems: 'center',
     },
     sheetCancelText: { color: C.muted, fontWeight: '700', fontSize: 14 },
 });

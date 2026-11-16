@@ -3,37 +3,29 @@
 //   1. Coach-assigned drills for today (from /athlete/{id}/drill-assignments)
 //   2. Weekly plan day (from /plan/{id}/weekly)
 //   3. Free-choice sport picker
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-    ActivityIndicator,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 import { fetchDrillsCatalog } from '../../services/drillsCatalog';
 import DrillTile from '../../components/DrillTile';
 
-const BG      = '#FBFBF8';
+const BG = '#FBFBF8';
 const SURFACE = '#FFFFFF';
-const ACCENT  = '#FC4C02';
-const TEXT    = '#242428';
-const MUTED   = '#9CA3AF';
+const ACCENT = '#FC4C02';
+const TEXT = '#242428';
+const MUTED = '#9CA3AF';
 const SUCCESS = '#10b981';
-const BORDER  = 'rgba(255,255,255,0.08)';
+const BORDER = 'rgba(255,255,255,0.08)';
 
 const SPORTS = [
-    { key: 'sprint',        label: 'Sprint' },
+    { key: 'sprint', label: 'Sprint' },
     { key: 'vertical_jump', label: 'Vertical Jump' },
-    { key: 'push_up',       label: 'Push-up' },
-    { key: 'squat',         label: 'Squat' },
-    { key: 'javelin',       label: 'Javelin' },
-    { key: 'cricket_bat',   label: 'Cricket Bat' },
+    { key: 'push_up', label: 'Push-up' },
+    { key: 'squat', label: 'Squat' },
+    { key: 'javelin', label: 'Javelin' },
+    { key: 'cricket_bat', label: 'Cricket Bat' },
 ];
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -69,15 +61,9 @@ function AssignmentCard({ assignment, onStart }) {
                         <Text style={s.sportChipText}>{assignment.sport.replace('_', ' ')}</Text>
                     </View>
                 )}
-                {!!assignment.scheduled_for && (
-                    <Text style={s.assignDate}>{assignment.scheduled_for}</Text>
-                )}
+                {!!assignment.scheduled_for && <Text style={s.assignDate}>{assignment.scheduled_for}</Text>}
             </View>
-            <TouchableOpacity
-                style={s.primaryBtn}
-                onPress={() => onStart(assignment)}
-                activeOpacity={0.85}
-            >
+            <TouchableOpacity style={s.primaryBtn} onPress={() => onStart(assignment)} activeOpacity={0.85}>
                 <Text style={s.primaryBtnText}>Start this drill</Text>
             </TouchableOpacity>
         </View>
@@ -88,10 +74,10 @@ function WeekRow({ slots, today }) {
     return (
         <View style={s.weekRow}>
             {DAY_LABELS.map((label, i) => {
-                const day       = slots[i];
-                const isToday   = day?.date === today;
+                const day = slots[i];
+                const isToday = day?.date === today;
                 const completed = !!day?.completed;
-                const isPast    = day && day.date < today && !completed;
+                const isPast = day && day.date < today && !completed;
 
                 let chipStyle = s.dayChip;
                 let textStyle = s.dayChipText;
@@ -117,11 +103,8 @@ function WeekRow({ slots, today }) {
 }
 
 function PlanDayCard({ day, onStart }) {
-    const volume = day.sets && day.reps
-        ? `${day.sets} × ${day.reps}`
-        : day.duration_min
-            ? `${day.duration_min} min`
-            : null;
+    const volume =
+        day.sets && day.reps ? `${day.sets} × ${day.reps}` : day.duration_min ? `${day.duration_min} min` : null;
 
     return (
         <View style={s.planCard}>
@@ -135,11 +118,7 @@ function PlanDayCard({ day, onStart }) {
                 {!!volume && <Text style={s.planVolume}>{volume}</Text>}
             </View>
             {!!day.notes && <Text style={s.planNotes}>{day.notes}</Text>}
-            <TouchableOpacity
-                style={s.outlineBtn}
-                onPress={() => onStart(day)}
-                activeOpacity={0.85}
-            >
+            <TouchableOpacity style={s.outlineBtn} onPress={() => onStart(day)} activeOpacity={0.85}>
                 <Text style={s.outlineBtnText}>Start plan drill</Text>
             </TouchableOpacity>
         </View>
@@ -149,42 +128,43 @@ function PlanDayCard({ day, onStart }) {
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function DrillPickerScreen({ navigation }) {
-    const [athleteId,   setAthleteId]   = useState(null);
+    const [athleteId, setAthleteId] = useState(null);
     const [assignments, setAssignments] = useState([]);
-    const [planWeek,    setPlanWeek]    = useState(null);
-    const [drills,      setDrills]      = useState([]);
-    const [loading,     setLoading]     = useState(true);
-    const [error,       setError]       = useState(false);
+    const [planWeek, setPlanWeek] = useState(null);
+    const [drills, setDrills] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
 
     const today = todayISO();
 
-    const load = useCallback(async (id) => {
-        setLoading(true);
-        setError(false);
-        try {
-            const [assignData, planData, drillCatalog] = await Promise.all([
-                api.getDrillAssignments(id),
-                api.getWeeklyPlan(id),
-                fetchDrillsCatalog(),
-            ]);
-            // Only show assignments that are scheduled for today
-            const todayOnly = (assignData?.assignments || []).filter(
-                a => a.scheduled_for === today,
-            );
-            setAssignments(todayOnly);
-            setPlanWeek(planData || null);
-            setDrills(drillCatalog || []);
-        } catch (_) {
-            setError(true);
-        } finally {
-            setLoading(false);
-        }
-    }, [today]);
+    const load = useCallback(
+        async (id) => {
+            setLoading(true);
+            setError(false);
+            try {
+                const [assignData, planData, drillCatalog] = await Promise.all([
+                    api.getDrillAssignments(id),
+                    api.getWeeklyPlan(id),
+                    fetchDrillsCatalog(),
+                ]);
+                // Only show assignments that are scheduled for today
+                const todayOnly = (assignData?.assignments || []).filter((a) => a.scheduled_for === today);
+                setAssignments(todayOnly);
+                setPlanWeek(planData || null);
+                setDrills(drillCatalog || []);
+            } catch (_) {
+                setError(true);
+            } finally {
+                setLoading(false);
+            }
+        },
+        [today],
+    );
 
     useEffect(() => {
         let alive = true;
         getOrCreateAnonymousAthleteId()
-            .then(id => {
+            .then((id) => {
                 if (!alive) return;
                 setAthleteId(id);
                 load(id);
@@ -194,37 +174,48 @@ export default function DrillPickerScreen({ navigation }) {
                 setError(true);
                 setLoading(false);
             });
-        return () => { alive = false; };
+        return () => {
+            alive = false;
+        };
     }, [load]);
 
-    const handleStartAssignment = useCallback((assignment) => {
-        navigation.navigate('PlacementWizard', {
-            sport:     assignment.sport || 'sprint',
-            drillName: assignment.drill_name,
-        });
-    }, [navigation]);
+    const handleStartAssignment = useCallback(
+        (assignment) => {
+            navigation.navigate('PlacementWizard', {
+                sport: assignment.sport || 'sprint',
+                drillName: assignment.drill_name,
+            });
+        },
+        [navigation],
+    );
 
-    const handleStartPlanDrill = useCallback((day) => {
-        navigation.navigate('PlacementWizard', { sport: day.sport || 'sprint' });
-    }, [navigation]);
+    const handleStartPlanDrill = useCallback(
+        (day) => {
+            navigation.navigate('PlacementWizard', { sport: day.sport || 'sprint' });
+        },
+        [navigation],
+    );
 
-    const handleStartFreeSport = useCallback((sportKey) => {
-        navigation.navigate('PlacementWizard', { sport: sportKey });
-    }, [navigation]);
+    const handleStartFreeSport = useCallback(
+        (sportKey) => {
+            navigation.navigate('PlacementWizard', { sport: sportKey });
+        },
+        [navigation],
+    );
 
     // Today's plan day; fall back to the next incomplete day in the week
     const activePlanDay = (() => {
         const days = planWeek?.days;
         if (!days?.length) return null;
-        const todayDay = days.find(d => d.date === today);
+        const todayDay = days.find((d) => d.date === today);
         if (todayDay && !todayDay.completed) return todayDay;
-        return days.find(d => !d.completed && d.date >= today) || null;
+        return days.find((d) => !d.completed && d.date >= today) || null;
     })();
 
     // 7-slot Mon–Sun array, padded with nulls for days not in the plan
     const weekSlots = (() => {
         const slots = Array(7).fill(null);
-        planWeek?.days?.forEach(d => {
+        planWeek?.days?.forEach((d) => {
             const i = dayIndexOf(d.date);
             if (i >= 0 && i < 7) slots[i] = d;
         });
@@ -260,7 +251,6 @@ export default function DrillPickerScreen({ navigation }) {
 
     return (
         <SafeAreaView style={s.safe}>
-
             {/* ── Header ── */}
             <View style={s.header}>
                 <TouchableOpacity
@@ -273,21 +263,13 @@ export default function DrillPickerScreen({ navigation }) {
                 <View style={{ width: 24 }} />
             </View>
 
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 40 }}
-            >
-
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
                 {/* ── Assigned by coach ── */}
                 {assignments.length > 0 && (
                     <View style={s.section}>
                         <SectionHeader label="ASSIGNED BY COACH" />
-                        {assignments.map(a => (
-                            <AssignmentCard
-                                key={a.assignment_id}
-                                assignment={a}
-                                onStart={handleStartAssignment}
-                            />
+                        {assignments.map((a) => (
+                            <AssignmentCard key={a.assignment_id} assignment={a} onStart={handleStartAssignment} />
                         ))}
                     </View>
                 )}
@@ -306,9 +288,7 @@ export default function DrillPickerScreen({ navigation }) {
                     ) : (
                         <View style={s.planEmptyCard}>
                             <Text style={s.planEmptyText}>
-                                {planWeek
-                                    ? 'All plan days complete this week!'
-                                    : 'No plan for this week yet.'}
+                                {planWeek ? 'All plan days complete this week!' : 'No plan for this week yet.'}
                             </Text>
                         </View>
                     )}
@@ -319,7 +299,7 @@ export default function DrillPickerScreen({ navigation }) {
                     <SectionHeader label="OR CHOOSE YOUR OWN" />
                     {drills.length > 0 ? (
                         <View style={s.drillGrid}>
-                            {drills.map(drill => (
+                            {drills.map((drill) => (
                                 <DrillTile
                                     key={drill.key}
                                     drill={drill}
@@ -334,7 +314,7 @@ export default function DrillPickerScreen({ navigation }) {
                             showsHorizontalScrollIndicator={false}
                             contentContainerStyle={s.sportScrollContent}
                         >
-                            {SPORTS.map(sport => (
+                            {SPORTS.map((sport) => (
                                 <TouchableOpacity
                                     key={sport.key}
                                     style={s.sportPill}
@@ -347,7 +327,6 @@ export default function DrillPickerScreen({ navigation }) {
                         </ScrollView>
                     )}
                 </View>
-
             </ScrollView>
         </SafeAreaView>
     );
@@ -356,7 +335,7 @@ export default function DrillPickerScreen({ navigation }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-    safe:   { flex: 1, backgroundColor: BG },
+    safe: { flex: 1, backgroundColor: BG },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
 
     header: {
@@ -370,7 +349,7 @@ const s = StyleSheet.create({
     },
     headerTitle: { fontSize: 17, fontWeight: '800', color: TEXT },
 
-    section:       { paddingHorizontal: 16, paddingTop: 24 },
+    section: { paddingHorizontal: 16, paddingTop: 24 },
     sectionHeader: {
         fontSize: 11,
         fontWeight: '800',
@@ -432,10 +411,10 @@ const s = StyleSheet.create({
         borderColor: 'rgba(16,185,129,0.4)',
     },
     dayChipToday: { borderColor: ACCENT, borderWidth: 2 },
-    dayChipPast:  { opacity: 0.45 },
-    dayChipText:          { fontSize: 10, fontWeight: '700', color: MUTED },
+    dayChipPast: { opacity: 0.45 },
+    dayChipText: { fontSize: 10, fontWeight: '700', color: MUTED },
     dayChipTextCompleted: { color: SUCCESS },
-    dayChipTextToday:     { color: ACCENT },
+    dayChipTextToday: { color: ACCENT },
 
     adherenceText: { fontSize: 12, color: MUTED, fontWeight: '600', marginBottom: 14 },
 
@@ -449,9 +428,9 @@ const s = StyleSheet.create({
         marginTop: 4,
     },
     planDrillName: { fontSize: 16, fontWeight: '800', color: TEXT, marginBottom: 8 },
-    planMeta:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-    planVolume:    { fontSize: 13, color: MUTED, fontWeight: '700' },
-    planNotes:     { fontSize: 13, color: MUTED, lineHeight: 18, marginBottom: 12 },
+    planMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+    planVolume: { fontSize: 13, color: MUTED, fontWeight: '700' },
+    planNotes: { fontSize: 13, color: MUTED, lineHeight: 18, marginBottom: 12 },
 
     outlineBtn: {
         borderRadius: 14,

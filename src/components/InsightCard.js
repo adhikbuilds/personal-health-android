@@ -1,8 +1,3 @@
-// PH-V2-A-03: Reusable InsightCard component
-// Status-aware card with halo effect (success/caution/alert/info).
-// Used for post-session insights, injury warnings, achievements.
-
-import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, STATUS_COLORS, RADIUS, SPACING } from '../styles/tokens';
@@ -10,19 +5,19 @@ import { COLORS, STATUS_COLORS, RADIUS, SPACING } from '../styles/tokens';
 const ICON_BY_TYPE = {
     success: 'checkmark-circle',
     caution: 'warning',
-    alert:   'alert-circle',
-    info:    'information-circle',
+    alert: 'alert-circle',
+    info: 'information-circle',
 };
 
 const BORDER_BY_TYPE = {
     success: 'rgba(16,185,129,0.25)',
     caution: 'rgba(245,158,11,0.25)',
-    alert:   'rgba(239,68,68,0.25)',
-    info:    'rgba(139,92,246,0.25)',
+    alert: 'rgba(239,68,68,0.25)',
+    info: 'rgba(139,92,246,0.25)',
 };
 
 export default function InsightCard({
-    type = 'info',  // success | caution | alert | info
+    type = 'info', // success | caution | alert | info
     title,
     message,
     ctaLabel,
@@ -35,12 +30,7 @@ export default function InsightCard({
     return (
         <View style={[styles.card, { borderColor }]}>
             {/* Halo blob — top right corner */}
-            <View
-                style={[
-                    styles.halo,
-                    { backgroundColor: status.glow },
-                ]}
-            />
+            <View style={[styles.halo, { backgroundColor: status.glow }]} />
 
             <View style={styles.content}>
                 <View style={[styles.iconBox, { backgroundColor: status.bg }]}>
@@ -55,10 +45,7 @@ export default function InsightCard({
                 {ctaLabel && onPress && (
                     <Pressable
                         onPress={onPress}
-                        style={({ pressed }) => [
-                            styles.cta,
-                            { borderColor: status.color, opacity: pressed ? 0.7 : 1 },
-                        ]}
+                        style={({ pressed }) => [styles.cta, { borderColor: status.color, opacity: pressed ? 0.7 : 1 }]}
                     >
                         <Text style={[styles.ctaLabel, { color: status.color }]}>{ctaLabel}</Text>
                     </Pressable>
@@ -92,9 +79,11 @@ const styles = StyleSheet.create({
         zIndex: 1,
     },
     iconBox: {
-        width: 44, height: 44,
+        width: 44,
+        height: 44,
         borderRadius: 14,
-        alignItems: 'center', justifyContent: 'center',
+        alignItems: 'center',
+        justifyContent: 'center',
         marginBottom: SPACING[3],
     },
     textBlock: {

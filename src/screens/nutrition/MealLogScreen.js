@@ -1,8 +1,15 @@
 // MealLogScreen — WN-16 (food search & add)
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-    View, Text, TextInput, ScrollView, TouchableOpacity,
-    StyleSheet, SafeAreaView, ActivityIndicator, Alert,
+    View,
+    Text,
+    TextInput,
+    ScrollView,
+    TouchableOpacity,
+    StyleSheet,
+    SafeAreaView,
+    ActivityIndicator,
+    Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { C } from '../../styles/colors';
@@ -30,31 +37,44 @@ export default function MealLogScreen({ navigation, route }) {
                 setRecentFoods(list);
                 // Handle quick-add prefill
                 if (quickFoodId) {
-                    const prefilled = list.find(f => f.food_id === quickFoodId);
-                    if (prefilled) { setSelected(prefilled); setQty(String(quickQty || prefilled.serving_g || 100)); }
-                    else {
+                    const prefilled = list.find((f) => f.food_id === quickFoodId);
+                    if (prefilled) {
+                        setSelected(prefilled);
+                        setQty(String(quickQty || prefilled.serving_g || 100));
+                    } else {
                         const foodRes = await api.get(`/foods/${quickFoodId}`);
-                        if (foodRes) { setSelected(foodRes); setQty(String(quickQty || foodRes.serving_g || 100)); }
+                        if (foodRes) {
+                            setSelected(foodRes);
+                            setQty(String(quickQty || foodRes.serving_g || 100));
+                        }
                     }
                 }
-            } catch { }
+            } catch {}
         })();
     }, [quickFoodId, quickQty]);
 
     const search = useCallback(async (q) => {
-        if (!q.trim()) { setResults([]); return; }
+        if (!q.trim()) {
+            setResults([]);
+            return;
+        }
         setSearching(true);
         try {
             const res = await api.get(`/foods?q=${encodeURIComponent(q)}&limit=20`);
             setResults(res?.foods || []);
-        } catch { setResults([]); }
+        } catch {
+            setResults([]);
+        }
         setSearching(false);
     }, []);
 
     const handleQueryChange = (text) => {
         setQuery(text);
         clearTimeout(debounceRef.current);
-        if (!text.trim()) { setResults([]); return; }
+        if (!text.trim()) {
+            setResults([]);
+            return;
+        }
         debounceRef.current = setTimeout(() => search(text), 300);
     };
 
@@ -70,9 +90,15 @@ export default function MealLogScreen({ navigation, route }) {
     };
 
     const handleSave = async () => {
-        const qtyNum = parseFloat(qty);
-        if (!selected) { Alert.alert('Select a food first'); return; }
-        if (!qtyNum || qtyNum <= 0) { Alert.alert('Enter a quantity greater than 0'); return; }
+        const qtyNum = Number.parseFloat(qty);
+        if (!selected) {
+            Alert.alert('Select a food first');
+            return;
+        }
+        if (!qtyNum || qtyNum <= 0) {
+            Alert.alert('Enter a quantity greater than 0');
+            return;
+        }
         setSaving(true);
         try {
             await api.post(`/athlete/${athleteId}/meals`, {
@@ -83,15 +109,20 @@ export default function MealLogScreen({ navigation, route }) {
             // Update recent foods
             const raw = await AsyncStorage.getItem(RECENT_KEY);
             const prev = raw ? JSON.parse(raw) : [];
-            const updated = [selected, ...prev.filter(f => f.food_id !== selected.food_id)].slice(0, MAX_RECENT);
+            const updated = [selected, ...prev.filter((f) => f.food_id !== selected.food_id)].slice(0, MAX_RECENT);
             await AsyncStorage.setItem(RECENT_KEY, JSON.stringify(updated));
             // Update per-slot recent (for quick add)
             const slotKey = `@recent_meals_${slot}`;
             const macros = computeMacros(selected, qtyNum);
-            const slotEntry = { label: selected.name, calories: macros.calories, food_id: selected.food_id, qty_g: qtyNum };
+            const slotEntry = {
+                label: selected.name,
+                calories: macros.calories,
+                food_id: selected.food_id,
+                qty_g: qtyNum,
+            };
             const rawSlot = await AsyncStorage.getItem(slotKey);
             const prevSlot = rawSlot ? JSON.parse(rawSlot) : [];
-            const updatedSlot = [slotEntry, ...prevSlot.filter(f => f.food_id !== selected.food_id)].slice(0, 20);
+            const updatedSlot = [slotEntry, ...prevSlot.filter((f) => f.food_id !== selected.food_id)].slice(0, 20);
             await AsyncStorage.setItem(slotKey, JSON.stringify(updatedSlot));
             navigation.goBack();
         } catch (e) {
@@ -101,7 +132,7 @@ export default function MealLogScreen({ navigation, route }) {
     };
 
     const displayList = query.trim() ? results : recentFoods;
-    const qtyNum = parseFloat(qty) || 0;
+    const qtyNum = Number.parseFloat(qty) || 0;
     const macros = selected ? computeMacros(selected, qtyNum) : null;
     const slotLabel = slot ? slot.charAt(0).toUpperCase() + slot.slice(1) : 'Meal';
 
@@ -133,12 +164,24 @@ export default function MealLogScreen({ navigation, route }) {
                 <View style={s.selectedCard}>
                     <Text style={s.selectedName}>{selected.name}</Text>
                     <View style={s.qtyRow}>
-                        <TouchableOpacity onPress={() => setQty(q => String(Math.max(25, (parseFloat(q) || 100) - 25)))} style={s.qtyBtn}>
+                        <TouchableOpacity
+                            onPress={() => setQty((q) => String(Math.max(25, (Number.parseFloat(q) || 100) - 25)))}
+                            style={s.qtyBtn}
+                        >
                             <Text style={s.qtyBtnText}>-25g</Text>
                         </TouchableOpacity>
-                        <TextInput style={s.qtyInput} value={qty} onChangeText={setQty} keyboardType="numeric" selectTextOnFocus />
+                        <TextInput
+                            style={s.qtyInput}
+                            value={qty}
+                            onChangeText={setQty}
+                            keyboardType="numeric"
+                            selectTextOnFocus
+                        />
                         <Text style={s.qtyUnit}>g</Text>
-                        <TouchableOpacity onPress={() => setQty(q => String((parseFloat(q) || 100) + 25))} style={s.qtyBtn}>
+                        <TouchableOpacity
+                            onPress={() => setQty((q) => String((Number.parseFloat(q) || 100) + 25))}
+                            style={s.qtyBtn}
+                        >
                             <Text style={s.qtyBtnText}>+25g</Text>
                         </TouchableOpacity>
                     </View>
@@ -164,12 +207,17 @@ export default function MealLogScreen({ navigation, route }) {
                     <TouchableOpacity
                         key={food.food_id || i}
                         style={[s.foodItem, selected?.food_id === food.food_id && s.foodItemSelected]}
-                        onPress={() => { setSelected(food); setQty(String(food.serving_g || 100)); }}
+                        onPress={() => {
+                            setSelected(food);
+                            setQty(String(food.serving_g || 100));
+                        }}
                     >
                         <View style={{ flex: 1 }}>
                             <Text style={s.foodName}>{food.name}</Text>
                             <Text style={s.foodMeta}>
-                                {food.cuisine || ''}{food.cuisine ? ' · ' : ''}{food.per_100g?.calories || 0} kcal/100g
+                                {food.cuisine || ''}
+                                {food.cuisine ? ' · ' : ''}
+                                {food.per_100g?.calories || 0} kcal/100g
                                 {food.serving_g ? ` · ${food.serving_g}g serving` : ''}
                             </Text>
                         </View>
@@ -189,19 +237,63 @@ const s = StyleSheet.create({
     title: { color: C.text, fontSize: 17, fontWeight: '700' },
     saveBtn: { width: 60, alignItems: 'flex-end' },
     saveText: { color: C.cyan, fontSize: 15, fontWeight: '700' },
-    searchInput: { marginHorizontal: 14, marginBottom: 8, backgroundColor: C.surf, borderRadius: 10, padding: 12, color: C.text, fontSize: 15, borderWidth: 1, borderColor: C.border },
-    selectedCard: { margin: 12, backgroundColor: C.surf, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: 'rgba(6,182,212,0.3)' },
+    searchInput: {
+        marginHorizontal: 14,
+        marginBottom: 8,
+        backgroundColor: C.surf,
+        borderRadius: 10,
+        padding: 12,
+        color: C.text,
+        fontSize: 15,
+        borderWidth: 1,
+        borderColor: C.border,
+    },
+    selectedCard: {
+        margin: 12,
+        backgroundColor: C.surf,
+        borderRadius: 12,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(6,182,212,0.3)',
+    },
     selectedName: { color: C.text, fontSize: 15, fontWeight: '600', marginBottom: 10 },
     qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
     qtyBtn: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 },
     qtyBtnText: { color: C.cyan, fontSize: 13, fontWeight: '600' },
-    qtyInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 6, padding: 8, color: C.text, fontSize: 15, fontWeight: '700', textAlign: 'center', borderWidth: 1, borderColor: C.border },
+    qtyInput: {
+        flex: 1,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 6,
+        padding: 8,
+        color: C.text,
+        fontSize: 15,
+        fontWeight: '700',
+        textAlign: 'center',
+        borderWidth: 1,
+        borderColor: C.border,
+    },
     qtyUnit: { color: C.muted, fontSize: 13 },
     macroRow: { flexDirection: 'row', gap: 12 },
     macroItem: { color: C.textSub, fontSize: 12, fontWeight: '500' },
-    sectionLabel: { color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+    sectionLabel: {
+        color: C.muted,
+        fontSize: 10,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 8,
+    },
     emptyText: { color: C.muted, fontSize: 14, textAlign: 'center', marginTop: 32 },
-    foodItem: { backgroundColor: C.surf, borderRadius: 10, padding: 12, marginBottom: 6, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: C.border },
+    foodItem: {
+        backgroundColor: C.surf,
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: C.border,
+    },
     foodItemSelected: { borderColor: C.cyan },
     foodName: { color: C.text, fontSize: 14, fontWeight: '500' },
     foodMeta: { color: C.muted, fontSize: 12, marginTop: 2 },

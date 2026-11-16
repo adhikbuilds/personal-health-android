@@ -2,10 +2,18 @@
 // Profile band · 3 tabs (Arena/Nutrition/Rank) · simple cards.
 // Preserves useUser, api.getLeaderboard, NUTRITION_PLANS, PLAYFIELDS, modals.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
-    View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView,
-    Modal, Pressable, Alert, StatusBar,
+    View,
+    Text,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    SafeAreaView,
+    Modal,
+    Pressable,
+    Alert,
+    StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../../context/UserContext';
@@ -14,22 +22,46 @@ import { NUTRITION_PLANS, PLAYFIELDS } from '../../data/constants';
 import api from '../../services/api';
 
 // ─── Strava palette ─────────────────────────
-const ORANGE  = '#FC4C02';
-const DARK    = '#242428';
-const GRAY    = '#6D6D78';
-const DIM     = '#9CA3AF';
-const LIGHT   = '#F7F7FA';
-const BORDER  = '#E6E6EA';
-const BG      = '#FFFFFF';
+const ORANGE = '#FC4C02';
+const DARK = '#242428';
+const GRAY = '#6D6D78';
+const DIM = '#9CA3AF';
+const LIGHT = '#F7F7FA';
+const BORDER = '#E6E6EA';
+const BG = '#FFFFFF';
 const SUCCESS = '#16A34A';
-const AMBER   = '#CA8A04';
+const AMBER = '#CA8A04';
 
 const SECTIONS = ['Arena', 'Nutrition', 'Rank'];
 
 const ARENA_CHALLENGES = [
-    { id: 'a1', title: 'Vertical Jump Test',  desc: '3 attempts — best recorded',     reward: '200 XP', sport: 'VJ',     icon: 'trending-up-outline',   difficulty: 'Medium' },
-    { id: 'a2', title: 'Agility T-Drill',     desc: 'Sprint through the T pattern',   reward: '150 XP', sport: 'Sprint', icon: 'flash-outline',         difficulty: 'Hard'   },
-    { id: 'a3', title: 'Snatch Form Check',   desc: '30-second AI snatch analysis',   reward: '180 XP', sport: 'Snatch', icon: 'barbell-outline',       difficulty: 'Hard'   },
+    {
+        id: 'a1',
+        title: 'Vertical Jump Test',
+        desc: '3 attempts — best recorded',
+        reward: '200 XP',
+        sport: 'VJ',
+        icon: 'trending-up-outline',
+        difficulty: 'Medium',
+    },
+    {
+        id: 'a2',
+        title: 'Agility T-Drill',
+        desc: 'Sprint through the T pattern',
+        reward: '150 XP',
+        sport: 'Sprint',
+        icon: 'flash-outline',
+        difficulty: 'Hard',
+    },
+    {
+        id: 'a3',
+        title: 'Snatch Form Check',
+        desc: '30-second AI snatch analysis',
+        reward: '180 XP',
+        sport: 'Snatch',
+        icon: 'barbell-outline',
+        difficulty: 'Hard',
+    },
 ];
 
 const TIME_SLOTS = ['6:00 AM', '7:00 AM', '8:00 AM', '9:00 AM', '5:00 PM', '6:00 PM', '7:00 PM'];
@@ -37,8 +69,7 @@ const TIME_SLOTS = ['6:00 AM', '7:00 AM', '8:00 AM', '9:00 AM', '5:00 PM', '6:00
 // ─── Sub-components ─────────────────────────
 
 function ArenaCard({ challenge, onPress }) {
-    const diffColor = challenge.difficulty === 'Hard' ? '#DC2626'
-        : challenge.difficulty === 'Medium' ? AMBER : SUCCESS;
+    const diffColor = challenge.difficulty === 'Hard' ? '#DC2626' : challenge.difficulty === 'Medium' ? AMBER : SUCCESS;
     return (
         <TouchableOpacity style={s.card} activeOpacity={0.7} onPress={onPress}>
             <View style={s.cardHead}>
@@ -49,7 +80,7 @@ function ArenaCard({ challenge, onPress }) {
                     <Text style={s.cardTitle}>{challenge.title}</Text>
                     <Text style={s.cardSub}>{challenge.desc}</Text>
                 </View>
-                <View style={[s.diffPill, { backgroundColor: diffColor + '15' }]}>
+                <View style={[s.diffPill, { backgroundColor: `${diffColor}15` }]}>
                     <Text style={[s.diffText, { color: diffColor }]}>{challenge.difficulty}</Text>
                 </View>
             </View>
@@ -130,7 +161,9 @@ function RecipeModal({ plan, visible, onClose }) {
                     <Text style={s.modalSection}>PREPARATION</Text>
                     {(plan.steps || []).map((step, i) => (
                         <View key={i} style={s.row}>
-                            <View style={s.stepNumWrap}><Text style={s.stepNum}>{i + 1}</Text></View>
+                            <View style={s.stepNumWrap}>
+                                <Text style={s.stepNum}>{i + 1}</Text>
+                            </View>
                             <Text style={s.stepText}>{step}</Text>
                         </View>
                     ))}
@@ -202,7 +235,9 @@ function BookingModal({ field, visible, onClose, showToast }) {
 
                     <TouchableOpacity style={s.closeBtn} onPress={confirmBooking}>
                         <Text style={s.closeBtnText}>
-                            {selectedSlot ? `CONFIRM: ${selectedDate.toUpperCase()} · ${selectedSlot}` : 'SELECT A SLOT'}
+                            {selectedSlot
+                                ? `CONFIRM: ${selectedDate.toUpperCase()} · ${selectedSlot}`
+                                : 'SELECT A SLOT'}
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={onClose} style={{ alignItems: 'center', marginTop: 10 }}>
@@ -225,18 +260,33 @@ export default function HubScreen({ showToast, navigation }) {
     const [recipeModal, setRecipeModal] = useState({ visible: false, plan: null });
     const [bookingModal, setBookingModal] = useState({ visible: false, field: null });
 
-    const initials = String(name).split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+    const initials = String(name)
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
 
     useEffect(() => {
         let deviceId = null;
-        getOrCreateAnonymousAthleteId().then(id => { deviceId = id; }).catch(() => {});
-        api.getLeaderboard?.().then((data) => {
-            if (!data?.leaderboard) return;
-            const idx = data.leaderboard.findIndex((a) => a.id === deviceId);
-            if (idx >= 0) {
-                setRankData({ rank: idx + 1, total: data.total || data.leaderboard.length, tier: data.leaderboard[idx]?.tier || 'District' });
-            }
-        }).catch(() => {});
+        getOrCreateAnonymousAthleteId()
+            .then((id) => {
+                deviceId = id;
+            })
+            .catch(() => {});
+        api.getLeaderboard?.()
+            .then((data) => {
+                if (!data?.leaderboard) return;
+                const idx = data.leaderboard.findIndex((a) => a.id === deviceId);
+                if (idx >= 0) {
+                    setRankData({
+                        rank: idx + 1,
+                        total: data.total || data.leaderboard.length,
+                        tier: data.leaderboard[idx]?.tier || 'District',
+                    });
+                }
+            })
+            .catch(() => {});
     }, []);
 
     const topPercent = Math.round((rankData.rank / Math.max(rankData.total, 1)) * 100);
@@ -244,20 +294,12 @@ export default function HubScreen({ showToast, navigation }) {
     const renderSection = useCallback(() => {
         if (activeSection === 'Arena') {
             return ARENA_CHALLENGES.map((c) => (
-                <ArenaCard
-                    key={c.id}
-                    challenge={c}
-                    onPress={() => showToast?.(`Starting ${c.title}…`)}
-                />
+                <ArenaCard key={c.id} challenge={c} onPress={() => showToast?.(`Starting ${c.title}…`)} />
             ));
         }
         if (activeSection === 'Nutrition') {
             return (NUTRITION_PLANS || []).map((p) => (
-                <NutritionRow
-                    key={p.id}
-                    plan={p}
-                    onPress={(plan) => setRecipeModal({ visible: true, plan })}
-                />
+                <NutritionRow key={p.id} plan={p} onPress={(plan) => setRecipeModal({ visible: true, plan })} />
             ));
         }
         // Rank tab
@@ -273,11 +315,7 @@ export default function HubScreen({ showToast, navigation }) {
                 </View>
                 <Text style={s.sectionLabel}>NEARBY PLAYFIELDS</Text>
                 {(PLAYFIELDS || []).slice(0, 5).map((f) => (
-                    <FieldRow
-                        key={f.id}
-                        field={f}
-                        onPress={(field) => setBookingModal({ visible: true, field })}
-                    />
+                    <FieldRow key={f.id} field={f} onPress={(field) => setBookingModal({ visible: true, field })} />
                 ))}
             </>
         );
@@ -298,11 +336,7 @@ export default function HubScreen({ showToast, navigation }) {
                             Level {level} · {streak}-day streak
                         </Text>
                     </View>
-                    <TouchableOpacity
-                        style={s.xpPill}
-                        onPress={() => navigation.navigate('Login')}
-                        activeOpacity={0.7}
-                    >
+                    <TouchableOpacity style={s.xpPill} onPress={() => navigation.navigate('Login')} activeOpacity={0.7}>
                         <Text style={s.xpText}>{Number(xp).toLocaleString()} XP</Text>
                     </TouchableOpacity>
                 </View>
@@ -332,9 +366,7 @@ export default function HubScreen({ showToast, navigation }) {
                 </View>
 
                 {/* Section body */}
-                <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-                    {renderSection()}
-                </View>
+                <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>{renderSection()}</View>
             </ScrollView>
 
             <RecipeModal

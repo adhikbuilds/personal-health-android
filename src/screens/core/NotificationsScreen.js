@@ -1,44 +1,59 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-    View, Text, ScrollView, StyleSheet,
-    TouchableOpacity, SafeAreaView, ActivityIndicator,
-} from 'react-native';
+import { useEffect, useState, useCallback } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 import api from '../../services/api';
 
-const BG      = '#FBFBF8';
+const BG = '#FBFBF8';
 const SURFACE = '#FFFFFF';
-const TEXT    = '#242428';
-const MUTED   = '#9CA3AF';
-const ACCENT  = '#FC4C02';
+const TEXT = '#242428';
+const MUTED = '#9CA3AF';
+const ACCENT = '#FC4C02';
 const WARNING = '#f59e0b';
 const SUCCESS = '#22c55e';
-const RED     = '#ef4444';
-const BORDER  = 'rgba(255,255,255,0.08)';
+const RED = '#ef4444';
+const BORDER = 'rgba(255,255,255,0.08)';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function relativeTime(isoString) {
-    const now  = Date.now();
+    const now = Date.now();
     const then = new Date(isoString).getTime();
     const diffSec = Math.floor((now - then) / 1000);
-    if (diffSec < 60)       return 'just now';
-    if (diffSec < 3600)     return `${Math.floor(diffSec / 60)}m ago`;
-    if (diffSec < 86400)    return `${Math.floor(diffSec / 3600)}h ago`;
+    if (diffSec < 60) return 'just now';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
     const days = Math.floor(diffSec / 86400);
-    if (days === 1)         return '1 day ago';
+    if (days === 1) return '1 day ago';
     return `${days} days ago`;
 }
 
 // ─── Type config ─────────────────────────────────────────────────────────────
 
 const TYPE_CONFIG = {
-    reengage:       { border: ACCENT,   icon: 'barbell-outline',  iconColor: ACCENT,   cta: 'Start drill',  ctaRoute: 'PlacementWizard' },
-    streak_risk:    { border: WARNING,  icon: 'flame-outline',    iconColor: WARNING,  cta: 'Train now',    ctaRoute: 'PlacementWizard' },
-    personal_best:  { border: SUCCESS,  icon: 'trophy-outline',   iconColor: SUCCESS,  cta: null,           ctaRoute: null },
-    milestone:      { border: ACCENT,   icon: 'star-outline',     iconColor: ACCENT,   cta: null,           ctaRoute: null },
-    injury_warning: { border: RED,      icon: 'warning-outline',  iconColor: RED,      cta: 'See details',  ctaRoute: 'InjuryRisk' },
+    reengage: {
+        border: ACCENT,
+        icon: 'barbell-outline',
+        iconColor: ACCENT,
+        cta: 'Start drill',
+        ctaRoute: 'PlacementWizard',
+    },
+    streak_risk: {
+        border: WARNING,
+        icon: 'flame-outline',
+        iconColor: WARNING,
+        cta: 'Train now',
+        ctaRoute: 'PlacementWizard',
+    },
+    personal_best: { border: SUCCESS, icon: 'trophy-outline', iconColor: SUCCESS, cta: null, ctaRoute: null },
+    milestone: { border: ACCENT, icon: 'star-outline', iconColor: ACCENT, cta: null, ctaRoute: null },
+    injury_warning: {
+        border: RED,
+        icon: 'warning-outline',
+        iconColor: RED,
+        cta: 'See details',
+        ctaRoute: 'InjuryRisk',
+    },
 };
 
 // ─── Notification Card ────────────────────────────────────────────────────────
@@ -62,7 +77,7 @@ function NotificationCard({ item, athleteSport, onNavigate }) {
 
             <View style={sc.cardContent}>
                 <View style={sc.cardTop}>
-                    <View style={[sc.iconWrap, { backgroundColor: cfg.border + '22' }]}>
+                    <View style={[sc.iconWrap, { backgroundColor: `${cfg.border}22` }]}>
                         <Ionicons name={cfg.icon} size={20} color={cfg.iconColor} />
                     </View>
                     <View style={sc.cardText}>
@@ -77,7 +92,7 @@ function NotificationCard({ item, athleteSport, onNavigate }) {
 
                 {cfg.cta && (
                     <TouchableOpacity
-                        style={[sc.ctaBtn, { borderColor: cfg.border + '60', backgroundColor: cfg.border + '18' }]}
+                        style={[sc.ctaBtn, { borderColor: `${cfg.border}60`, backgroundColor: `${cfg.border}18` }]}
                         onPress={handleCta}
                         activeOpacity={0.8}
                     >
@@ -91,13 +106,13 @@ function NotificationCard({ item, athleteSport, onNavigate }) {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
-export default function NotificationsScreen({ navigation, showToast }) {
-    const [athleteId,    setAthleteId]    = useState(null);
+export default function NotificationsScreen({ navigation }) {
+    const [athleteId, setAthleteId] = useState(null);
     const [athleteSport, setAthleteSport] = useState('sprint');
-    const [notifs,       setNotifs]       = useState([]);
-    const [unreadCount,  setUnreadCount]  = useState(0);
-    const [loading,      setLoading]      = useState(true);
-    const [error,        setError]        = useState(false);
+    const [notifs, setNotifs] = useState([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
 
     const fetchNotifications = useCallback(async (id) => {
         setLoading(true);
@@ -126,7 +141,7 @@ export default function NotificationsScreen({ navigation, showToast }) {
             markTimer = setTimeout(async () => {
                 await api.markNotificationsRead(id);
                 setUnreadCount(0);
-                setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+                setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
             }, 1500);
         });
         return () => clearTimeout(markTimer);
@@ -140,7 +155,7 @@ export default function NotificationsScreen({ navigation, showToast }) {
         if (!athleteId) return;
         await api.markNotificationsRead(athleteId);
         setUnreadCount(0);
-        setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+        setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
     };
 
     const handleNavigate = (route, params) => {
@@ -183,10 +198,7 @@ export default function NotificationsScreen({ navigation, showToast }) {
                     <Text style={sc.emptyText}>No notifications yet.</Text>
                 </View>
             ) : (
-                <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={sc.list}
-                >
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={sc.list}>
                     {notifs.map((item, idx) => (
                         <NotificationCard
                             key={item.id || idx}
@@ -203,7 +215,7 @@ export default function NotificationsScreen({ navigation, showToast }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const sc = StyleSheet.create({
-    safe:   { flex: 1, backgroundColor: BG },
+    safe: { flex: 1, backgroundColor: BG },
 
     // Header
     header: {
@@ -214,16 +226,24 @@ const sc = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: BORDER,
     },
-    backBtn:       { padding: 4, marginRight: 8 },
-    headerTitle:   { flex: 1, fontSize: 17, fontWeight: '800', color: TEXT },
-    markAllBtn:    { fontSize: 13, color: ACCENT, fontWeight: '700' },
-    headerSpacer:  { width: 80 },
+    backBtn: { padding: 4, marginRight: 8 },
+    headerTitle: { flex: 1, fontSize: 17, fontWeight: '800', color: TEXT },
+    markAllBtn: { fontSize: 13, color: ACCENT, fontWeight: '700' },
+    headerSpacer: { width: 80 },
 
     // States
-    center:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-    emptyText:     { fontSize: 14, color: MUTED, fontWeight: '600', marginTop: 4 },
-    retryBtn:      { marginTop: 4, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10, backgroundColor: 'rgba(6,182,212,0.12)', borderWidth: 1, borderColor: ACCENT + '50' },
-    retryBtnText:  { color: ACCENT, fontWeight: '700', fontSize: 13 },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    emptyText: { fontSize: 14, color: MUTED, fontWeight: '600', marginTop: 4 },
+    retryBtn: {
+        marginTop: 4,
+        borderRadius: 10,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        backgroundColor: 'rgba(6,182,212,0.12)',
+        borderWidth: 1,
+        borderColor: `${ACCENT}50`,
+    },
+    retryBtnText: { color: ACCENT, fontWeight: '700', fontSize: 13 },
 
     // List
     list: { padding: 16, gap: 10, paddingBottom: 30 },
@@ -240,7 +260,7 @@ const sc = StyleSheet.create({
         borderColor: BORDER,
     },
     cardProminent: {
-        borderColor: ACCENT + '30',
+        borderColor: `${ACCENT}30`,
     },
 
     // Unread dot
@@ -256,13 +276,20 @@ const sc = StyleSheet.create({
 
     // Card internals
     cardContent: { flex: 1 },
-    cardTop:     { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8, gap: 10 },
-    iconWrap:    { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-    cardText:    { flex: 1 },
-    cardTitle:   { fontSize: 14, fontWeight: '700', color: TEXT, lineHeight: 19 },
+    cardTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8, gap: 10 },
+    iconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    cardText: { flex: 1 },
+    cardTitle: { fontSize: 14, fontWeight: '700', color: TEXT, lineHeight: 19 },
     cardTitleProminent: { fontSize: 16 },
-    cardTime:    { fontSize: 11, color: MUTED, marginTop: 2, fontWeight: '600' },
-    cardBody:    { fontSize: 14, color: MUTED, lineHeight: 20, marginBottom: 10 },
+    cardTime: { fontSize: 11, color: MUTED, marginTop: 2, fontWeight: '600' },
+    cardBody: { fontSize: 14, color: MUTED, lineHeight: 20, marginBottom: 10 },
 
     // CTA button
     ctaBtn: {

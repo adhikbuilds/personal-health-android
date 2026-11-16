@@ -1,7 +1,7 @@
 // PH-V2-A-02: Reusable StatCard component
 // Premium KPI tile matching the frontend ph-stat-card design.
 
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, STATUS_COLORS, RADIUS, SPACING } from '../styles/tokens';
@@ -10,7 +10,7 @@ export default function StatCard({
     label,
     value,
     icon = 'pulse',
-    color = 'brand',  // brand | pb | success | caution | alert | info
+    color = 'brand', // brand | pb | success | caution | alert | info
     delta,
     onPress,
 }) {
@@ -25,9 +25,7 @@ export default function StatCard({
     };
 
     const Wrapper = onPress ? Pressable : View;
-    const wrapperProps = onPress
-        ? { onPress, onPressIn: handlePressIn, onPressOut: handlePressOut }
-        : {};
+    const wrapperProps = onPress ? { onPress, onPressIn: handlePressIn, onPressOut: handlePressOut } : {};
 
     return (
         <Animated.View style={{ transform: [{ scale }] }}>
@@ -44,14 +42,13 @@ export default function StatCard({
                 <Text style={styles.label}>{label}</Text>
 
                 {/* Value */}
-                <Text style={[styles.value, { color: color === 'pb' ? COLORS.pb : COLORS.text }]}>
-                    {value ?? '—'}
-                </Text>
+                <Text style={[styles.value, { color: color === 'pb' ? COLORS.pb : COLORS.text }]}>{value ?? '—'}</Text>
 
                 {/* Optional delta */}
                 {delta != null && (
                     <Text style={[styles.delta, { color: delta >= 0 ? COLORS.success : COLORS.alert }]}>
-                        {delta >= 0 ? '+' : ''}{delta}
+                        {delta >= 0 ? '+' : ''}
+                        {delta}
                     </Text>
                 )}
             </Wrapper>
@@ -71,14 +68,18 @@ const styles = StyleSheet.create({
     },
     topEdge: {
         position: 'absolute',
-        top: 0, left: 0, right: 0,
+        top: 0,
+        left: 0,
+        right: 0,
         height: 1,
         backgroundColor: 'rgba(255,255,255,0.08)',
     },
     iconBox: {
-        width: 40, height: 40,
+        width: 40,
+        height: 40,
         borderRadius: RADIUS.md,
-        alignItems: 'center', justifyContent: 'center',
+        alignItems: 'center',
+        justifyContent: 'center',
         marginBottom: SPACING[3],
     },
     label: {

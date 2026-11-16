@@ -22,7 +22,9 @@ export async function setSecure(key, value) {
             await SecureStore.setItemAsync(key, String(value));
             return;
         }
-    } catch (_) { /* fall through to AsyncStorage */ }
+    } catch (_) {
+        /* fall through to AsyncStorage */
+    }
     if (value == null) {
         await AsyncStorage.removeItem(key);
     } else {
@@ -36,7 +38,9 @@ export async function getSecure(key) {
             const v = await SecureStore.getItemAsync(key);
             if (v != null) return v;
         }
-    } catch (_) { /* fall through */ }
+    } catch (_) {
+        /* fall through */
+    }
     return AsyncStorage.getItem(key);
 }
 
@@ -45,10 +49,14 @@ export async function deleteSecure(key) {
         if (SECURE_OK) {
             await SecureStore.deleteItemAsync(key);
         }
-    } catch (_) { /* ignore */ }
+    } catch (_) {
+        /* ignore */
+    }
     try {
         await AsyncStorage.removeItem(key);
-    } catch (_) { /* ignore */ }
+    } catch (_) {
+        /* ignore */
+    }
 }
 
 export const STORAGE_BACKEND = SECURE_OK ? 'secure-store' : 'async-storage';

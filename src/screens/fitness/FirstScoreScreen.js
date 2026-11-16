@@ -1,11 +1,8 @@
 // FirstScoreScreen — ST-02: First-session celebration before regular ShareCard
 // Shows the initial score, what it means, and what's next.
 
-import React, { useEffect, useState } from 'react';
-import {
-    View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
-    ActivityIndicator,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '../../styles/colors';
@@ -37,11 +34,13 @@ export default function FirstScoreScreen({ navigation, route }) {
                 if (athleteId) {
                     try {
                         const wj = await api.getWeakJoints(athleteId, 30);
-                        weakest = (wj?.weak_joints || []).find(j => (j.deviation_deg || 0) > 0) || null;
+                        weakest = (wj?.weak_joints || []).find((j) => (j.deviation_deg || 0) > 0) || null;
                     } catch {}
                 }
                 setData({ ...card, weakest });
-                try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+                try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                } catch {}
             } catch (e) {
                 setError(e?.message || 'Could not load score');
             } finally {
@@ -52,7 +51,9 @@ export default function FirstScoreScreen({ navigation, route }) {
     }, [sessionId, athleteId]);
 
     const handleContinue = async () => {
-        try { await markOnboardingComplete(); } catch {}
+        try {
+            await markOnboardingComplete();
+        } catch {}
         navigation.replace('ShareCard', { sessionId, athleteId });
     };
 
@@ -100,17 +101,14 @@ export default function FirstScoreScreen({ navigation, route }) {
                 <View style={s.nextWrap}>
                     <Text style={s.nextTitle}>What's next</Text>
                     <Text style={s.nextBody}>
-                        Your next session will show a ▲ or ▼ vs. this {heroNumber}. Aim to stay consistent, then improve.
+                        Your next session will show a ▲ or ▼ vs. this {heroNumber}. Aim to stay consistent, then
+                        improve.
                     </Text>
                 </View>
 
                 <View style={s.spacer} />
 
-                <TouchableOpacity
-                    style={s.continueBtn}
-                    onPress={handleContinue}
-                    activeOpacity={0.85}
-                >
+                <TouchableOpacity style={s.continueBtn} onPress={handleContinue} activeOpacity={0.85}>
                     <Text style={s.continueBtnText}>Continue</Text>
                     <Ionicons name="arrow-forward" size={18} color={BG} style={{ marginLeft: 8 }} />
                 </TouchableOpacity>

@@ -63,5 +63,5 @@ export async function cancelDailyReminder() {
 
 export async function isDailyReminderScheduled() {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    return scheduled.some(n => n.identifier === 'daily-checkin');
+    return scheduled.some((n) => n.identifier === 'daily-checkin');
 }

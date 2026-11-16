@@ -5,8 +5,8 @@
 // that api.js can request a refresh on 401 without circular imports.
 
 let _accessToken = null;
-let _refreshHandler = null;   // async () => boolean — returns true if refresh succeeded
-let _logoutHandler  = null;   // async () => void   — clears tokens + bumps state
+let _refreshHandler = null; // async () => boolean — returns true if refresh succeeded
+let _logoutHandler = null; // async () => void   — clears tokens + bumps state
 
 export function getAccessToken() {
     return _accessToken;
@@ -39,7 +39,11 @@ export function setLogoutHandler(fn) {
 
 export async function triggerLogout() {
     if (_logoutHandler) {
-        try { await _logoutHandler(); } catch (_) { /* ignore */ }
+        try {
+            await _logoutHandler();
+        } catch (_) {
+            /* ignore */
+        }
     }
     clearAccessToken();
 }

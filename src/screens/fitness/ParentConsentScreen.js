@@ -3,37 +3,29 @@
 // Framing is neutral: this is about giving parents peace of mind,
 // not surveillance. The athlete stays in full control.
 
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-    ActivityIndicator,
-    FlatList,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { API_BASE } from '../../services/api';
 import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 
-const BG      = '#FBFBF8';
+const BG = '#FBFBF8';
 const SURFACE = '#FFFFFF';
-const CYAN    = '#FC4C02';
-const TEXT    = '#242428';
-const MUTED   = '#9CA3AF';
-const AMBER   = '#f59e0b';
-const RED     = '#ef4444';
-const BORDER  = 'rgba(255,255,255,0.08)';
+const CYAN = '#FC4C02';
+const TEXT = '#242428';
+const MUTED = '#9CA3AF';
+const AMBER = '#f59e0b';
+const RED = '#ef4444';
+const BORDER = 'rgba(255,255,255,0.08)';
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }) {
     const map = {
-        pending:  { label: 'PENDING',  color: AMBER },
-        active:   { label: 'ACTIVE',   color: CYAN  },
-        revoked:  { label: 'REVOKED',  color: MUTED },
+        pending: { label: 'PENDING', color: AMBER },
+        active: { label: 'ACTIVE', color: CYAN },
+        revoked: { label: 'REVOKED', color: MUTED },
     };
     const cfg = map[status] || { label: status.toUpperCase(), color: MUTED };
     return (
@@ -64,10 +56,11 @@ function ConsentRow({ item, onAccept, onRevoke, loading }) {
                         onPress={() => onAccept(item.consent_id)}
                         disabled={busy}
                     >
-                        {busy
-                            ? <ActivityIndicator size="small" color={BG} />
-                            : <Text style={styles.btnAcceptText}>Allow access</Text>
-                        }
+                        {busy ? (
+                            <ActivityIndicator size="small" color={BG} />
+                        ) : (
+                            <Text style={styles.btnAcceptText}>Allow access</Text>
+                        )}
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.btn, styles.btnDecline]}
@@ -86,10 +79,11 @@ function ConsentRow({ item, onAccept, onRevoke, loading }) {
                         onPress={() => onRevoke(item.consent_id)}
                         disabled={busy}
                     >
-                        {busy
-                            ? <ActivityIndicator size="small" color={RED} />
-                            : <Text style={styles.btnRevokeText}>Revoke access</Text>
-                        }
+                        {busy ? (
+                            <ActivityIndicator size="small" color={RED} />
+                        ) : (
+                            <Text style={styles.btnRevokeText}>Revoke access</Text>
+                        )}
                     </TouchableOpacity>
                 </View>
             )}
@@ -101,9 +95,9 @@ function ConsentRow({ item, onAccept, onRevoke, loading }) {
 
 export default function ParentConsentScreen({ navigation }) {
     const [athleteId, setAthleteId] = useState(null);
-    const [consents, setConsents]   = useState([]);
-    const [loading, setLoading]     = useState(true);
-    const [busy, setBusy]           = useState(null); // consent_id being actioned
+    const [consents, setConsents] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [busy, setBusy] = useState(null); // consent_id being actioned
 
     useEffect(() => {
         let alive = true;
@@ -111,7 +105,9 @@ export default function ParentConsentScreen({ navigation }) {
             if (!alive) return;
             setAthleteId(id);
         });
-        return () => { alive = false; };
+        return () => {
+            alive = false;
+        };
     }, []);
 
     const apiFetch = useCallback(async (path, method = 'GET') => {
@@ -127,13 +123,16 @@ export default function ParentConsentScreen({ navigation }) {
         }
     }, []);
 
-    const loadConsents = useCallback(async (id) => {
-        if (!id) return;
-        setLoading(true);
-        const data = await apiFetch(`/athlete/${id}/parent-consents`);
-        setConsents(data?.consents || []);
-        setLoading(false);
-    }, [apiFetch]);
+    const loadConsents = useCallback(
+        async (id) => {
+            if (!id) return;
+            setLoading(true);
+            const data = await apiFetch(`/athlete/${id}/parent-consents`);
+            setConsents(data?.consents || []);
+            setLoading(false);
+        },
+        [apiFetch],
+    );
 
     useEffect(() => {
         if (athleteId) loadConsents(athleteId);
@@ -176,9 +175,8 @@ export default function ParentConsentScreen({ navigation }) {
                     <Ionicons name="shield-checkmark-outline" size={48} color={MUTED} />
                     <Text style={styles.emptyTitle}>No access requests yet</Text>
                     <Text style={styles.emptyBody}>
-                        A parent can request read-only access to see that you're training
-                        safely. They'll only see whether you're active and injury-risk
-                        signals — not your raw scores or session details.
+                        A parent can request read-only access to see that you're training safely. They'll only see
+                        whether you're active and injury-risk signals — not your raw scores or session details.
                         {'\n\n'}
                         You can revoke access at any time.
                     </Text>
@@ -190,17 +188,12 @@ export default function ParentConsentScreen({ navigation }) {
                     contentContainerStyle={styles.list}
                     ItemSeparatorComponent={() => <View style={styles.separator} />}
                     renderItem={({ item }) => (
-                        <ConsentRow
-                            item={item}
-                            onAccept={handleAccept}
-                            onRevoke={handleRevoke}
-                            loading={busy}
-                        />
+                        <ConsentRow item={item} onAccept={handleAccept} onRevoke={handleRevoke} loading={busy} />
                     )}
                     ListHeaderComponent={
                         <Text style={styles.listNote}>
-                            Parents with active access see your training frequency, sport,
-                            and whether injury-risk signals are elevated. No raw data is shared.
+                            Parents with active access see your training frequency, sport, and whether injury-risk
+                            signals are elevated. No raw data is shared.
                         </Text>
                     }
                 />
@@ -217,126 +210,126 @@ const styles = StyleSheet.create({
         backgroundColor: BG,
     },
     header: {
-        flexDirection:  'row',
-        alignItems:     'center',
+        flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingVertical:   14,
+        paddingVertical: 14,
         borderBottomWidth: 1,
         borderBottomColor: BORDER,
     },
     headerTitle: {
-        fontSize:   17,
+        fontSize: 17,
         fontWeight: '700',
-        color:      TEXT,
+        color: TEXT,
     },
     center: {
-        flex:           1,
-        alignItems:     'center',
+        flex: 1,
+        alignItems: 'center',
         justifyContent: 'center',
     },
     empty: {
-        flex:            1,
-        alignItems:      'center',
-        justifyContent:  'center',
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
         paddingHorizontal: 36,
-        gap:             16,
+        gap: 16,
     },
     emptyTitle: {
-        fontSize:   18,
+        fontSize: 18,
         fontWeight: '700',
-        color:      TEXT,
-        textAlign:  'center',
+        color: TEXT,
+        textAlign: 'center',
     },
     emptyBody: {
-        fontSize:   14,
-        color:      MUTED,
-        textAlign:  'center',
+        fontSize: 14,
+        color: MUTED,
+        textAlign: 'center',
         lineHeight: 22,
     },
     list: {
         padding: 16,
     },
     listNote: {
-        fontSize:      13,
-        color:         MUTED,
-        marginBottom:  16,
-        lineHeight:    20,
+        fontSize: 13,
+        color: MUTED,
+        marginBottom: 16,
+        lineHeight: 20,
     },
     separator: {
-        height:          1,
+        height: 1,
         backgroundColor: BORDER,
-        marginVertical:  4,
+        marginVertical: 4,
     },
     row: {
         backgroundColor: SURFACE,
-        borderRadius:    14,
-        padding:         16,
-        marginBottom:    4,
+        borderRadius: 14,
+        padding: 16,
+        marginBottom: 4,
     },
     rowTop: {
-        flexDirection:  'row',
-        alignItems:     'flex-start',
-        marginBottom:   12,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 12,
     },
     parentName: {
-        fontSize:   15,
+        fontSize: 15,
         fontWeight: '700',
-        color:      TEXT,
+        color: TEXT,
         marginBottom: 2,
     },
     parentEmail: {
         fontSize: 13,
-        color:    MUTED,
+        color: MUTED,
     },
     badge: {
-        borderWidth:   1,
-        borderRadius:  6,
+        borderWidth: 1,
+        borderRadius: 6,
         paddingHorizontal: 8,
-        paddingVertical:   3,
-        alignSelf:     'flex-start',
-        marginLeft:    8,
+        paddingVertical: 3,
+        alignSelf: 'flex-start',
+        marginLeft: 8,
     },
     badgeText: {
-        fontSize:   10,
+        fontSize: 10,
         fontWeight: '800',
         letterSpacing: 0.5,
     },
     rowActions: {
         flexDirection: 'row',
-        gap:           10,
+        gap: 10,
     },
     btn: {
-        flex:             1,
-        paddingVertical:  10,
-        borderRadius:     10,
-        alignItems:       'center',
-        justifyContent:   'center',
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     btnAccept: {
         backgroundColor: CYAN,
     },
     btnAcceptText: {
-        color:      BG,
+        color: BG,
         fontWeight: '700',
-        fontSize:   14,
+        fontSize: 14,
     },
     btnDecline: {
-        borderWidth:  1,
-        borderColor:  MUTED,
+        borderWidth: 1,
+        borderColor: MUTED,
     },
     btnDeclineText: {
-        color:      MUTED,
+        color: MUTED,
         fontWeight: '600',
-        fontSize:   14,
+        fontSize: 14,
     },
     btnRevoke: {
-        borderWidth:  1,
-        borderColor:  RED,
+        borderWidth: 1,
+        borderColor: RED,
     },
     btnRevokeText: {
-        color:      RED,
+        color: RED,
         fontWeight: '600',
-        fontSize:   14,
+        fontSize: 14,
     },
 });

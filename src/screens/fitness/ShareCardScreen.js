@@ -9,19 +9,12 @@
 //     chip_colour, rep_count, share_text, share_url, image_url,
 //     design_system, multiplayer }
 
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-    View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
-    ActivityIndicator, Share, Platform,
-} from 'react-native';
+import { useEffect, useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Share } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { C } from '../../styles/colors';
 import api from '../../services/api';
-import {
-    generateCoachInviteLink,
-    hasInvitedCoach,
-    markCoachInvited,
-} from '../../services/coachInvite';
+import { generateCoachInviteLink, hasInvitedCoach, markCoachInvited } from '../../services/coachInvite';
 
 export default function ShareCardScreen({ navigation, route }) {
     const sessionId = route.params?.sessionId;
@@ -31,7 +24,7 @@ export default function ShareCardScreen({ navigation, route }) {
     const [loading, setLoading] = useState(true);
     const [showCoachInvite, setShowCoachInvite] = useState(false);
     const [coachInviteLoading, setCoachInviteLoading] = useState(false);
-    const [inviteLink, setInviteLink] = useState(null);
+    const [_inviteLink, setInviteLink] = useState(null);
     const [inviteConfirmed, setInviteConfirmed] = useState(false);
 
     const load = useCallback(async () => {
@@ -44,7 +37,9 @@ export default function ShareCardScreen({ navigation, route }) {
         try {
             const data = await api.get(`/session/${sessionId}/share-card`);
             setCard(data);
-            try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+            try {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch {}
         } catch (e) {
             setError(e?.message || 'Could not load share card');
         } finally {
@@ -133,11 +128,8 @@ export default function ShareCardScreen({ navigation, route }) {
     const textSecondary = ds.text_secondary || '#9CA3AF';
     const chipColour = card.chip_colour || textSecondary;
 
-    const deltaArrow =
-        card.delta_direction === 'up' ? '▲' :
-        card.delta_direction === 'down' ? '▼' : '—';
-    const deltaColour =
-        card.delta_direction === 'up' ? accent : textSecondary;
+    const deltaArrow = card.delta_direction === 'up' ? '▲' : card.delta_direction === 'down' ? '▼' : '—';
+    const deltaColour = card.delta_direction === 'up' ? accent : textSecondary;
 
     // show_up variant intentionally hides the delta line per spec
     const showDelta = card.variant !== 'show_up' && card.delta !== null && card.delta !== undefined;
@@ -156,14 +148,15 @@ export default function ShareCardScreen({ navigation, route }) {
                     <View style={s.deltaRow}>
                         <Text style={[s.deltaArrow, { color: deltaColour }]}>{deltaArrow}</Text>
                         <Text style={[s.deltaText, { color: deltaColour }]}>
-                            {card.delta > 0 ? '+' : ''}{Number(card.delta).toFixed(1)} vs last session
+                            {card.delta > 0 ? '+' : ''}
+                            {Number(card.delta).toFixed(1)} vs last session
                         </Text>
                     </View>
                 ) : null}
 
                 <Text style={[s.sub, { color: textSecondary }]}>{card.sub}</Text>
 
-                <View style={[s.chip, { borderColor: chipColour + '66', backgroundColor: chipColour + '18' }]}>
+                <View style={[s.chip, { borderColor: `${chipColour}66`, backgroundColor: `${chipColour}18` }]}>
                     <Text style={[s.chipText, { color: chipColour }]}>{card.chip}</Text>
                 </View>
 
@@ -179,10 +172,7 @@ export default function ShareCardScreen({ navigation, route }) {
             ) : null}
 
             <View style={s.actions}>
-                <TouchableOpacity
-                    style={[s.shareBtn, { backgroundColor: accent }]}
-                    onPress={onShare}
-                >
+                <TouchableOpacity style={[s.shareBtn, { backgroundColor: accent }]} onPress={onShare}>
                     <Text style={s.shareText}>share</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.secondaryBtn} onPress={() => navigation.popToTop()}>
@@ -191,7 +181,7 @@ export default function ShareCardScreen({ navigation, route }) {
             </View>
 
             {showCoachInvite && !inviteConfirmed && (
-                <View style={[s.coachSection, { backgroundColor: '#FFFFFF', borderColor: accent + '33' }]}>
+                <View style={[s.coachSection, { backgroundColor: '#FFFFFF', borderColor: `${accent}33` }]}>
                     <Text style={[s.coachTitle, { color: textPrimary }]}>Training with a coach?</Text>
                     <Text style={[s.coachSub, { color: textSecondary }]}>
                         Send them this — they'll see your form scores and can send you notes.
@@ -209,7 +199,7 @@ export default function ShareCardScreen({ navigation, route }) {
             )}
 
             {inviteConfirmed && (
-                <View style={[s.coachSection, { backgroundColor: '#FFFFFF', borderColor: accent + '33' }]}>
+                <View style={[s.coachSection, { backgroundColor: '#FFFFFF', borderColor: `${accent}33` }]}>
                     <Text style={[s.coachTitle, { color: textPrimary }]}>Sent</Text>
                     <Text style={[s.coachSub, { color: textSecondary }]}>
                         Your coach will appear on your roster once they install.
@@ -224,8 +214,11 @@ const s = StyleSheet.create({
     safe: { flex: 1, backgroundColor: '#FBFBF8', alignItems: 'center', justifyContent: 'center' },
 
     card: {
-        width: '86%', paddingVertical: 48, alignItems: 'center',
-        borderRadius: 24, backgroundColor: '#FFFFFF',
+        width: '86%',
+        paddingVertical: 48,
+        alignItems: 'center',
+        borderRadius: 24,
+        backgroundColor: '#FFFFFF',
     },
     hero: { fontSize: 120, fontWeight: '900', lineHeight: 128 },
     heroLabel: { fontSize: 13, letterSpacing: 1.5, marginTop: 6, textAlign: 'center' },
@@ -237,8 +230,11 @@ const s = StyleSheet.create({
     sub: { fontSize: 14, marginTop: 18, textAlign: 'center', paddingHorizontal: 20 },
 
     chip: {
-        marginTop: 16, paddingHorizontal: 14, paddingVertical: 5,
-        borderRadius: 999, borderWidth: 1,
+        marginTop: 16,
+        paddingHorizontal: 14,
+        paddingVertical: 5,
+        borderRadius: 999,
+        borderWidth: 1,
     },
     chipText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
 
@@ -260,7 +256,14 @@ const s = StyleSheet.create({
     backBtn: { paddingVertical: 10 },
     backText: { color: C.muted, fontSize: 13 },
 
-    coachSection: { marginTop: 20, width: '86%', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
+    coachSection: {
+        marginTop: 20,
+        width: '86%',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderRadius: 14,
+        borderWidth: 1,
+    },
     coachTitle: { fontSize: 15, fontWeight: '800', marginBottom: 6 },
     coachSub: { fontSize: 13, lineHeight: 18, marginBottom: 12 },
     coachBtn: { paddingVertical: 10, borderRadius: 10, alignItems: 'center' },

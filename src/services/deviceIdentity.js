@@ -19,8 +19,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE } from '../constants';
 
 const KEY_ATHLETE_ID = '@ph_v1_anon_athlete_id';
-const KEY_ONBOARDED  = '@ph_v1_onboarded';
-const KEY_ACCESS_TOKEN  = '@ph_v1_access_token';
+const KEY_ONBOARDED = '@ph_v1_onboarded';
+const KEY_ACCESS_TOKEN = '@ph_v1_access_token';
 const KEY_REFRESH_TOKEN = '@ph_v1_refresh_token';
 
 /**
@@ -89,9 +89,7 @@ export async function markOnboardingComplete() {
  */
 export async function clearDeviceIdentity() {
     try {
-        await AsyncStorage.multiRemove([
-            KEY_ATHLETE_ID, KEY_ONBOARDED, KEY_ACCESS_TOKEN, KEY_REFRESH_TOKEN,
-        ]);
+        await AsyncStorage.multiRemove([KEY_ATHLETE_ID, KEY_ONBOARDED, KEY_ACCESS_TOKEN, KEY_REFRESH_TOKEN]);
     } catch (e) {
         console.warn('[deviceIdentity] reset failed', e);
     }
@@ -122,7 +120,7 @@ export async function getRefreshToken() {
 
 async function _storeTokens(access, refresh) {
     const ops = [];
-    if (access)  ops.push(AsyncStorage.setItem(KEY_ACCESS_TOKEN,  access));
+    if (access) ops.push(AsyncStorage.setItem(KEY_ACCESS_TOKEN, access));
     if (refresh) ops.push(AsyncStorage.setItem(KEY_REFRESH_TOKEN, refresh));
     await Promise.all(ops);
 }

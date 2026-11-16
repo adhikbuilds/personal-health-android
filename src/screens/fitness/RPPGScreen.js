@@ -6,10 +6,17 @@
  * Sends base64 JPEG frames over WebSocket; backend extracts average RGB.
  */
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity,
-    Dimensions, Animated, Easing, StatusBar, ScrollView
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    Dimensions,
+    Animated,
+    Easing,
+    StatusBar,
+    ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -70,7 +77,12 @@ function BPMRing({ bpm, quality }) {
         const intervalMs = Math.round(60000 / Math.max(bpm, 30));
         const pulse = Animated.sequence([
             Animated.parallel([
-                Animated.timing(pulseAnim, { toValue: 1.06, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+                Animated.timing(pulseAnim, {
+                    toValue: 1.06,
+                    duration: 180,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                }),
                 Animated.timing(glowAnim, { toValue: 1.0, duration: 180, useNativeDriver: true }),
             ]),
             Animated.parallel([
@@ -86,19 +98,24 @@ function BPMRing({ bpm, quality }) {
     return (
         <View style={ring.wrap}>
             <Animated.View style={[ring.glow, { borderColor: color, opacity: glowAnim, shadowColor: color }]} />
-            <Animated.View style={[ring.circle, { borderColor: color, transform: [{ scale: pulseAnim }], shadowColor: color }]}>
-                <Text style={[ring.bpm, { color }]}>
-                    {bpm > 0 ? Math.round(bpm) : '––'}
-                </Text>
+            <Animated.View
+                style={[ring.circle, { borderColor: color, transform: [{ scale: pulseAnim }], shadowColor: color }]}
+            >
+                <Text style={[ring.bpm, { color }]}>{bpm > 0 ? Math.round(bpm) : '––'}</Text>
                 <Text style={ring.bpmLabel}>BPM</Text>
             </Animated.View>
             <Text style={[ring.quality, { color: qualityColor(quality) }]}>
-                {quality === 'excellent' ? '● Excellent' :
-                    quality === 'good' ? '● Good' :
-                        quality === 'fair' ? '● Fair' :
-                            quality === 'poor' ? '● Poor' :
-                                quality === 'warmup' ? '⏳ Collecting...' :
-                                    '⏳ Place face in view'}
+                {quality === 'excellent'
+                    ? '● Excellent'
+                    : quality === 'good'
+                      ? '● Good'
+                      : quality === 'fair'
+                        ? '● Fair'
+                        : quality === 'poor'
+                          ? '● Poor'
+                          : quality === 'warmup'
+                            ? '⏳ Collecting...'
+                            : '⏳ Place face in view'}
             </Text>
         </View>
     );
@@ -106,8 +123,29 @@ function BPMRing({ bpm, quality }) {
 
 const ring = StyleSheet.create({
     wrap: { alignItems: 'center', paddingVertical: 24 },
-    glow: { position: 'absolute', width: 180, height: 180, borderRadius: 90, borderWidth: 4, top: 20, shadowOffset: { width: 0, height: 0 }, shadowRadius: 30, shadowOpacity: 0.5 },
-    circle: { width: 160, height: 160, borderRadius: 80, borderWidth: 3, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 0 }, shadowRadius: 20, shadowOpacity: 0.8 },
+    glow: {
+        position: 'absolute',
+        width: 180,
+        height: 180,
+        borderRadius: 90,
+        borderWidth: 4,
+        top: 20,
+        shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 30,
+        shadowOpacity: 0.5,
+    },
+    circle: {
+        width: 160,
+        height: 160,
+        borderRadius: 80,
+        borderWidth: 3,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 20,
+        shadowOpacity: 0.8,
+    },
     bpm: { fontSize: 58, fontWeight: '900', lineHeight: 62 },
     bpmLabel: { fontSize: 12, fontWeight: '800', color: T.muted, letterSpacing: 2, textTransform: 'uppercase' },
     quality: { marginTop: 14, fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
@@ -118,9 +156,7 @@ function Waveform({ points, color }) {
     if (!points || points.length < 3) {
         return (
             <View style={{ height: WF_H, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: T.muted, fontSize: 11 }}>
-                    Warming up — keep face still ~10s
-                </Text>
+                <Text style={{ color: T.muted, fontSize: 11 }}>Warming up — keep face still ~10s</Text>
             </View>
         );
     }
@@ -133,12 +169,14 @@ function Waveform({ points, color }) {
 
     return (
         <Svg width={W - 64} height={WF_H}>
-            <Line x1={0} y1={WF_H / 2} x2={W - 64} y2={WF_H / 2}
-                stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+            <Line x1={0} y1={WF_H / 2} x2={W - 64} y2={WF_H / 2} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
             <Polyline
                 points={pts.join(' ')}
-                fill="none" stroke={color}
-                strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round"
+                fill="none"
+                stroke={color}
+                strokeWidth={2.2}
+                strokeLinejoin="round"
+                strokeLinecap="round"
             />
         </Svg>
     );
@@ -148,26 +186,29 @@ function Waveform({ points, color }) {
 function HealthInsights({ bpm, hrv, quality }) {
     if (quality === 'waiting' || quality === 'warmup') return null;
 
-    let insightTitle = "Gathering Insights...";
-    let insightDesc = "Keep still for a few more seconds to analyze your cardiovascular state.";
-    let icon = "⏳";
+    let insightTitle = 'Gathering Insights...';
+    let insightDesc = 'Keep still for a few more seconds to analyze your cardiovascular state.';
+    let icon = '⏳';
     let color = T.muted;
 
     if (bpm > 0) {
         if (hrv > 60) {
-            insightTitle = "Peak Readiness";
-            insightDesc = "Your Heart Rate Variability is high. Your nervous system is fully recovered and primed for intense training.";
-            icon = "🔋";
+            insightTitle = 'Peak Readiness';
+            insightDesc =
+                'Your Heart Rate Variability is high. Your nervous system is fully recovered and primed for intense training.';
+            icon = '🔋';
             color = T.cyan;
         } else if (hrv > 30) {
-            insightTitle = "Moderate Fatigue";
-            insightDesc = "Your HRV is balanced. You are ready for a normal workout, but pay attention to hydration and sleep.";
-            icon = "⚖️";
+            insightTitle = 'Moderate Fatigue';
+            insightDesc =
+                'Your HRV is balanced. You are ready for a normal workout, but pay attention to hydration and sleep.';
+            icon = '⚖️';
             color = T.green;
         } else {
-            insightTitle = "High Stress / Fatigue";
-            insightDesc = "Low HRV detected. Your body is under stress. Consider active recovery, stretching, or a rest day.";
-            icon = "⚠️";
+            insightTitle = 'High Stress / Fatigue';
+            insightDesc =
+                'Low HRV detected. Your body is under stress. Consider active recovery, stretching, or a rest day.';
+            icon = '⚠️';
             color = T.orange;
         }
     }
@@ -200,11 +241,28 @@ function Stat({ label, value, unit, color = T.text, icon }) {
     );
 }
 const st = StyleSheet.create({
-    pill: { backgroundColor: T.card, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center', flex: 1, borderWidth: 1, borderColor: T.border, minWidth: 80 },
+    pill: {
+        backgroundColor: T.card,
+        borderRadius: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        alignItems: 'center',
+        flex: 1,
+        borderWidth: 1,
+        borderColor: T.border,
+        minWidth: 80,
+    },
     icon: { fontSize: 16, marginBottom: 4 },
     val: { fontSize: 22, fontWeight: '900', lineHeight: 26 },
     unit: { fontSize: 9, fontWeight: '700', color: T.muted, textTransform: 'uppercase', letterSpacing: 1 },
-    label: { fontSize: 9, fontWeight: '700', color: T.muted, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
+    label: {
+        fontSize: 9,
+        fontWeight: '700',
+        color: T.muted,
+        marginTop: 2,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -222,10 +280,10 @@ export default function RPPGScreen({ navigation, route }) {
     const [quality, setQuality] = useState('waiting');
     const [waveform, setWave] = useState([]);
     const [isRunning, setRunning] = useState(false);
-    const [fps, setFps] = useState(0);
-    const [framesIn, setFrames] = useState(0);
+    const [_fps, setFps] = useState(0);
+    const [_framesIn, setFrames] = useState(0);
     const [errMsg, setErr] = useState('');
-    const [history, setHistory] = useState([]);
+    const [_history, setHistory] = useState([]);
     const [frameFlash, setFrameFlash] = useState(false);
     const wsRef = useRef(null);
     const lastUpdateRef = useRef(0);
@@ -255,14 +313,16 @@ export default function RPPGScreen({ navigation, route }) {
                     skipProcessing: true,
                 });
                 if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && photo?.base64) {
-                    wsRef.current.send(JSON.stringify({
-                        face_found: true,
-                        image_b64: photo.base64,
-                        ts: Date.now() / 1000.0,
-                    }));
+                    wsRef.current.send(
+                        JSON.stringify({
+                            face_found: true,
+                            image_b64: photo.base64,
+                            ts: Date.now() / 1000.0,
+                        }),
+                    );
                     setFrameFlash(true);
                     setTimeout(() => setFrameFlash(false), 150);
-                    setFrames(prev => prev + 1);
+                    setFrames((prev) => prev + 1);
                 }
             } catch (_) {
                 // Camera busy or not ready — skip frame
@@ -295,7 +355,7 @@ export default function RPPGScreen({ navigation, route }) {
 
                 if (result.bpm > 0 && result.status !== 'warmup') {
                     setBpm(result.bpm);
-                    setHistory(prev => {
+                    setHistory((prev) => {
                         const line = { t: new Date().toLocaleTimeString(), bpm: result.bpm };
                         return [...prev, line].slice(-20);
                     });
@@ -306,43 +366,56 @@ export default function RPPGScreen({ navigation, route }) {
                 if (result.waveform?.length > 2) setWave(result.waveform);
                 if (result.error) setErr(result.error);
             },
-            (error) => setErr('WebSocket Error. Ensure Backend is running.'),
-            () => { if (runningRef.current) setErr('Stream disconnected.'); }
+            (_error) => setErr('WebSocket Error. Ensure Backend is running.'),
+            () => {
+                if (runningRef.current) setErr('Stream disconnected.');
+            },
         );
 
         startCapture();
     }, [sessionId, startCapture]);
 
-    const stopMeasuring = useCallback((finalBpm, finalHrv, finalQuality) => {
-        runningRef.current = false;
-        setRunning(false);
-        stopCapture();
-        if (wsRef.current) {
-            wsRef.current.close();
-            wsRef.current = null;
-        }
-        if (finalBpm > 0) {
-            // Prefer backend-computed result (averaged over full session) over last frame's value
-            api.getRPPGResult(sessionId).then(result => {
-                const bpm  = (result?.bpm  > 0 ? result.bpm  : finalBpm);
-                const hrv  = (result?.hrv_ms   != null ? result.hrv_ms   : finalHrv);
-                const qual = (result?.signal_quality   ?? finalQuality) || 'fair';
-                AsyncStorage.setItem('@latest_hr_reading', JSON.stringify({
-                    bpm: Math.round(bpm),
-                    hrv_ms: Math.round(hrv || 0),
-                    quality: qual,
-                    recorded_at: new Date().toISOString(),
-                })).catch(() => {});
-            }).catch(() => {
-                AsyncStorage.setItem('@latest_hr_reading', JSON.stringify({
-                    bpm: Math.round(finalBpm),
-                    hrv_ms: Math.round(finalHrv || 0),
-                    quality: finalQuality || 'fair',
-                    recorded_at: new Date().toISOString(),
-                })).catch(() => {});
-            });
-        }
-    }, [stopCapture, sessionId]);
+    const stopMeasuring = useCallback(
+        (finalBpm, finalHrv, finalQuality) => {
+            runningRef.current = false;
+            setRunning(false);
+            stopCapture();
+            if (wsRef.current) {
+                wsRef.current.close();
+                wsRef.current = null;
+            }
+            if (finalBpm > 0) {
+                // Prefer backend-computed result (averaged over full session) over last frame's value
+                api.getRPPGResult(sessionId)
+                    .then((result) => {
+                        const bpm = result?.bpm > 0 ? result.bpm : finalBpm;
+                        const hrv = result?.hrv_ms != null ? result.hrv_ms : finalHrv;
+                        const qual = (result?.signal_quality ?? finalQuality) || 'fair';
+                        AsyncStorage.setItem(
+                            '@latest_hr_reading',
+                            JSON.stringify({
+                                bpm: Math.round(bpm),
+                                hrv_ms: Math.round(hrv || 0),
+                                quality: qual,
+                                recorded_at: new Date().toISOString(),
+                            }),
+                        ).catch(() => {});
+                    })
+                    .catch(() => {
+                        AsyncStorage.setItem(
+                            '@latest_hr_reading',
+                            JSON.stringify({
+                                bpm: Math.round(finalBpm),
+                                hrv_ms: Math.round(finalHrv || 0),
+                                quality: finalQuality || 'fair',
+                                recorded_at: new Date().toISOString(),
+                            }),
+                        ).catch(() => {});
+                    });
+            }
+        },
+        [stopCapture, sessionId],
+    );
 
     // ── Permission ────────────────────────────────────────────────────────────
     if (!permission) return <View style={s.bg} />;
@@ -365,7 +438,7 @@ export default function RPPGScreen({ navigation, route }) {
         );
     }
 
-    const color = bpmColor(bpm);
+    const _color = bpmColor(bpm);
     const wfColor = qualityColor(quality);
 
     return (
@@ -374,25 +447,22 @@ export default function RPPGScreen({ navigation, route }) {
 
             {/* ── Top Half: Camera ── */}
             <View style={[s.camWrap, { borderBottomColor: qualityBorderColor(quality), borderBottomWidth: 3 }]}>
-                <CameraView
-                    ref={cameraRef}
-                    style={StyleSheet.absoluteFill}
-                    facing="front"
-                />
+                <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="front" />
 
                 {/* Top Bar */}
                 <SafeAreaView style={s.topBar}>
                     <TouchableOpacity
                         style={s.backBtn}
-                        onPress={() => { stopMeasuring(bpm, hrv, quality); navigation?.goBack(); }}
+                        onPress={() => {
+                            stopMeasuring(bpm, hrv, quality);
+                            navigation?.goBack();
+                        }}
                     >
                         <Text style={s.backTxt}>← Back</Text>
                     </TouchableOpacity>
                     <View style={{ flex: 1 }} />
                     <View style={s.liveIndicator}>
-                        {isRunning && (
-                            <Animated.View style={[s.signalPointer, { opacity: frameFlash ? 1 : 0.2 }]} />
-                        )}
+                        {isRunning && <Animated.View style={[s.signalPointer, { opacity: frameFlash ? 1 : 0.2 }]} />}
                         <Text style={s.liveTxt}>{isRunning ? 'LIVE' : 'READY'}</Text>
                         <View style={[s.liveDot, { backgroundColor: isRunning ? T.red : T.muted }]} />
                     </View>
@@ -405,13 +475,22 @@ export default function RPPGScreen({ navigation, route }) {
                     <View style={[s.corner, s.bl, { borderColor: 'rgba(255,255,255,0.4)' }]} />
                     <View style={[s.corner, s.br, { borderColor: 'rgba(255,255,255,0.4)' }]} />
                 </View>
-                <Text style={[s.faceLabel, { color: 'rgba(255,255,255,0.7)', bottom: 20, position: 'absolute', alignSelf: 'center' }]}>
+                <Text
+                    style={[
+                        s.faceLabel,
+                        { color: 'rgba(255,255,255,0.7)', bottom: 20, position: 'absolute', alignSelf: 'center' },
+                    ]}
+                >
                     Center your face here
                 </Text>
             </View>
 
             {/* ── Bottom Half: Dashboard ── */}
-            <ScrollView style={s.dashboard} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                style={s.dashboard}
+                contentContainerStyle={{ paddingBottom: 40 }}
+                showsVerticalScrollIndicator={false}
+            >
                 <View style={s.dashHeader}>
                     <Text style={s.dashTitle}>Vitals Monitor</Text>
                     <Text style={s.dashSub}>Remote Photoplethysmography (rPPG)</Text>
@@ -423,11 +502,20 @@ export default function RPPGScreen({ navigation, route }) {
                     </View>
                     <View style={s.sideStats}>
                         <Stat icon="💓" label="HRV" value={hrv > 0 ? hrv.toFixed(0) : '–'} unit="ms" color={T.purple} />
-                        <Stat icon="📡" label="Signal" value={
-                            quality === 'excellent' ? 'Opt' :
-                                quality === 'good' ? 'Good' :
-                                    quality === 'fair' ? 'Fair' : 'Poor'
-                        } color={wfColor} />
+                        <Stat
+                            icon="📡"
+                            label="Signal"
+                            value={
+                                quality === 'excellent'
+                                    ? 'Opt'
+                                    : quality === 'good'
+                                      ? 'Good'
+                                      : quality === 'fair'
+                                        ? 'Fair'
+                                        : 'Poor'
+                            }
+                            color={wfColor}
+                        />
                     </View>
                 </View>
 
@@ -446,11 +534,19 @@ export default function RPPGScreen({ navigation, route }) {
 
                 <View style={s.fabWrap}>
                     {!isRunning ? (
-                        <TouchableOpacity style={[s.fab, { backgroundColor: T.cyan }]} onPress={startMeasuring} activeOpacity={0.85}>
+                        <TouchableOpacity
+                            style={[s.fab, { backgroundColor: T.cyan }]}
+                            onPress={startMeasuring}
+                            activeOpacity={0.85}
+                        >
                             <Text style={s.fabTxt}>START SCAN</Text>
                         </TouchableOpacity>
                     ) : (
-                        <TouchableOpacity style={[s.fab, { backgroundColor: T.red }]} onPress={() => stopMeasuring(bpm, hrv, quality)} activeOpacity={0.85}>
+                        <TouchableOpacity
+                            style={[s.fab, { backgroundColor: T.red }]}
+                            onPress={() => stopMeasuring(bpm, hrv, quality)}
+                            activeOpacity={0.85}
+                        >
                             <Text style={s.fabTxt}>STOP SCAN</Text>
                         </TouchableOpacity>
                     )}
@@ -473,14 +569,36 @@ const s = StyleSheet.create({
     grantTxt: { color: '#000', fontWeight: '900', fontSize: 14 },
 
     // Layout
-    camWrap: { flex: 0.45, backgroundColor: '#111', overflow: 'hidden', borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
+    camWrap: {
+        flex: 0.45,
+        backgroundColor: '#111',
+        overflow: 'hidden',
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+    },
     dashboard: { flex: 0.55, backgroundColor: T.surf, paddingHorizontal: 20, paddingTop: 20 },
 
     // Top Bar (over camera)
-    topBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16 },
+    topBar: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 16,
+    },
     backBtn: { backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
     backTxt: { color: T.text, fontWeight: '700', fontSize: 13 },
-    liveIndicator: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
+    liveIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
     liveTxt: { color: T.text, fontSize: 10, fontWeight: '800', marginRight: 6 },
     liveDot: { width: 8, height: 8, borderRadius: 4 },
     signalPointer: { width: 6, height: 6, borderRadius: 3, backgroundColor: T.cyan, marginRight: 8, elevation: 4 },
@@ -500,19 +618,56 @@ const s = StyleSheet.create({
     dashSub: { fontSize: 12, color: T.muted, fontWeight: '600', marginTop: 2 },
 
     // Metrics Core
-    metricsCore: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.card, borderRadius: 24, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: T.border },
+    metricsCore: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: T.card,
+        borderRadius: 24,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
     sideStats: { width: 100, gap: 10 },
 
     // Waveform Box
-    wfBox: { backgroundColor: T.card, borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: T.border },
-    wfLabel: { color: T.muted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+    wfBox: {
+        backgroundColor: T.card,
+        borderRadius: 20,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    wfLabel: {
+        color: T.muted,
+        fontSize: 10,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        marginBottom: 8,
+    },
 
     // Errors
-    errBanner: { backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)' },
+    errBanner: {
+        backgroundColor: 'rgba(239,68,68,0.1)',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(239,68,68,0.3)',
+    },
     errTxt: { color: T.red, fontSize: 12, fontWeight: '700', textAlign: 'center' },
 
     // Insights
-    insightCard: { backgroundColor: T.card, borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: T.border },
+    insightCard: {
+        backgroundColor: T.card,
+        borderRadius: 20,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
     insightHeader: { marginBottom: 10 },
     insightTitle: { color: T.muted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
     insightBody: { flexDirection: 'row', alignItems: 'center' },
@@ -521,6 +676,15 @@ const s = StyleSheet.create({
 
     // Action FAB
     fabWrap: { alignItems: 'center', justifyContent: 'center', marginTop: 10, marginBottom: 20 },
-    fab: { borderRadius: 16, paddingVertical: 16, width: '100%', alignItems: 'center', shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, shadowOpacity: 0.3, elevation: 6 },
+    fab: {
+        borderRadius: 16,
+        paddingVertical: 16,
+        width: '100%',
+        alignItems: 'center',
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 10,
+        shadowOpacity: 0.3,
+        elevation: 6,
+    },
     fabTxt: { color: '#000', fontWeight: '900', fontSize: 15, letterSpacing: 1 },
 });

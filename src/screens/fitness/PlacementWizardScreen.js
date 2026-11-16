@@ -11,20 +11,18 @@
 // a follow-up once the native frame processor is stable in Expo Go).
 // Tap "start anyway" to proceed without waiting.
 
-import React, { useEffect, useRef, useState } from 'react';
-import {
-    View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Platform,
-} from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Camera, CameraView } from 'expo-camera';
 import { C } from '../../styles/colors';
 import { markOnboardingComplete } from '../../services/deviceIdentity';
 
 const SIM_STATES = [
-    { band: 'red',    msg: 'no full body visible — prop your phone 2m away' },
+    { band: 'red', msg: 'no full body visible — prop your phone 2m away' },
     { band: 'yellow', msg: 'step further back' },
     { band: 'yellow', msg: 'move phone higher' },
-    { band: 'green',  msg: 'ready' },
+    { band: 'green', msg: 'ready' },
 ];
 
 const BAND_COLOR = { red: C.red, yellow: C.yellow, green: C.green };
@@ -59,7 +57,9 @@ export default function PlacementWizardScreen({ navigation, route }) {
             i = Math.min(i + 1, SIM_STATES.length - 1);
             setStateIdx(i);
             if (SIM_STATES[i].band === 'green') {
-                try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+                try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                } catch {}
                 clearInterval(tickerRef.current);
                 // Hold GREEN for 1.5s then auto-advance
                 setTimeout(() => {
@@ -74,7 +74,11 @@ export default function PlacementWizardScreen({ navigation, route }) {
         // 15-second clock to unlock "start anyway"
         const c = setInterval(() => {
             setSecondsLeft((s) => {
-                if (s <= 1) { clearInterval(c); setAllowOverride(true); return 0; }
+                if (s <= 1) {
+                    clearInterval(c);
+                    setAllowOverride(true);
+                    return 0;
+                }
                 return s - 1;
             });
         }, 1000);
@@ -103,34 +107,32 @@ export default function PlacementWizardScreen({ navigation, route }) {
             </View>
 
             <View style={s.footer}>
-                <View style={[s.statusPill, { backgroundColor: borderColor + '22', borderColor }]}>
+                <View style={[s.statusPill, { backgroundColor: `${borderColor}22`, borderColor }]}>
                     <View style={[s.statusDot, { backgroundColor: borderColor }]} />
-                    <Text style={[s.statusText, { color: borderColor }]}>
-                        {current.band.toUpperCase()}
-                    </Text>
+                    <Text style={[s.statusText, { color: borderColor }]}>{current.band.toUpperCase()}</Text>
                 </View>
                 <Text style={s.message}>{current.msg}</Text>
 
                 <TouchableOpacity
                     style={[
                         s.btn,
-                        current.band === 'green' ? s.btnPrimary : (allowOverride ? s.btnSecondary : s.btnDisabled),
+                        current.band === 'green' ? s.btnPrimary : allowOverride ? s.btnSecondary : s.btnDisabled,
                     ]}
                     disabled={!allowOverride && current.band !== 'green'}
                     onPress={() => {
                         navigation.replace(nextScreen, {
-                            athleteId, drill,
+                            athleteId,
+                            drill,
                             setupQuality: current.band === 'green' ? 'ok' : 'sub_optimal',
                         });
                     }}
                 >
-                    <Text style={[
-                        s.btnText,
-                        current.band === 'green' ? { color: '#FBFBF8' } : { color: C.text },
-                    ]}>
+                    <Text style={[s.btnText, current.band === 'green' ? { color: '#FBFBF8' } : { color: C.text }]}>
                         {current.band === 'green'
                             ? 'tap to start'
-                            : allowOverride ? 'start anyway' : `start anyway (${secondsLeft}s)`}
+                            : allowOverride
+                              ? 'start anyway'
+                              : `start anyway (${secondsLeft}s)`}
                     </Text>
                 </TouchableOpacity>
 
@@ -142,7 +144,9 @@ export default function PlacementWizardScreen({ navigation, route }) {
                     <TouchableOpacity
                         style={s.tipsBtn}
                         onPress={async () => {
-                            try { await markOnboardingComplete(); } catch {}
+                            try {
+                                await markOnboardingComplete();
+                            } catch {}
                             navigation.reset({ index: 0, routes: [{ name: 'Tabs' }] });
                         }}
                     >
@@ -157,14 +161,22 @@ export default function PlacementWizardScreen({ navigation, route }) {
 const s = StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.bg },
     cameraWrap: {
-        flex: 1, margin: 18, borderRadius: 20, overflow: 'hidden',
-        borderWidth: 3, backgroundColor: '#000', position: 'relative',
+        flex: 1,
+        margin: 18,
+        borderRadius: 20,
+        overflow: 'hidden',
+        borderWidth: 3,
+        backgroundColor: '#000',
+        position: 'relative',
     },
     camera: { flex: 1 },
     placeholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' },
     placeholderText: { color: C.muted, fontSize: 14 },
     overlayCorner: {
-        position: 'absolute', width: 32, height: 32, borderColor: 'white',
+        position: 'absolute',
+        width: 32,
+        height: 32,
+        borderColor: 'white',
     },
     cornerTL: { top: 12, left: 12, borderTopWidth: 3, borderLeftWidth: 3 },
     cornerTR: { top: 12, right: 12, borderTopWidth: 3, borderRightWidth: 3 },
@@ -173,16 +185,25 @@ const s = StyleSheet.create({
 
     footer: { padding: 20, alignItems: 'center', gap: 14 },
     statusPill: {
-        flexDirection: 'row', alignItems: 'center', gap: 8,
-        paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, borderWidth: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 6,
+        borderRadius: 999,
+        borderWidth: 1,
     },
     statusDot: { width: 10, height: 10, borderRadius: 5 },
     statusText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
     message: { color: C.text, fontSize: 20, textAlign: 'center', fontWeight: '600', paddingHorizontal: 24 },
 
     btn: {
-        marginTop: 4, paddingVertical: 16, paddingHorizontal: 42, borderRadius: 14,
-        alignItems: 'center', minWidth: 240,
+        marginTop: 4,
+        paddingVertical: 16,
+        paddingHorizontal: 42,
+        borderRadius: 14,
+        alignItems: 'center',
+        minWidth: 240,
     },
     btnPrimary: { backgroundColor: C.cyan },
     btnSecondary: { backgroundColor: 'rgba(6,182,212,0.12)', borderWidth: 1, borderColor: 'rgba(6,182,212,0.3)' },

@@ -2,11 +2,13 @@
 // Tap feedback, fade-in animation, haptic touch, typography helpers.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, Platform, StyleSheet, Text, View, Vibration } from 'react-native';
+import { Animated, Pressable, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 let Haptics;
-try { Haptics = require('expo-haptics'); } catch (_) {}
+try {
+    Haptics = require('expo-haptics');
+} catch (_) {}
 
 const CONDENSED = Platform.OS === 'android' ? 'sans-serif-condensed' : 'HelveticaNeue-CondensedBold';
 const MONO = Platform.OS === 'android' ? 'monospace' : 'Courier';
@@ -18,7 +20,9 @@ export function Tap({ onPress, children, style, haptic = true }) {
     const onIn = () => {
         Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 50 }).start();
         if (haptic && Haptics) {
-            try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch (_) {}
+            try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            } catch (_) {}
         }
     };
     const onOut = () => {
@@ -44,11 +48,7 @@ export function Fade({ delay = 0, distance = 24, duration = 650, children, style
         anim.start();
         return () => anim.stop();
     }, []);
-    return (
-        <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>
-            {children}
-        </Animated.View>
-    );
+    return <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>{children}</Animated.View>;
 }
 
 // ── Animated number counter (with flash on finish) ─────────────────────────
@@ -86,10 +86,20 @@ export function PulsingDot({ color, size = 8 }) {
             Animated.sequence([
                 Animated.timing(scale, { toValue: 1.4, duration: 1000, useNativeDriver: true }),
                 Animated.timing(scale, { toValue: 1, duration: 1000, useNativeDriver: true }),
-            ])
+            ]),
         ).start();
     }, []);
-    return <Animated.View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, transform: [{ scale }] }} />;
+    return (
+        <Animated.View
+            style={{
+                width: size,
+                height: size,
+                borderRadius: size / 2,
+                backgroundColor: color,
+                transform: [{ scale }],
+            }}
+        />
+    );
 }
 
 // ── Gradient divider (#9) ───────────────────────────────────────────────────
@@ -123,7 +133,9 @@ export function ActionRow({ label, color, onPress }) {
             <Animated.View style={[ui.actionRow, { transform: [{ scale }] }]}>
                 <View style={ui.actionLeft}>
                     {color && <View style={[ui.actionDot, { backgroundColor: color }]} />}
-                    <Animated.Text style={[ui.actionTitle, { transform: [{ translateX: slideX }] }]}>{label}</Animated.Text>
+                    <Animated.Text style={[ui.actionTitle, { transform: [{ translateX: slideX }] }]}>
+                        {label}
+                    </Animated.Text>
                 </View>
                 <Text style={ui.actionArrow}>›</Text>
             </Animated.View>
@@ -148,10 +160,26 @@ export function ProgressRing({ pct, color, size = 140, stroke = 6 }) {
     const c = 2 * Math.PI * r;
     return (
         <Svg width={size} height={size}>
-            <Circle cx={size/2} cy={size/2} r={r} stroke="rgba(255,255,255,0.06)" fill="none" strokeWidth={stroke} />
-            <Circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
-                strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(1, (pct||0)/100))}
-                strokeLinecap="round" transform={`rotate(-90 ${size/2} ${size/2})`} />
+            <Circle
+                cx={size / 2}
+                cy={size / 2}
+                r={r}
+                stroke="rgba(255,255,255,0.06)"
+                fill="none"
+                strokeWidth={stroke}
+            />
+            <Circle
+                cx={size / 2}
+                cy={size / 2}
+                r={r}
+                fill="none"
+                stroke={color}
+                strokeWidth={stroke}
+                strokeDasharray={c}
+                strokeDashoffset={c * (1 - Math.min(1, (pct || 0) / 100))}
+                strokeLinecap="round"
+                transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            />
         </Svg>
     );
 }
@@ -159,7 +187,14 @@ export function ProgressRing({ pct, color, size = 140, stroke = 6 }) {
 // ── Shared styles ───────────────────────────────────────────────────────────
 
 const ui = StyleSheet.create({
-    sectionLabel: { fontSize: 11, fontWeight: '800', color: '#4b5563', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 16 },
+    sectionLabel: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#4b5563',
+        letterSpacing: 3,
+        textTransform: 'uppercase',
+        marginBottom: 16,
+    },
     actionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18 },
     actionLeft: { flexDirection: 'row', alignItems: 'center' },
     actionDot: { width: 8, height: 8, borderRadius: 4, marginRight: 14 },
@@ -178,31 +213,46 @@ const ui = StyleSheet.create({
 export function useDebouncedCallback(fn, delay = 300) {
     const timer = useRef(null);
     const fnRef = useRef(fn);
-    useEffect(() => { fnRef.current = fn; }, [fn]);
-    useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-    return useCallback((...args) => {
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => fnRef.current(...args), delay);
-    }, [delay]);
+    useEffect(() => {
+        fnRef.current = fn;
+    }, [fn]);
+    useEffect(
+        () => () => {
+            if (timer.current) clearTimeout(timer.current);
+        },
+        [],
+    );
+    return useCallback(
+        (...args) => {
+            if (timer.current) clearTimeout(timer.current);
+            timer.current = setTimeout(() => fnRef.current(...args), delay);
+        },
+        [delay],
+    );
 }
 
 export function useAsyncTap(fn, { minInterval = 400 } = {}) {
     const [pending, setPending] = useState(false);
     const lastCallRef = useRef(0);
     const fnRef = useRef(fn);
-    useEffect(() => { fnRef.current = fn; }, [fn]);
-    const wrapped = useCallback(async (...args) => {
-        const now = Date.now();
-        if (pending) return;
-        if (now - lastCallRef.current < minInterval) return;
-        lastCallRef.current = now;
-        setPending(true);
-        try {
-            return await fnRef.current(...args);
-        } finally {
-            setPending(false);
-        }
-    }, [pending, minInterval]);
+    useEffect(() => {
+        fnRef.current = fn;
+    }, [fn]);
+    const wrapped = useCallback(
+        async (...args) => {
+            const now = Date.now();
+            if (pending) return;
+            if (now - lastCallRef.current < minInterval) return;
+            lastCallRef.current = now;
+            setPending(true);
+            try {
+                return await fnRef.current(...args);
+            } finally {
+                setPending(false);
+            }
+        },
+        [pending, minInterval],
+    );
     return [wrapped, pending];
 }
 

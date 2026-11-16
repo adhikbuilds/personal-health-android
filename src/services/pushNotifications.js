@@ -61,7 +61,7 @@ export async function registerForPushNotifications(athleteId) {
                 platform: Platform.OS,
             }),
         });
-        console.log('[Push] Token registered:', token.slice(0, 30) + '…');
+        console.log('[Push] Token registered:', `${token.slice(0, 30)}…`);
     } catch (e) {
         console.warn('[Push] Token registration failed:', e.message);
     }
@@ -72,7 +72,7 @@ export async function registerForPushNotifications(athleteId) {
 // Call this to add a tap-handler that navigates to the right screen.
 // Pass a ref to your navigation object.
 export function addNotificationTapListener(navigationRef) {
-    return Notifications.addNotificationResponseReceivedListener(response => {
+    return Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data || {};
         const screen = data.screen;
         if (screen && navigationRef?.current?.navigate) {

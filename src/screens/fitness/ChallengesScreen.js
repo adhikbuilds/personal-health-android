@@ -2,10 +2,16 @@
 // Generates a fresh set of 3 challenges every day from the athlete's sport.
 // Completion is persisted locally in AsyncStorage keyed by date so progress
 // survives app restarts without a backend round-trip.
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-    View, Text, ScrollView, TouchableOpacity, StyleSheet,
-    SafeAreaView, ActivityIndicator, Alert,
+    View,
+    Text,
+    ScrollView,
+    TouchableOpacity,
+    StyleSheet,
+    SafeAreaView,
+    ActivityIndicator,
+    Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -13,22 +19,30 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 
-const BG      = '#FBFBF8';
+const BG = '#FBFBF8';
 const SURFACE = '#FFFFFF';
-const ACCENT  = '#FC4C02';
-const TEXT    = '#242428';
-const MUTED   = '#9CA3AF';
+const ACCENT = '#FC4C02';
+const TEXT = '#242428';
+const MUTED = '#9CA3AF';
 const SUCCESS = '#10b981';
-const BORDER  = '#E6E6EA';
+const BORDER = '#E6E6EA';
 
-const tap = () => { try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} };
-const tick = () => { try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {} };
+const tap = () => {
+    try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+};
+const tick = () => {
+    try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+};
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const STORAGE_KEY = `@challenges_${TODAY}`;
 
 // Fallback challenges when backend is unavailable
-const FALLBACK_CHALLENGES: Record<string, Array<{id: string; title: string; reps: string; xp: number}>> = {
+const FALLBACK_CHALLENGES = {
     vertical_jump: [
         { id: 'vj_1', title: 'Box Jump Warm-Up', reps: '3 × 5 reps', xp: 50 },
         { id: 'vj_2', title: 'Broad Jump Distance', reps: '3 attempts, max distance', xp: 75 },
@@ -75,7 +89,10 @@ function ChallengeCard({ challenge, completed, onToggle }) {
     return (
         <TouchableOpacity
             style={[s.card, completed && s.cardDone]}
-            onPress={() => { tap(); onToggle(challenge.id); }}
+            onPress={() => {
+                tap();
+                onToggle(challenge.id);
+            }}
             activeOpacity={0.75}
         >
             <View style={s.cardLeft}>
@@ -104,71 +121,77 @@ export default function ChallengesScreen({ navigation, route }) {
 
     useEffect(() => {
         if (!athleteId) {
-            getOrCreateAnonymousAthleteId().then(setAthleteId).catch(() => {});
+            getOrCreateAnonymousAthleteId()
+                .then(setAthleteId)
+                .catch(() => {});
         }
     }, []);
 
-    const loadChallenges = useCallback(async (id, sportKey) => {
-        setLoading(true);
-        try {
-            const athlete = await api.get(`/athlete/${id}`);
-            const activeSport = sportKey || athlete?.sport || 'vertical_jump';
-            setSport(activeSport);
-
-            // Try to get drills from backend intelligence endpoint
-            let drills = null;
+    const loadChallenges = useCallback(
+        async (id, sportKey) => {
+            setLoading(true);
             try {
-                const insightsRes = await api.get(`/athlete/${id}/insights`);
-                const backendDrills = insightsRes?.coaching?.drills;
-                if (backendDrills && backendDrills.length >= 3) {
-                    drills = backendDrills.map((d, i) => ({
-                        id: `backend_${i}`,
-                        title: d.drill,
-                        reps: d.focus,
-                        xp: 50 + i * 15,
-                    }));
-                }
-            } catch {}
+                const athlete = await api.get(`/athlete/${id}`);
+                const activeSport = sportKey || athlete?.sport || 'vertical_jump';
+                setSport(activeSport);
 
-            const finalChallenges = drills || FALLBACK_CHALLENGES[activeSport] || FALLBACK_CHALLENGES.vertical_jump;
-            setChallenges(finalChallenges);
+                // Try to get drills from backend intelligence endpoint
+                let drills = null;
+                try {
+                    const insightsRes = await api.get(`/athlete/${id}/insights`);
+                    const backendDrills = insightsRes?.coaching?.drills;
+                    if (backendDrills && backendDrills.length >= 3) {
+                        drills = backendDrills.map((d, i) => ({
+                            id: `backend_${i}`,
+                            title: d.drill,
+                            reps: d.focus,
+                            xp: 50 + i * 15,
+                        }));
+                    }
+                } catch {}
 
-            // Restore saved completions for today
-            const raw = await AsyncStorage.getItem(STORAGE_KEY);
-            const saved = raw ? JSON.parse(raw) : {};
-            setCompleted(saved);
-            setTotalXp(finalChallenges.filter(c => saved[c.id]).reduce((sum, c) => sum + c.xp, 0));
-        } catch (e) {
-            console.warn('[ChallengesScreen] load error', e);
-            const fallback = FALLBACK_CHALLENGES[sport || 'vertical_jump'];
-            setChallenges(fallback);
-        }
-        setLoading(false);
-    }, [sport]);
+                const finalChallenges = drills || FALLBACK_CHALLENGES[activeSport] || FALLBACK_CHALLENGES.vertical_jump;
+                setChallenges(finalChallenges);
+
+                // Restore saved completions for today
+                const raw = await AsyncStorage.getItem(STORAGE_KEY);
+                const saved = raw ? JSON.parse(raw) : {};
+                setCompleted(saved);
+                setTotalXp(finalChallenges.filter((c) => saved[c.id]).reduce((sum, c) => sum + c.xp, 0));
+            } catch (e) {
+                console.warn('[ChallengesScreen] load error', e);
+                const fallback = FALLBACK_CHALLENGES[sport || 'vertical_jump'];
+                setChallenges(fallback);
+            }
+            setLoading(false);
+        },
+        [sport],
+    );
 
     useEffect(() => {
         if (athleteId) loadChallenges(athleteId, sport);
     }, [athleteId]);
 
-    const toggleChallenge = useCallback(async (id) => {
-        setCompleted(prev => {
-            const next = { ...prev, [id]: !prev[id] };
-            AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
-            const earned = challenges.filter(c => next[c.id]).reduce((sum, c) => sum + c.xp, 0);
-            setTotalXp(earned);
-            if (!prev[id]) tick();
-            return next;
-        });
-    }, [challenges]);
+    const toggleChallenge = useCallback(
+        async (id) => {
+            setCompleted((prev) => {
+                const next = { ...prev, [id]: !prev[id] };
+                AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+                const earned = challenges.filter((c) => next[c.id]).reduce((sum, c) => sum + c.xp, 0);
+                setTotalXp(earned);
+                if (!prev[id]) tick();
+                return next;
+            });
+        },
+        [challenges],
+    );
 
-    const allDone = challenges.length > 0 && challenges.every(c => completed[c.id]);
+    const allDone = challenges.length > 0 && challenges.every((c) => completed[c.id]);
 
     const handleClaimXp = () => {
-        Alert.alert(
-            'Challenges Complete!',
-            `You earned ${totalXp} XP today. Keep the streak alive!`,
-            [{ text: 'Nice!', style: 'default' }],
-        );
+        Alert.alert('Challenges Complete!', `You earned ${totalXp} XP today. Keep the streak alive!`, [
+            { text: 'Nice!', style: 'default' },
+        ]);
     };
 
     if (loading) {
@@ -179,7 +202,7 @@ export default function ChallengesScreen({ navigation, route }) {
         );
     }
 
-    const completedCount = challenges.filter(c => completed[c.id]).length;
+    const completedCount = challenges.filter((c) => completed[c.id]).length;
 
     return (
         <SafeAreaView style={s.safe}>
@@ -200,7 +223,12 @@ export default function ChallengesScreen({ navigation, route }) {
                         <Text style={s.progressLabel}>
                             {completedCount}/{challenges.length} done
                         </Text>
-                        <Text style={s.dateLabel}>{new Date(TODAY + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}</Text>
+                        <Text style={s.dateLabel}>
+                            {new Date(`${TODAY}T00:00:00`).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'long',
+                            })}
+                        </Text>
                     </View>
                     <View style={s.progressTrack}>
                         <View style={[s.progressFill, { width: `${(completedCount / challenges.length) * 100}%` }]} />
@@ -215,13 +243,8 @@ export default function ChallengesScreen({ navigation, route }) {
                 )}
 
                 {/* Challenge cards */}
-                {challenges.map(c => (
-                    <ChallengeCard
-                        key={c.id}
-                        challenge={c}
-                        completed={!!completed[c.id]}
-                        onToggle={toggleChallenge}
-                    />
+                {challenges.map((c) => (
+                    <ChallengeCard key={c.id} challenge={c} completed={!!completed[c.id]} onToggle={toggleChallenge} />
                 ))}
 
                 {/* Claim button when all done */}
@@ -252,12 +275,37 @@ const s = StyleSheet.create({
     dateLabel: { color: MUTED, fontSize: 12 },
     progressTrack: { height: 6, backgroundColor: BORDER, borderRadius: 3, overflow: 'hidden' },
     progressFill: { height: '100%', backgroundColor: ACCENT, borderRadius: 3 },
-    sportBadge: { alignSelf: 'flex-start', backgroundColor: 'rgba(252,76,2,0.1)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 14 },
+    sportBadge: {
+        alignSelf: 'flex-start',
+        backgroundColor: 'rgba(252,76,2,0.1)',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        marginBottom: 14,
+    },
     sportBadgeText: { color: ACCENT, fontWeight: '700', fontSize: 11, letterSpacing: 1 },
-    card: { backgroundColor: SURFACE, borderRadius: 12, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: BORDER },
+    card: {
+        backgroundColor: SURFACE,
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: BORDER,
+    },
     cardDone: { opacity: 0.65, borderColor: SUCCESS },
     cardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-    checkbox: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: MUTED, alignItems: 'center', justifyContent: 'center' },
+    checkbox: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        borderWidth: 2,
+        borderColor: MUTED,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     checkboxDone: { backgroundColor: SUCCESS, borderColor: SUCCESS },
     challengeTitle: { color: TEXT, fontWeight: '600', fontSize: 14 },
     textDone: { textDecorationLine: 'line-through', color: MUTED },
@@ -266,6 +314,15 @@ const s = StyleSheet.create({
     xpBadgeDone: { backgroundColor: 'rgba(16,185,129,0.1)' },
     xpText: { color: ACCENT, fontWeight: '700', fontSize: 12 },
     xpTextDone: { color: SUCCESS },
-    claimBtn: { backgroundColor: SUCCESS, borderRadius: 12, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 },
+    claimBtn: {
+        backgroundColor: SUCCESS,
+        borderRadius: 12,
+        padding: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        marginTop: 8,
+    },
     claimText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });

@@ -29,10 +29,13 @@ export async function hasInvitedCoach() {
 
 export async function markCoachInvited() {
     try {
-        await AsyncStorage.setItem(INVITE_STATE_KEY, JSON.stringify({
-            invited: true,
-            timestamp: new Date().toISOString(),
-        }));
+        await AsyncStorage.setItem(
+            INVITE_STATE_KEY,
+            JSON.stringify({
+                invited: true,
+                timestamp: new Date().toISOString(),
+            }),
+        );
     } catch (error) {
         console.warn('[coachInvite] failed to mark invited', error);
     }

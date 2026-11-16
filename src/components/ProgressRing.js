@@ -1,21 +1,36 @@
-import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { C } from '../styles/colors';
 
-export default function ProgressRing({ value = 0, size = 80, strokeWidth = 8, color = C.cyan, label = '', sublabel = '' }) {
+export default function ProgressRing({
+    value = 0,
+    size = 80,
+    strokeWidth = 8,
+    color = C.cyan,
+    label = '',
+    sublabel = '',
+}) {
     const r = (size - strokeWidth) / 2;
     const circ = 2 * Math.PI * r;
     const clampedVal = Math.min(150, Math.max(0, value));
-    const fillColor = clampedVal > 110 ? C.red : (clampedVal >= 80 ? C.green : color);
+    const fillColor = clampedVal > 110 ? C.red : clampedVal >= 80 ? C.green : color;
     const offset = circ - (Math.min(clampedVal, 100) / 100) * circ;
 
     return (
         <View style={[s.container, { width: size, height: size }]}>
             <Svg width={size} height={size}>
-                <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={strokeWidth} fill="none" />
                 <Circle
-                    cx={size / 2} cy={size / 2} r={r}
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    stroke="rgba(255,255,255,0.08)"
+                    strokeWidth={strokeWidth}
+                    fill="none"
+                />
+                <Circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
                     stroke={fillColor}
                     strokeWidth={strokeWidth}
                     fill="none"

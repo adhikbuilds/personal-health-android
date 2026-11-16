@@ -2,11 +2,8 @@
 // One hero card · simple activity feed · 4 quick actions · single accent color.
 // Preserves all data hooks (useUser, api.ping, getNotifications, AsyncStorage tracker).
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import {
-    View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView,
-    StatusBar,
-} from 'react-native';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,38 +16,42 @@ import { DAILY_TRACKER_DEFAULTS, HOME_CONTENT_GRID } from '../../data/constants'
 
 // Map each tile's emoji to a clean Ionicons name (no rainbow palette)
 const TILE_ICONS = {
-    nutrition:     'restaurant-outline',
-    playfields:    'location-outline',
-    pe_lessons:    'school-outline',
+    nutrition: 'restaurant-outline',
+    playfields: 'location-outline',
+    pe_lessons: 'school-outline',
     live_sessions: 'radio-outline',
-    injury_risk:   'fitness-outline',
-    coach_inbox:   'chatbubble-outline',
+    injury_risk: 'fitness-outline',
+    coach_inbox: 'chatbubble-outline',
 };
 
 // ─── Strava palette ─────────────────────────
 const ORANGE = '#FC4C02';
-const DARK   = '#242428';
-const GRAY   = '#6D6D78';
-const DIM    = '#9CA3AF';
-const LIGHT  = '#F7F7FA';
+const DARK = '#242428';
+const GRAY = '#6D6D78';
+const DIM = '#9CA3AF';
+const LIGHT = '#F7F7FA';
 const BORDER = '#E6E6EA';
-const BG     = '#FFFFFF';
+const BG = '#FFFFFF';
 const SUCCESS = '#16A34A';
-const ALERT   = '#DC2626';
+const ALERT = '#DC2626';
 
 const TODAY_KEY = `@daily_tracker_${new Date().toISOString().slice(0, 10)}`;
 const WATER_KEY = `@water_glasses_${new Date().toISOString().slice(0, 10)}`;
-const tap = () => { try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} };
+const tap = () => {
+    try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+};
 
 export default function HomeScreen({ navigation, showToast }) {
-    const { user, displayName, level, xp } = useUser();
-    const [tracker, setTracker]     = useState(DAILY_TRACKER_DEFAULTS || {});
+    const { user, displayName } = useUser();
+    const [tracker, setTracker] = useState(DAILY_TRACKER_DEFAULTS || {});
     const [apiStatus, setApiStatus] = useState('checking');
-    const [unread, setUnread]       = useState(0);
+    const [unread, setUnread] = useState(0);
     const [fitnessScore, setFitnessScore] = useState(null);
-    const [streak, setStreak]       = useState(0);
+    const [streak, setStreak] = useState(0);
     const [recentSessions, setRecentSessions] = useState([]);
-    const [steps, setSteps]         = useState(null);
+    const [steps, setSteps] = useState(null);
     const [waterGlasses, setWaterGlasses] = useState(0);
     const pedometerSub = useRef(null);
 
@@ -59,33 +60,44 @@ export default function HomeScreen({ navigation, showToast }) {
     // Load today's tracker
     useEffect(() => {
         AsyncStorage.getItem(TODAY_KEY).then((raw) => {
-            if (raw) { try { setTracker(JSON.parse(raw)); } catch (_) {} }
+            if (raw) {
+                try {
+                    setTracker(JSON.parse(raw));
+                } catch (_) {}
+            }
         });
         AsyncStorage.getItem(WATER_KEY).then((raw) => {
-            if (raw) setWaterGlasses(parseInt(raw, 10) || 0);
+            if (raw) setWaterGlasses(Number.parseInt(raw, 10) || 0);
         });
     }, []);
 
     // Step counter via Pedometer
     useEffect(() => {
-        Pedometer.isAvailableAsync().then((available) => {
-            if (!available) { setSteps(-1); return; }
-            const now = new Date();
-            const start = new Date(now);
-            start.setHours(0, 0, 0, 0);
-            Pedometer.getStepCountAsync(start, now)
-                .then(result => setSteps(result.steps))
-                .catch(() => setSteps(-1));
-            pedometerSub.current = Pedometer.watchStepCount(result => {
-                setSteps(s => (s === -1 ? result.steps : (s || 0) + result.steps));
-            });
-        }).catch(() => setSteps(-1));
-        return () => { pedometerSub.current?.remove(); };
+        Pedometer.isAvailableAsync()
+            .then((available) => {
+                if (!available) {
+                    setSteps(-1);
+                    return;
+                }
+                const now = new Date();
+                const start = new Date(now);
+                start.setHours(0, 0, 0, 0);
+                Pedometer.getStepCountAsync(start, now)
+                    .then((result) => setSteps(result.steps))
+                    .catch(() => setSteps(-1));
+                pedometerSub.current = Pedometer.watchStepCount((result) => {
+                    setSteps((s) => (s === -1 ? result.steps : (s || 0) + result.steps));
+                });
+            })
+            .catch(() => setSteps(-1));
+        return () => {
+            pedometerSub.current?.remove();
+        };
     }, []);
 
     const incrementWater = () => {
         tap();
-        setWaterGlasses(prev => {
+        setWaterGlasses((prev) => {
             const next = prev + 1;
             AsyncStorage.setItem(WATER_KEY, String(next)).catch(() => {});
             return next;
@@ -96,40 +108,49 @@ export default function HomeScreen({ navigation, showToast }) {
 
     // API status + recent sessions + goals
     useEffect(() => {
-        api.ping().then((ok) => setApiStatus(ok ? 'online' : 'offline')).catch(() => setApiStatus('offline'));
-        getOrCreateAnonymousAthleteId().then(async (id) => {
-            try {
-                const [progress, s, goals] = await Promise.allSettled([
-                    api.getAthleteProgress?.(id),
-                    api.getStreaks?.(id),
-                    api.get(`/athlete/${id}/goals`),
-                ]);
-                if (progress.status === 'fulfilled') {
-                    if (progress.value?.sessions?.length) setRecentSessions(progress.value.sessions.slice(-4).reverse());
-                    if (progress.value?.avg_form_score) setFitnessScore({ score: Math.round(progress.value.avg_form_score), label: 'Form Score' });
-                }
-                if (s.status === 'fulfilled' && s.value?.current_streak != null) setStreak(s.value.current_streak);
-                if (goals.status === 'fulfilled') setWeeklyGoals(goals.value);
-            } catch (_) {}
-        }).catch(() => {});
+        api.ping()
+            .then((ok) => setApiStatus(ok ? 'online' : 'offline'))
+            .catch(() => setApiStatus('offline'));
+        getOrCreateAnonymousAthleteId()
+            .then(async (id) => {
+                try {
+                    const [progress, s, goals] = await Promise.allSettled([
+                        api.getAthleteProgress?.(id),
+                        api.getStreaks?.(id),
+                        api.get(`/athlete/${id}/goals`),
+                    ]);
+                    if (progress.status === 'fulfilled') {
+                        if (progress.value?.sessions?.length)
+                            setRecentSessions(progress.value.sessions.slice(-4).reverse());
+                        if (progress.value?.avg_form_score)
+                            setFitnessScore({ score: Math.round(progress.value.avg_form_score), label: 'Form Score' });
+                    }
+                    if (s.status === 'fulfilled' && s.value?.current_streak != null) setStreak(s.value.current_streak);
+                    if (goals.status === 'fulfilled') setWeeklyGoals(goals.value);
+                } catch (_) {}
+            })
+            .catch(() => {});
     }, []);
 
     // Unread notifications (refresh on focus)
-    useFocusEffect(useCallback(() => {
-        getOrCreateAnonymousAthleteId().then((id) => {
-            api.getNotifications?.(id, true).then((data) => {
-                if (data) setUnread(data.unread_count || 0);
-            }).catch(() => {});
-        }).catch(() => {});
-    }, []));
+    useFocusEffect(
+        useCallback(() => {
+            getOrCreateAnonymousAthleteId()
+                .then((id) => {
+                    api.getNotifications?.(id, true)
+                        .then((data) => {
+                            if (data) setUnread(data.unread_count || 0);
+                        })
+                        .catch(() => {});
+                })
+                .catch(() => {});
+        }, []),
+    );
 
     return (
         <SafeAreaView style={styles.safe}>
             <StatusBar barStyle="dark-content" />
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 100 }}
-            >
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
                 {/* ── Top bar ─────────────────────── */}
                 <View style={styles.topBar}>
                     <View style={{ flex: 1 }}>
@@ -139,7 +160,10 @@ export default function HomeScreen({ navigation, showToast }) {
                     <TouchableOpacity
                         style={styles.notifBtn}
                         activeOpacity={0.7}
-                        onPress={() => { tap(); navigation.navigate('Notifications'); }}
+                        onPress={() => {
+                            tap();
+                            navigation.navigate('Notifications');
+                        }}
                     >
                         <Ionicons name="notifications-outline" size={22} color={DARK} />
                         {unread > 0 && (
@@ -154,15 +178,31 @@ export default function HomeScreen({ navigation, showToast }) {
                 <View style={styles.heroCard}>
                     <View style={styles.heroLabelRow}>
                         <Text style={styles.heroEyebrow}>YOUR FORM SCORE</Text>
-                        <View style={[styles.statusPill, {
-                            backgroundColor: apiStatus === 'online' ? 'rgba(22,163,74,0.10)' : 'rgba(220,38,38,0.10)',
-                        }]}>
-                            <View style={[styles.statusDot, {
-                                backgroundColor: apiStatus === 'online' ? SUCCESS : ALERT,
-                            }]} />
-                            <Text style={[styles.statusText, {
-                                color: apiStatus === 'online' ? SUCCESS : ALERT,
-                            }]}>
+                        <View
+                            style={[
+                                styles.statusPill,
+                                {
+                                    backgroundColor:
+                                        apiStatus === 'online' ? 'rgba(22,163,74,0.10)' : 'rgba(220,38,38,0.10)',
+                                },
+                            ]}
+                        >
+                            <View
+                                style={[
+                                    styles.statusDot,
+                                    {
+                                        backgroundColor: apiStatus === 'online' ? SUCCESS : ALERT,
+                                    },
+                                ]}
+                            />
+                            <Text
+                                style={[
+                                    styles.statusText,
+                                    {
+                                        color: apiStatus === 'online' ? SUCCESS : ALERT,
+                                    },
+                                ]}
+                            >
                                 {apiStatus === 'online' ? 'LIVE' : 'OFFLINE'}
                             </Text>
                         </View>
@@ -180,7 +220,10 @@ export default function HomeScreen({ navigation, showToast }) {
                         <TouchableOpacity
                             style={styles.heroCTA}
                             activeOpacity={0.85}
-                            onPress={() => { tap(); navigation.jumpTo('Camera'); }}
+                            onPress={() => {
+                                tap();
+                                navigation.jumpTo('Camera');
+                            }}
                         >
                             <Text style={styles.heroCTAText}>+ RECORD</Text>
                         </TouchableOpacity>
@@ -189,10 +232,38 @@ export default function HomeScreen({ navigation, showToast }) {
 
                 {/* ── Primary 4 quick actions ──────── */}
                 <View style={styles.actionGrid}>
-                    <ActionTile icon="pulse-outline"      label="Heart Rate"   onPress={() => { tap(); navigation.navigate('HeartRate'); }} />
-                    <ActionTile icon="barbell-outline"    label="Drills"       onPress={() => { tap(); navigation.navigate('DrillPicker'); }} />
-                    <ActionTile icon="trophy-outline"     label="Fitness Test" onPress={() => { tap(); navigation.navigate('FitnessTest'); }} />
-                    <ActionTile icon="leaf-outline"       label="Wellness"     onPress={() => { tap(); navigation.navigate('Wellness'); }} />
+                    <ActionTile
+                        icon="pulse-outline"
+                        label="Heart Rate"
+                        onPress={() => {
+                            tap();
+                            navigation.navigate('HeartRate');
+                        }}
+                    />
+                    <ActionTile
+                        icon="barbell-outline"
+                        label="Drills"
+                        onPress={() => {
+                            tap();
+                            navigation.navigate('DrillPicker');
+                        }}
+                    />
+                    <ActionTile
+                        icon="trophy-outline"
+                        label="Fitness Test"
+                        onPress={() => {
+                            tap();
+                            navigation.navigate('FitnessTest');
+                        }}
+                    />
+                    <ActionTile
+                        icon="leaf-outline"
+                        label="Wellness"
+                        onPress={() => {
+                            tap();
+                            navigation.navigate('Wellness');
+                        }}
+                    />
                 </View>
 
                 {/* ── Explore grid (Nutrition, Playfields, Yoga, Wellness…) ── */}
@@ -206,7 +277,10 @@ export default function HomeScreen({ navigation, showToast }) {
                                 activeOpacity={0.7}
                                 onPress={() => {
                                     tap();
-                                    if (!item.route) { showToast?.('Coming soon'); return; }
+                                    if (!item.route) {
+                                        showToast?.('Coming soon');
+                                        return;
+                                    }
                                     if (item.routeParams) navigation.navigate(item.route, item.routeParams);
                                     else navigation.navigate(item.route);
                                 }}
@@ -214,7 +288,9 @@ export default function HomeScreen({ navigation, showToast }) {
                                 <View style={styles.exploreIcon}>
                                     <Ionicons name={TILE_ICONS[item.id] || 'apps-outline'} size={20} color={ORANGE} />
                                 </View>
-                                <Text style={styles.exploreLabel} numberOfLines={2}>{item.label}</Text>
+                                <Text style={styles.exploreLabel} numberOfLines={2}>
+                                    {item.label}
+                                </Text>
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -224,7 +300,12 @@ export default function HomeScreen({ navigation, showToast }) {
                 <View style={styles.section}>
                     <View style={styles.sectionHead}>
                         <Text style={styles.sectionTitle}>RECENT ACTIVITY</Text>
-                        <TouchableOpacity onPress={() => { tap(); navigation.jumpTo('Lab'); }}>
+                        <TouchableOpacity
+                            onPress={() => {
+                                tap();
+                                navigation.jumpTo('Lab');
+                            }}
+                        >
                             <Text style={styles.sectionLink}>View all →</Text>
                         </TouchableOpacity>
                     </View>
@@ -236,7 +317,10 @@ export default function HomeScreen({ navigation, showToast }) {
                             <TouchableOpacity
                                 style={styles.emptyCTA}
                                 activeOpacity={0.85}
-                                onPress={() => { tap(); navigation.jumpTo('Camera'); }}
+                                onPress={() => {
+                                    tap();
+                                    navigation.jumpTo('Camera');
+                                }}
                             >
                                 <Text style={styles.emptyCTAText}>Start First Session →</Text>
                             </TouchableOpacity>
@@ -246,7 +330,9 @@ export default function HomeScreen({ navigation, showToast }) {
                             <SessionRow
                                 key={s.session_id || i}
                                 session={s}
-                                onPress={() => { tap(); /* navigate to session detail when route exists */ }}
+                                onPress={() => {
+                                    tap(); /* navigate to session detail when route exists */
+                                }}
                             />
                         ))
                     )}
@@ -257,7 +343,12 @@ export default function HomeScreen({ navigation, showToast }) {
                     <View style={styles.section}>
                         <View style={styles.sectionHead}>
                             <Text style={styles.sectionTitle}>THIS WEEK</Text>
-                            <Text style={[styles.sectionLink, { color: weeklyGoals.overall_pct >= 80 ? SUCCESS : ORANGE }]}>
+                            <Text
+                                style={[
+                                    styles.sectionLink,
+                                    { color: weeklyGoals.overall_pct >= 80 ? SUCCESS : ORANGE },
+                                ]}
+                            >
                                 {weeklyGoals.overall_pct}% complete
                             </Text>
                         </View>
@@ -266,10 +357,20 @@ export default function HomeScreen({ navigation, showToast }) {
                                 <View key={g.type} style={styles.goalRow}>
                                     <Text style={styles.goalLabel}>{g.label}</Text>
                                     <View style={styles.goalBarBg}>
-                                        <View style={[styles.goalBarFill, {
-                                            width: `${g.pct}%`,
-                                            backgroundColor: g.status === 'achieved' ? SUCCESS : (g.pct >= 60 ? ORANGE : ALERT),
-                                        }]} />
+                                        <View
+                                            style={[
+                                                styles.goalBarFill,
+                                                {
+                                                    width: `${g.pct}%`,
+                                                    backgroundColor:
+                                                        g.status === 'achieved'
+                                                            ? SUCCESS
+                                                            : g.pct >= 60
+                                                              ? ORANGE
+                                                              : ALERT,
+                                                },
+                                            ]}
+                                        />
                                     </View>
                                     <Text style={[styles.goalPct, { color: g.status === 'achieved' ? SUCCESS : GRAY }]}>
                                         {g.current}/{g.target} {g.unit}
@@ -299,12 +400,20 @@ export default function HomeScreen({ navigation, showToast }) {
                                 tappable
                             />
                         </TouchableOpacity>
-                        <CheckChip label="Sleep" value={tracker?.sleep?.value || '—'} unit="hr" filled={!!tracker?.sleep?.value} />
+                        <CheckChip
+                            label="Sleep"
+                            value={tracker?.sleep?.value || '—'}
+                            unit="hr"
+                            filled={!!tracker?.sleep?.value}
+                        />
                     </View>
                     <TouchableOpacity
                         style={styles.checkinBtn}
                         activeOpacity={0.7}
-                        onPress={() => { tap(); navigation.navigate('WellnessLogForm'); }}
+                        onPress={() => {
+                            tap();
+                            navigation.navigate('WellnessLogForm');
+                        }}
                     >
                         <Text style={styles.checkinBtnText}>Log Check-in</Text>
                         <Ionicons name="arrow-forward" size={14} color={DARK} />
@@ -329,7 +438,7 @@ function ActionTile({ icon, label, onPress }) {
 }
 
 function SessionRow({ session, onPress }) {
-    const date  = session.started_at ? new Date(session.started_at) : null;
+    const date = session.started_at ? new Date(session.started_at) : null;
     const sport = String(session.sport || 'Training').replace(/_/g, ' ');
     const score = session.summary?.avg_form_score || 0;
     const dateStr = date
@@ -538,7 +647,7 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     sessionTitle: { fontSize: 14, fontWeight: '700', color: DARK, textTransform: 'capitalize' },
-    sessionMeta:  { fontSize: 11, color: GRAY, marginTop: 2 },
+    sessionMeta: { fontSize: 11, color: GRAY, marginTop: 2 },
     sessionScore: { fontSize: 22, fontWeight: '800', color: ORANGE, lineHeight: 22 },
     sessionScoreLabel: { fontSize: 9, fontWeight: '800', color: GRAY, letterSpacing: 0.5, marginTop: 2 },
 

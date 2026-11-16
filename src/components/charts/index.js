@@ -15,13 +15,23 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, {
-    Circle, Line, Path, Polygon, Polyline, Rect, Text as SvgText,
-    Defs, LinearGradient, Stop, G,
+    Circle,
+    Line,
+    Path,
+    Polygon,
+    Rect,
+    Text as SvgText,
+    Defs,
+    LinearGradient,
+    Stop,
+    G,
 } from 'react-native-svg';
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
-function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+function clamp(n, lo, hi) {
+    return Math.max(lo, Math.min(hi, n));
+}
 
 function niceRange(vals) {
     if (!vals || !vals.length) return [0, 1];
@@ -57,10 +67,26 @@ export function Ring({ pct = 0, color = '#06b6d4', size = 120, stroke = 8, label
     return (
         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
             <Svg width={size} height={size}>
-                <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.06)" fill="none" strokeWidth={stroke} />
-                <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
-                    strokeDasharray={c} strokeDashoffset={c * (1 - clamp(pct / 100, 0, 1))}
-                    strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+                <Circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    stroke="rgba(255,255,255,0.06)"
+                    fill="none"
+                    strokeWidth={stroke}
+                />
+                <Circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth={stroke}
+                    strokeDasharray={c}
+                    strokeDashoffset={c * (1 - clamp(pct / 100, 0, 1))}
+                    strokeLinecap="round"
+                    transform={`rotate(-90 ${size / 2} ${size / 2})`}
+                />
             </Svg>
             <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -101,17 +127,22 @@ export function Sparkline({ data = [], color = '#06b6d4', width = 120, height = 
 // ─── MultiLine with optional gradient area ─────────────────────────────────
 
 export function MultiLine({
-    series = [],          // [{ label, color, data: [{x, y}] }] OR [{ color, data: [v, v, v] }]
-    width = 320, height = 160, padding = 28,
-    yTicks = 4, showGrid = true, area = true, labelColor = '#64748b',
+    series = [], // [{ label, color, data: [{x, y}] }] OR [{ color, data: [v, v, v] }]
+    width = 320,
+    height = 160,
+    padding = 28,
+    yTicks = 4,
+    showGrid = true,
+    area = true,
+    labelColor = '#64748b',
     xLabels = null,
 }) {
     const allY = [];
-    series.forEach(s => s.data.forEach(p => allY.push(typeof p === 'number' ? p : p.y)));
+    series.forEach((s) => s.data.forEach((p) => allY.push(typeof p === 'number' ? p : p.y)));
     const [lo, hi] = niceRange(allY);
     const w = width - padding * 2;
     const h = height - padding * 2;
-    const xMax = Math.max(...series.map(s => s.data.length - 1), 1);
+    const xMax = Math.max(...series.map((s) => s.data.length - 1), 1);
 
     const toPx = (i, v) => ({
         x: padding + (i / xMax) * w,
@@ -128,16 +159,26 @@ export function MultiLine({
                     </LinearGradient>
                 ))}
             </Defs>
-            {showGrid && Array.from({ length: yTicks + 1 }, (_, t) => {
-                const y = padding + (t / yTicks) * h;
-                const label = Math.round(hi - (hi - lo) * (t / yTicks));
-                return (
-                    <React.Fragment key={t}>
-                        <Line x1={padding} y1={y} x2={padding + w} y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-                        <SvgText x={padding - 6} y={y + 3} fontSize="9" fill={labelColor} textAnchor="end">{label}</SvgText>
-                    </React.Fragment>
-                );
-            })}
+            {showGrid &&
+                Array.from({ length: yTicks + 1 }, (_, t) => {
+                    const y = padding + (t / yTicks) * h;
+                    const label = Math.round(hi - (hi - lo) * (t / yTicks));
+                    return (
+                        <React.Fragment key={t}>
+                            <Line
+                                x1={padding}
+                                y1={y}
+                                x2={padding + w}
+                                y2={y}
+                                stroke="rgba(255,255,255,0.05)"
+                                strokeWidth="1"
+                            />
+                            <SvgText x={padding - 6} y={y + 3} fontSize="9" fill={labelColor} textAnchor="end">
+                                {label}
+                            </SvgText>
+                        </React.Fragment>
+                    );
+                })}
             {series.map((s, i) => {
                 const points = s.data.map((p, j) => {
                     const v = typeof p === 'number' ? p : p.y;
@@ -152,11 +193,17 @@ export function MultiLine({
                     </G>
                 );
             })}
-            {xLabels && xLabels.map((label, i) => (
-                <SvgText key={`xl-${i}`}
+            {xLabels?.map((label, i) => (
+                <SvgText
+                    key={`xl-${i}`}
                     x={padding + (i / (xLabels.length - 1 || 1)) * w}
                     y={height - 6}
-                    fontSize="9" fill={labelColor} textAnchor="middle">{label}</SvgText>
+                    fontSize="9"
+                    fill={labelColor}
+                    textAnchor="middle"
+                >
+                    {label}
+                </SvgText>
             ))}
         </Svg>
     );
@@ -165,12 +212,16 @@ export function MultiLine({
 // ─── Bar chart ─────────────────────────────────────────────────────────────
 
 export function Bar({
-    data = [],                // [{ label, value, color? }]
-    width = 320, height = 160, padding = 28, barGap = 8,
-    color = '#06b6d4', labelColor = '#64748b',
+    data = [], // [{ label, value, color? }]
+    width = 320,
+    height = 160,
+    padding = 28,
+    barGap = 8,
+    color = '#06b6d4',
+    labelColor = '#64748b',
 }) {
     if (!data.length) return <View style={{ width, height }} />;
-    const [lo, hi] = niceRange([0, ...data.map(d => d.value)]);
+    const [lo, hi] = niceRange([0, ...data.map((d) => d.value)]);
     const w = width - padding * 2;
     const h = height - padding * 2;
     const barW = Math.max(6, (w - barGap * (data.length - 1)) / data.length);
@@ -199,8 +250,10 @@ export function Bar({
 // ─── Stacked area (zones or multi-series overlap) ─────────────────────────
 
 export function StackedArea({
-    series = [],              // [{ label, color, data: [v, v, v] }]  lengths must match
-    width = 320, height = 160, padding = 28, labelColor = '#64748b',
+    series = [], // [{ label, color, data: [v, v, v] }]  lengths must match
+    width = 320,
+    height = 160,
+    padding = 28,
 }) {
     if (!series.length || !series[0].data.length) return <View style={{ width, height }} />;
     const len = series[0].data.length;
@@ -209,10 +262,12 @@ export function StackedArea({
     const h = height - padding * 2;
 
     // Compute stacked tops
-    const tops = series.map(s => s.data.map((v, i) => {
-        cumulative[i] += v;
-        return cumulative[i];
-    }));
+    const tops = series.map((s) =>
+        s.data.map((v, i) => {
+            cumulative[i] += v;
+            return cumulative[i];
+        }),
+    );
     const total = Math.max(...cumulative, 1);
 
     return (
@@ -232,7 +287,7 @@ export function StackedArea({
                     const y = padding + (1 - bottom[i] / total) * h;
                     points.push({ x, y });
                 }
-                const d = points.map((p, i) => (i === 0 ? 'M' : 'L') + p.x + ' ' + p.y).join(' ') + ' Z';
+                const d = `${points.map((p, i) => `${(i === 0 ? 'M' : 'L') + p.x} ${p.y}`).join(' ')} Z`;
                 return <Path key={si} d={d} fill={s.color} opacity="0.85" />;
             })}
         </Svg>
@@ -247,14 +302,16 @@ export function StackedArea({
 // edge of the canvas and got clipped by the parent ScrollView.
 
 export function Radar({
-    axes = [],                // [{ label, value (0-100) }]
-    color = '#06b6d4', size = 220, labelColor = '#9ca3af',
+    axes = [], // [{ label, value (0-100) }]
+    color = '#06b6d4',
+    size = 220,
+    labelColor = '#9ca3af',
 }) {
     if (!axes.length) return <View style={{ width: size, height: size }} />;
     const cx = size / 2;
     const cy = size / 2;
-    const r = size * 0.32;              // data radius (smaller so labels fit)
-    const labelR = size * 0.43;         // label radius — inside canvas edges
+    const r = size * 0.32; // data radius (smaller so labels fit)
+    const labelR = size * 0.43; // label radius — inside canvas edges
     const n = axes.length;
     const step = (Math.PI * 2) / n;
 
@@ -271,7 +328,7 @@ export function Radar({
         <Svg width={size} height={size}>
             {gridLevels.map((lvl, gi) => {
                 const pts = axes.map((_, i) => polarPt(i, lvl));
-                const d = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p.x + ' ' + p.y).join(' ') + ' Z';
+                const d = `${pts.map((p, i) => `${(i === 0 ? 'M' : 'L') + p.x} ${p.y}`).join(' ')} Z`;
                 return <Path key={gi} d={d} stroke="rgba(255,255,255,0.07)" strokeWidth="1" fill="none" />;
             })}
             {axes.map((a, i) => {
@@ -283,20 +340,19 @@ export function Radar({
                 return (
                     <G key={`ax-${i}`}>
                         <Line x1={cx} y1={cy} x2={ox} y2={oy} stroke="rgba(255,255,255,0.08)" />
-                        <SvgText
-                            x={lx} y={ly}
-                            fontSize="9"
-                            fontWeight="700"
-                            fill={labelColor}
-                            textAnchor="middle">
+                        <SvgText x={lx} y={ly} fontSize="9" fontWeight="700" fill={labelColor} textAnchor="middle">
                             {a.label}
                         </SvgText>
                     </G>
                 );
             })}
             <Polygon
-                points={dataPoints.map(p => `${p.x},${p.y}`).join(' ')}
-                fill={color} fillOpacity="0.25" stroke={color} strokeWidth="2" />
+                points={dataPoints.map((p) => `${p.x},${p.y}`).join(' ')}
+                fill={color}
+                fillOpacity="0.25"
+                stroke={color}
+                strokeWidth="2"
+            />
             {dataPoints.map((p, i) => (
                 <Circle key={`dp-${i}`} cx={p.x} cy={p.y} r="3" fill={color} />
             ))}
@@ -307,21 +363,31 @@ export function Radar({
 // ─── Heatmap (calendar-style) ──────────────────────────────────────────────
 
 export function Heatmap({
-    cells = [],               // [{ date, value }]  flat list sorted ascending
-    cols = 7, width = 320, cellGap = 3, label = null,
-    colorLow = '#082f49', colorHigh = '#06b6d4',
+    cells = [], // [{ date, value }]  flat list sorted ascending
+    cols = 7,
+    width = 320,
+    cellGap = 3,
+    label = null,
+    colorLow = '#082f49',
+    colorHigh = '#06b6d4',
 }) {
     if (!cells.length) return <View style={{ width, height: 40 }} />;
     const rows = Math.ceil(cells.length / cols);
     const cellW = (width - cellGap * (cols - 1)) / cols;
     const cellH = cellW;
     const height = rows * cellH + (rows - 1) * cellGap + (label ? 14 : 0);
-    const max = Math.max(...cells.map(c => c.value || 0), 1);
+    const max = Math.max(...cells.map((c) => c.value || 0), 1);
 
-    function lerp(a, b, t) { return a + (b - a) * t; }
+    function lerp(a, b, t) {
+        return a + (b - a) * t;
+    }
     function hexToRgb(h) {
         const v = h.replace('#', '');
-        return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)];
+        return [
+            Number.parseInt(v.slice(0, 2), 16),
+            Number.parseInt(v.slice(2, 4), 16),
+            Number.parseInt(v.slice(4, 6), 16),
+        ];
     }
     const lowRgb = hexToRgb(colorLow);
     const highRgb = hexToRgb(colorHigh);
@@ -339,12 +405,21 @@ export function Heatmap({
                 const y = row * (cellH + cellGap);
                 const t = Math.sqrt((c.value || 0) / max);
                 return (
-                    <Rect key={i} x={x} y={y} width={cellW} height={cellH} rx="3"
-                        fill={c.value ? color(t) : '#0b1220'} />
+                    <Rect
+                        key={i}
+                        x={x}
+                        y={y}
+                        width={cellW}
+                        height={cellH}
+                        rx="3"
+                        fill={c.value ? color(t) : '#0b1220'}
+                    />
                 );
             })}
             {label && (
-                <SvgText x={0} y={height - 2} fontSize="9" fill="#64748b">{label}</SvgText>
+                <SvgText x={0} y={height - 2} fontSize="9" fill="#64748b">
+                    {label}
+                </SvgText>
             )}
         </Svg>
     );
@@ -364,7 +439,7 @@ export function Gauge({ value = 0, max = 100, color = '#06b6d4', size = 180, lab
     const strokeW = size * 0.08;
     const start = Math.PI;
     const end = 0;
-    const angle = start + (clamp(value / max, 0, 1)) * (end - start);
+    const angle = start + clamp(value / max, 0, 1) * (end - start);
 
     function arc(a1, a2) {
         const x1 = cx + r * Math.cos(a1);
@@ -378,11 +453,27 @@ export function Gauge({ value = 0, max = 100, color = '#06b6d4', size = 180, lab
 
     return (
         <Svg width={size} height={svgH}>
-            <Path d={arc(start, end)} stroke="rgba(255,255,255,0.1)" strokeWidth={strokeW} fill="none" strokeLinecap="round" />
+            <Path
+                d={arc(start, end)}
+                stroke="rgba(255,255,255,0.1)"
+                strokeWidth={strokeW}
+                fill="none"
+                strokeLinecap="round"
+            />
             {zones.map((z, i) => {
                 const a1 = start + (z.from / max) * (end - start);
                 const a2 = start + (z.to / max) * (end - start);
-                return <Path key={i} d={arc(a1, a2)} stroke={z.color} strokeWidth={strokeW} fill="none" strokeLinecap="round" opacity="0.5" />;
+                return (
+                    <Path
+                        key={i}
+                        d={arc(a1, a2)}
+                        stroke={z.color}
+                        strokeWidth={strokeW}
+                        fill="none"
+                        strokeLinecap="round"
+                        opacity="0.5"
+                    />
+                );
             })}
             <Path d={arc(start, angle)} stroke={color} strokeWidth={strokeW} fill="none" strokeLinecap="round" />
             <SvgText x={cx} y={cy + 6} fontSize={size * 0.22} fontWeight="800" fill="#fff" textAnchor="middle">

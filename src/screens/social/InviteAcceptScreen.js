@@ -2,22 +2,20 @@
 // Validates the token, shows coach context, then joins the roster on tap.
 // Target: <90 seconds from link tap to first session pick.
 
-import React, { useEffect, useState } from 'react';
-import {
-    ActivityIndicator, SafeAreaView, StyleSheet, Text, TouchableOpacity, View,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { API_BASE } from '../../services/api';
 import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 
 const C = {
-    bg:     '#FBFBF8',
-    surf:   '#FFFFFF',
-    cyan:   '#FC4C02',
-    text:   '#242428',
-    muted:  '#9CA3AF',
+    bg: '#FBFBF8',
+    surf: '#FFFFFF',
+    cyan: '#FC4C02',
+    text: '#242428',
+    muted: '#9CA3AF',
     border: 'rgba(255,255,255,0.08)',
-    red:    '#ef4444',
+    red: '#ef4444',
 };
 
 async function apiFetch(path, options = {}) {
@@ -35,7 +33,7 @@ async function apiFetch(path, options = {}) {
 export default function InviteAcceptScreen({ route, navigation }) {
     const token = route?.params?.token;
 
-    const [state, setState]       = useState('loading'); // loading | valid | error | joining | done
+    const [state, setState] = useState('loading'); // loading | valid | error | joining | done
     const [coachInfo, setCoachInfo] = useState(null);
     const [errorMsg, setErrorMsg] = useState('');
 
@@ -45,7 +43,7 @@ export default function InviteAcceptScreen({ route, navigation }) {
             setErrorMsg('No invite token found in the link.');
             return;
         }
-        apiFetch(`/invite/${encodeURIComponent(token)}`).then(data => {
+        apiFetch(`/invite/${encodeURIComponent(token)}`).then((data) => {
             if (!data || !data.valid) {
                 setState('error');
                 setErrorMsg('This invite link has expired or is no longer valid.');
@@ -77,7 +75,9 @@ export default function InviteAcceptScreen({ route, navigation }) {
         <SafeAreaView style={s.safe}>
             <View style={s.card}>
                 <View style={s.logoRow}>
-                    <View style={s.logoMark}><Text style={s.logoText}>PH</Text></View>
+                    <View style={s.logoMark}>
+                        <Text style={s.logoText}>PH</Text>
+                    </View>
                     <Text style={s.logoName}>Personal Health</Text>
                 </View>
 
@@ -92,7 +92,8 @@ export default function InviteAcceptScreen({ route, navigation }) {
                     <>
                         <Text style={s.headline}>You've been invited</Text>
                         <Text style={s.sub}>
-                            <Text style={s.coachName}>{coachInfo.coach_name}</Text> has invited you to join their coaching roster.
+                            <Text style={s.coachName}>{coachInfo.coach_name}</Text> has invited you to join their
+                            coaching roster.
                             {coachInfo.label ? `\n\nGroup: ${coachInfo.label}` : ''}
                         </Text>
 
@@ -146,27 +147,41 @@ export default function InviteAcceptScreen({ route, navigation }) {
 }
 
 const s = StyleSheet.create({
-    safe:  { flex: 1, backgroundColor: C.bg, justifyContent: 'center', padding: 24 },
-    card:  { backgroundColor: C.surf, borderRadius: 20, padding: 28, borderWidth: 1, borderColor: C.border },
+    safe: { flex: 1, backgroundColor: C.bg, justifyContent: 'center', padding: 24 },
+    card: { backgroundColor: C.surf, borderRadius: 20, padding: 28, borderWidth: 1, borderColor: C.border },
 
-    logoRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 28 },
-    logoMark: { width: 30, height: 30, borderRadius: 8, backgroundColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
+    logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 28 },
+    logoMark: {
+        width: 30,
+        height: 30,
+        borderRadius: 8,
+        backgroundColor: C.cyan,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     logoText: { fontSize: 11, fontWeight: '900', color: '#000' },
     logoName: { fontSize: 14, fontWeight: '700', color: C.text },
 
-    headline:  { fontSize: 22, fontWeight: '800', color: C.text, marginBottom: 10 },
-    sub:       { fontSize: 15, color: C.muted, lineHeight: 22, marginBottom: 18 },
+    headline: { fontSize: 22, fontWeight: '800', color: C.text, marginBottom: 10 },
+    sub: { fontSize: 15, color: C.muted, lineHeight: 22, marginBottom: 18 },
     coachName: { color: C.text, fontWeight: '700' },
 
-    infoRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+    infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
     infoText: { fontSize: 13, color: C.muted },
 
-    acceptBtn:     { backgroundColor: C.cyan, borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
+    acceptBtn: {
+        backgroundColor: C.cyan,
+        borderRadius: 14,
+        height: 52,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 20,
+    },
     acceptBtnText: { fontSize: 16, fontWeight: '800', color: '#FBFBF8' },
 
     cancelLink: { alignItems: 'center', marginTop: 14 },
     cancelText: { fontSize: 13, color: C.muted },
 
-    center:  { alignItems: 'center', paddingVertical: 24 },
+    center: { alignItems: 'center', paddingVertical: 24 },
     subText: { fontSize: 14, color: C.muted, marginTop: 12, textAlign: 'center' },
 });

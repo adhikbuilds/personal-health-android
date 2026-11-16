@@ -67,7 +67,7 @@ export function nowHHMMSS() {
 
 export function nowISO() {
     const d = new Date();
-    return d.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    return `${d.toISOString().replace('T', ' ').slice(0, 19)} UTC`;
 }
 
 // ─── Building blocks ───────────────────────────────────────────────────────
@@ -99,10 +99,12 @@ export function FieldRow({ label, value, color = '#E8E8E8', delta, dim, onPress,
         <View style={s.fieldRow}>
             <Text style={[s.fieldLabel, dim && { color: C.muted }]}>{label}</Text>
             <View style={s.fieldRight}>
-                <Text style={[size === 'lg' ? s.fieldValueLg : size === 'sm' ? s.fieldValueSm : s.fieldValue, { color }]}>{value}</Text>
-                {delta != null && (
-                    <Text style={[s.fieldDelta, { color: trendColor(delta) }]}>{signPct(delta)}</Text>
-                )}
+                <Text
+                    style={[size === 'lg' ? s.fieldValueLg : size === 'sm' ? s.fieldValueSm : s.fieldValue, { color }]}
+                >
+                    {value}
+                </Text>
+                {delta != null && <Text style={[s.fieldDelta, { color: trendColor(delta) }]}>{signPct(delta)}</Text>}
             </View>
         </View>
     );
@@ -110,7 +112,9 @@ export function FieldRow({ label, value, color = '#E8E8E8', delta, dim, onPress,
         <Pressable onPress={onPress} style={({ pressed }) => pressed && { backgroundColor: '#0a0a0a' }}>
             {content}
         </Pressable>
-    ) : content;
+    ) : (
+        content
+    );
 }
 
 export function Triad({ items = [] }) {
@@ -118,10 +122,18 @@ export function Triad({ items = [] }) {
         <View style={s.triadRow}>
             {items.map((it, i) => (
                 <React.Fragment key={i}>
-                    <View style={[s.triadCell, i === 0 && { alignItems: 'flex-start' }, i === items.length - 1 && { alignItems: 'flex-end' }]}>
+                    <View
+                        style={[
+                            s.triadCell,
+                            i === 0 && { alignItems: 'flex-start' },
+                            i === items.length - 1 && { alignItems: 'flex-end' },
+                        ]}
+                    >
                         <Text style={s.triadLabel}>{it.label}</Text>
                         <Text style={[s.triadValue, { color: it.color || '#E8E8E8' }]}>{it.value}</Text>
-                        {it.caption && <Text style={[s.triadCaption, { color: it.color || C.muted }]}>{it.caption}</Text>}
+                        {it.caption && (
+                            <Text style={[s.triadCaption, { color: it.color || C.muted }]}>{it.caption}</Text>
+                        )}
                     </View>
                     {i < items.length - 1 && <View style={s.triadRule} />}
                 </React.Fragment>
@@ -133,24 +145,32 @@ export function Triad({ items = [] }) {
 export function PulseDot({ color = C.good, size = 6 }) {
     const o = useRef(new Animated.Value(1)).current;
     useEffect(() => {
-        const loop = Animated.loop(Animated.sequence([
-            Animated.timing(o, { toValue: 0.25, duration: 700, useNativeDriver: true }),
-            Animated.timing(o, { toValue: 1,    duration: 700, useNativeDriver: true }),
-        ]));
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(o, { toValue: 0.25, duration: 700, useNativeDriver: true }),
+                Animated.timing(o, { toValue: 1, duration: 700, useNativeDriver: true }),
+            ]),
+        );
         loop.start();
         return () => loop.stop();
     }, []);
     return (
-        <Animated.View style={{
-            width: size, height: size, borderRadius: size / 2,
-            backgroundColor: color, opacity: o, marginRight: 8,
-        }} />
+        <Animated.View
+            style={{
+                width: size,
+                height: size,
+                borderRadius: size / 2,
+                backgroundColor: color,
+                opacity: o,
+                marginRight: 8,
+            }}
+        />
     );
 }
 
 export function SysBar({ online, identity, clock }) {
     const stateColor = online ? C.good : online === false ? C.bad : C.warn;
-    const stateText  = online ? 'CONN' : online === false ? 'OFF ' : 'WAIT';
+    const stateText = online ? 'CONN' : online === false ? 'OFF ' : 'WAIT';
     return (
         <View style={s.sysBar}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -180,7 +200,8 @@ export function SysBar({ online, identity, clock }) {
 export function Ticker({ items = [] }) {
     return (
         <ScrollView
-            horizontal showsHorizontalScrollIndicator={false}
+            horizontal
+            showsHorizontalScrollIndicator={false}
             style={s.ticker}
             contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 12 }}
         >
@@ -190,7 +211,8 @@ export function Ticker({ items = [] }) {
                     <Text style={[s.tickerValue, t.color && { color: t.color }]}>{t.value}</Text>
                     {t.delta != null && (
                         <Text style={[s.tickerDelta, { color: trendColor(t.delta) }]}>
-                            {t.delta >= 0 ? '▲' : '▼'}{Math.abs(t.delta).toFixed(1)}
+                            {t.delta >= 0 ? '▲' : '▼'}
+                            {Math.abs(t.delta).toFixed(1)}
                         </Text>
                     )}
                     {i < items.length - 1 && <Text style={s.tickerSep}>·</Text>}
@@ -209,7 +231,7 @@ export function DistBar({ label, value, total = 100, color = C.text, pct }) {
                 <View style={[s.distBarFill, { backgroundColor: color, width: `${Math.min(100, p)}%` }]} />
             </View>
             <Text style={[s.distValue, { color }]}>
-                {String(value).padStart(4, ' ')}  {fmt(p, 1).padStart(5, ' ')}%
+                {String(value).padStart(4, ' ')} {fmt(p, 1).padStart(5, ' ')}%
             </Text>
         </View>
     );
@@ -220,7 +242,9 @@ export function Table({ cols = [], rows = [] }) {
         <View>
             <View style={s.tblHead}>
                 {cols.map((c, i) => (
-                    <Text key={i} style={[s.tblCol, { flex: c.flex || 1, textAlign: c.align || 'left' }]}>{c.label}</Text>
+                    <Text key={i} style={[s.tblCol, { flex: c.flex || 1, textAlign: c.align || 'left' }]}>
+                        {c.label}
+                    </Text>
                 ))}
             </View>
             {rows.map((row, ri) => (
@@ -230,11 +254,14 @@ export function Table({ cols = [], rows = [] }) {
                     style={({ pressed }) => [s.tblRow, pressed && { backgroundColor: '#0a0a0a' }]}
                 >
                     {row.cells.map((cell, ci) => (
-                        <Text key={ci} style={[
-                            s.tblCell,
-                            { flex: cols[ci]?.flex || 1, textAlign: cols[ci]?.align || 'left' },
-                            cell.color && { color: cell.color },
-                        ]}>
+                        <Text
+                            key={ci}
+                            style={[
+                                s.tblCell,
+                                { flex: cols[ci]?.flex || 1, textAlign: cols[ci]?.align || 'left' },
+                                cell.color && { color: cell.color },
+                            ]}
+                        >
                             {cell.value}
                         </Text>
                     ))}
@@ -246,13 +273,14 @@ export function Table({ cols = [], rows = [] }) {
 
 export function CmdRow({ hotkey, label, desc, color = C.text, onPress, right }) {
     return (
-        <Pressable
-            onPress={onPress}
-            style={({ pressed }) => [s.cmdRow, pressed && { backgroundColor: '#111' }]}
-        >
+        <Pressable onPress={onPress} style={({ pressed }) => [s.cmdRow, pressed && { backgroundColor: '#111' }]}>
             {hotkey && <Text style={[s.cmdKey, { color }]}>[{hotkey}]</Text>}
             <Text style={[s.cmdLabel, { color: '#E8E8E8' }]}>{label}</Text>
-            {desc && <Text style={s.cmdDesc} numberOfLines={1}>{desc}</Text>}
+            {desc && (
+                <Text style={s.cmdDesc} numberOfLines={1}>
+                    {desc}
+                </Text>
+            )}
             {right || <Text style={[s.cmdArrow, { color }]}>▸</Text>}
         </Pressable>
     );
@@ -262,7 +290,9 @@ export function Footer({ lines = [] }) {
     return (
         <View style={s.footer}>
             {lines.map((l, i) => (
-                <Text key={i} style={[s.footerText, l.color && { color: l.color }]}>{l.text}</Text>
+                <Text key={i} style={[s.footerText, l.color && { color: l.color }]}>
+                    {l.text}
+                </Text>
             ))}
         </View>
     );
@@ -276,12 +306,18 @@ export function TerminalScreen({ children, style }) {
 export function BlinkCursor({ color = C.text }) {
     const o = useRef(new Animated.Value(1)).current;
     useEffect(() => {
-        Animated.loop(Animated.sequence([
-            Animated.timing(o, { toValue: 0, duration: 500, useNativeDriver: true }),
-            Animated.timing(o, { toValue: 1, duration: 500, useNativeDriver: true }),
-        ])).start();
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(o, { toValue: 0, duration: 500, useNativeDriver: true }),
+                Animated.timing(o, { toValue: 1, duration: 500, useNativeDriver: true }),
+            ]),
+        ).start();
     }, []);
-    return <Animated.Text style={{ opacity: o, color, fontFamily: T.MONO, fontSize: 24, fontWeight: '700' }}>_</Animated.Text>;
+    return (
+        <Animated.Text style={{ opacity: o, color, fontFamily: T.MONO, fontSize: 24, fontWeight: '700' }}>
+            _
+        </Animated.Text>
+    );
 }
 
 // Useful live-updating clock used in several screens.
@@ -301,15 +337,21 @@ const s = StyleSheet.create({
 
     // Panel
     panel: {
-        marginHorizontal: 16, marginTop: 14,
-        borderWidth: 1, borderColor: C.border,
+        marginHorizontal: 16,
+        marginTop: 14,
+        borderWidth: 1,
+        borderColor: C.border,
         backgroundColor: P.panelBg,
     },
     header: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 12, paddingVertical: 8,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
         backgroundColor: P.headerBg,
-        borderBottomWidth: 1, borderBottomColor: C.border,
+        borderBottomWidth: 1,
+        borderBottomColor: C.border,
     },
     headerTitle: { fontSize: 11, fontWeight: '700', fontFamily: T.MONO, letterSpacing: 1.5 },
     hdrMeta: { fontSize: 10, color: C.textMid, fontFamily: T.MONO, fontWeight: '600' },
@@ -317,13 +359,17 @@ const s = StyleSheet.create({
 
     // Field row
     fieldRow: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 12, paddingVertical: 6,
-        borderBottomWidth: 1, borderBottomColor: C.border,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: C.border,
     },
     fieldLabel: { fontSize: 10, color: C.textMid, fontFamily: T.MONO, fontWeight: '600', letterSpacing: 0.5, flex: 1 },
     fieldRight: { flexDirection: 'row', alignItems: 'baseline' },
-    fieldValue:   { fontSize: 13, fontFamily: T.MONO, fontWeight: '700' },
+    fieldValue: { fontSize: 13, fontFamily: T.MONO, fontWeight: '700' },
     fieldValueLg: { fontSize: 18, fontFamily: T.MONO, fontWeight: '700' },
     fieldValueSm: { fontSize: 11, fontFamily: T.MONO, fontWeight: '600' },
     fieldDelta: { fontSize: 10, fontFamily: T.MONO, fontWeight: '700', marginLeft: 8 },
@@ -338,10 +384,14 @@ const s = StyleSheet.create({
 
     // System bar
     sysBar: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 12, paddingVertical: 6,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
         backgroundColor: P.screenBg,
-        borderBottomWidth: 1, borderBottomColor: C.border,
+        borderBottomWidth: 1,
+        borderBottomColor: C.border,
     },
     sysDot: { width: 6, height: 6, borderRadius: 3, marginRight: 8 },
     sysText: { fontSize: 10, fontWeight: '700', fontFamily: T.MONO, letterSpacing: 1 },
@@ -350,7 +400,8 @@ const s = StyleSheet.create({
     // Ticker
     ticker: {
         maxHeight: 32,
-        borderBottomWidth: 1, borderBottomColor: C.border,
+        borderBottomWidth: 1,
+        borderBottomColor: C.border,
         backgroundColor: P.tickerBg,
     },
     tickerCell: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
@@ -362,28 +413,44 @@ const s = StyleSheet.create({
     // Distribution
     distRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 4 },
     distLabel: { fontSize: 10, color: C.textMid, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 0.5 },
-    distBarTrack: { flex: 1, height: 8, marginHorizontal: 8, backgroundColor: P.rowAltBg, borderWidth: 1, borderColor: C.border },
+    distBarTrack: {
+        flex: 1,
+        height: 8,
+        marginHorizontal: 8,
+        backgroundColor: P.rowAltBg,
+        borderWidth: 1,
+        borderColor: C.border,
+    },
     distBarFill: { height: 6 },
     distValue: { fontSize: 10, fontFamily: T.MONO, fontWeight: '700', width: 96, textAlign: 'right' },
 
     // Table
     tblHead: {
-        flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 6,
-        borderBottomWidth: 1, borderBottomColor: C.border,
+        flexDirection: 'row',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: C.border,
         backgroundColor: P.tblHeadBg,
     },
     tblCol: { fontSize: 9, color: C.textMid, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 0.8 },
     tblRow: {
-        flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 7,
-        borderBottomWidth: 1, borderBottomColor: C.border,
+        flexDirection: 'row',
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderBottomWidth: 1,
+        borderBottomColor: C.border,
     },
     tblCell: { fontSize: 11, fontFamily: T.MONO, fontWeight: '600', color: C.white },
 
     // Command menu
     cmdRow: {
-        flexDirection: 'row', alignItems: 'center',
-        paddingHorizontal: 12, paddingVertical: 10,
-        borderBottomWidth: 1, borderBottomColor: C.border,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: C.border,
     },
     cmdKey: { fontSize: 10, fontFamily: T.MONO, fontWeight: '700', marginRight: 10, letterSpacing: 0.5 },
     cmdLabel: { fontSize: 12, fontFamily: T.MONO, fontWeight: '700', letterSpacing: 1, width: 110 },

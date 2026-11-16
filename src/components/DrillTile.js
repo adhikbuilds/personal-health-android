@@ -1,7 +1,7 @@
 // DrillTile — ST-05: Reusable drill tile with video thumbnail (looping)
 // Used by OnboardingScreen step 1, DrillPickerScreen, and web PlanPage
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { TouchableOpacity, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Video, ResizeMode } from 'expo-av';
@@ -14,7 +14,7 @@ function resolveVideoUrl(url) {
     return `${API_BASE}${url}`;
 }
 
-const BG = C.bg;
+const _BG = C.bg;
 const SURF = C.surf;
 const TEXT = C.text;
 const MUTED = C.muted;
@@ -32,11 +32,7 @@ export default function DrillTile({ drill, onPress, showSportChip = true, select
     const videoSource = !videoFailed ? resolveVideoUrl(drill.video_url) : null;
 
     return (
-        <TouchableOpacity
-            style={s.tile}
-            activeOpacity={0.85}
-            onPress={handlePress}
-        >
+        <TouchableOpacity style={s.tile} activeOpacity={0.85} onPress={handlePress}>
             <View style={[s.videoWrap, { backgroundColor: SURF }]}>
                 {videoSource ? (
                     <Video
@@ -54,9 +50,7 @@ export default function DrillTile({ drill, onPress, showSportChip = true, select
                 <Text style={s.videoDuration}>3s</Text>
             </View>
 
-            <Text style={[s.label, isPrimary && { color: ACCENT }]}>
-                {drill.label}
-            </Text>
+            <Text style={[s.label, isPrimary && { color: ACCENT }]}>{drill.label}</Text>
 
             {drill.cues && drill.cues.length > 0 && (
                 <Text style={s.cue} numberOfLines={1}>

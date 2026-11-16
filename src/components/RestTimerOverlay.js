@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Speech from 'expo-speech';
 
@@ -22,7 +22,9 @@ export default function RestTimerOverlay({ visible, sport, restSeconds = 60, onC
             Speech.stop();
             Speech.speak(text, {
                 ...SPEECH_OPTS,
-                onError: () => { speechFailedRef.current = true; },
+                onError: () => {
+                    speechFailedRef.current = true;
+                },
             });
         } catch (_) {
             speechFailedRef.current = true;

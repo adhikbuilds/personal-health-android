@@ -1,22 +1,30 @@
 // WellnessScreen — WN-20 (dashboard) + WN-22 (sleep detail) + WN-23 (sparkline)
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-    View, Text, ScrollView, TouchableOpacity, StyleSheet,
-    SafeAreaView, ActivityIndicator,
-} from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { C } from '../../styles/colors';
 import api from '../../services/api';
 import { getOrCreateAnonymousAthleteId } from '../../services/deviceIdentity';
 
-const tap = () => { try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} };
+const tap = () => {
+    try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+};
 
 const COMPONENT_MAX = { sleep: 30, hydration: 15, mood: 15, energy: 15, stress: 10, soreness: 15 };
-const COMPONENT_LABELS = { sleep: 'Sleep', hydration: 'Hydration', mood: 'Mood', energy: 'Energy', stress: 'Stress', soreness: 'Soreness' };
+const COMPONENT_LABELS = {
+    sleep: 'Sleep',
+    hydration: 'Hydration',
+    mood: 'Mood',
+    energy: 'Energy',
+    stress: 'Stress',
+    soreness: 'Soreness',
+};
 
 function ScoreCircle({ score }) {
-    const color = score == null ? C.muted : (score >= 70 ? C.green : (score >= 50 ? C.yellow : C.red));
+    const color = score == null ? C.muted : score >= 70 ? C.green : score >= 50 ? C.yellow : C.red;
     return (
         <View style={[sc.circle, { borderColor: color }]}>
             <Text style={[sc.scoreNum, { color }]}>{score ?? '—'}</Text>
@@ -47,7 +55,13 @@ function MiniBar({ values = [], color = C.cyan, barHeight = 40 }) {
 }
 
 const REC_COLOR = { hard: '#10b981', normal: '#10b981', light: '#f59e0b', active_recovery: '#f59e0b', rest: '#ef4444' };
-const REC_ICON  = { hard: 'flash', normal: 'checkmark-circle', light: 'partly-sunny', active_recovery: 'walk', rest: 'bed' };
+const REC_ICON = {
+    hard: 'flash',
+    normal: 'checkmark-circle',
+    light: 'partly-sunny',
+    active_recovery: 'walk',
+    rest: 'bed',
+};
 
 function StreakBadge({ streak }) {
     if (!streak || streak.current_streak === 0) return null;
@@ -93,7 +107,9 @@ export default function WellnessScreen({ navigation, route }) {
 
     useEffect(() => {
         if (!athleteId) {
-            getOrCreateAnonymousAthleteId().then(setAthleteId).catch(() => setAthleteId(null));
+            getOrCreateAnonymousAthleteId()
+                .then(setAthleteId)
+                .catch(() => setAthleteId(null));
         }
     }, []);
 
@@ -121,17 +137,25 @@ export default function WellnessScreen({ navigation, route }) {
         setLoading(false);
     }, []);
 
-    useEffect(() => { if (athleteId) load(athleteId); }, [athleteId, load]);
+    useEffect(() => {
+        if (athleteId) load(athleteId);
+    }, [athleteId, load]);
 
     const score = scoreData?.wellness_score;
     const hasData = score != null;
     const breakdown = scoreData?.breakdown || {};
 
-    const recoveryLabel = !hasData ? 'No Data' : (score >= 70 ? 'Ready to Train' : (score >= 50 ? 'Train with Caution' : 'Rest Day Recommended'));
-    const recoveryColor = !hasData ? C.muted : (score >= 70 ? C.green : (score >= 50 ? C.yellow : C.red));
+    const recoveryLabel = !hasData
+        ? 'No Data'
+        : score >= 70
+          ? 'Ready to Train'
+          : score >= 50
+            ? 'Train with Caution'
+            : 'Rest Day Recommended';
+    const recoveryColor = !hasData ? C.muted : score >= 70 ? C.green : score >= 50 ? C.yellow : C.red;
 
     // Sleep 7-day trend
-    const sleepLast7 = history.slice(-7).map(e => e.sleep?.sleep_score || 0);
+    const sleepLast7 = history.slice(-7).map((e) => e.sleep?.sleep_score || 0);
     const sleepAvg = sleepLast7.length ? Math.round(sleepLast7.reduce((a, b) => a + b, 0) / sleepLast7.length) : 0;
     const sleepBest = history.slice(-7).reduce((best, e) => {
         const sc = e.sleep?.sleep_score || 0;
@@ -144,10 +168,10 @@ export default function WellnessScreen({ navigation, route }) {
 
     // Weekly wellness sparkline
     const trendData = trends?.trends || [];
-    const trendValues = trendData.map(t => t.avg_wellness || 0);
+    const trendValues = trendData.map((t) => t.avg_wellness || 0);
     const trendDir = trends?.direction || 'stable';
-    const trendColor = trendDir === 'improving' ? C.green : (trendDir === 'declining' ? C.red : C.cyan);
-    const trendLabel = trendDir === 'improving' ? '↑ Improving' : (trendDir === 'declining' ? '↓ Declining' : '→ Stable');
+    const trendColor = trendDir === 'improving' ? C.green : trendDir === 'declining' ? C.red : C.cyan;
+    const trendLabel = trendDir === 'improving' ? '↑ Improving' : trendDir === 'declining' ? '↓ Declining' : '→ Stable';
 
     return (
         <SafeAreaView style={s.safe}>
@@ -159,12 +183,22 @@ export default function WellnessScreen({ navigation, route }) {
                 <View style={{ width: 60 }} />
             </View>
 
-            {loading ? <ActivityIndicator color={C.cyan} style={{ marginTop: 40 }} /> : error ? (
+            {loading ? (
+                <ActivityIndicator color={C.cyan} style={{ marginTop: 40 }} />
+            ) : error ? (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
                     <Text style={{ color: C.muted, fontSize: 14, marginBottom: 16, textAlign: 'center' }}>
                         Could not load wellness data.
                     </Text>
-                    <TouchableOpacity onPress={() => load(athleteId)} style={{ backgroundColor: C.cyan, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}>
+                    <TouchableOpacity
+                        onPress={() => load(athleteId)}
+                        style={{
+                            backgroundColor: C.cyan,
+                            borderRadius: 12,
+                            paddingHorizontal: 24,
+                            paddingVertical: 12,
+                        }}
+                    >
                         <Text style={{ color: '#FBFBF8', fontWeight: '700' }}>Retry</Text>
                     </TouchableOpacity>
                 </View>
@@ -174,7 +208,12 @@ export default function WellnessScreen({ navigation, route }) {
                     <View style={s.scoreSection}>
                         <ScoreCircle score={score} />
                         <StreakBadge streak={streak} />
-                        <View style={[s.recoveryBadge, { borderColor: recoveryColor + '60', backgroundColor: recoveryColor + '18' }]}>
+                        <View
+                            style={[
+                                s.recoveryBadge,
+                                { borderColor: `${recoveryColor}60`, backgroundColor: `${recoveryColor}18` },
+                            ]}
+                        >
                             <Text style={[s.recoveryText, { color: recoveryColor }]}>{recoveryLabel}</Text>
                         </View>
                         {scoreData?.recommendation ? (
@@ -194,13 +233,15 @@ export default function WellnessScreen({ navigation, route }) {
                         <View style={s.componentGrid}>
                             {Object.entries(breakdown).map(([key, val]) => {
                                 const pct = Math.round((val / (COMPONENT_MAX[key] || 15)) * 100);
-                                const barColor = pct >= 70 ? C.green : (pct >= 40 ? C.yellow : C.red);
+                                const barColor = pct >= 70 ? C.green : pct >= 40 ? C.yellow : C.red;
                                 return (
                                     <View key={key} style={s.componentCard}>
                                         <Text style={s.componentLabel}>{COMPONENT_LABELS[key]}</Text>
                                         <Text style={[s.componentScore, { color: barColor }]}>{pct}%</Text>
                                         <View style={s.barBg}>
-                                            <View style={[s.barFill, { width: `${pct}%`, backgroundColor: barColor }]} />
+                                            <View
+                                                style={[s.barFill, { width: `${pct}%`, backgroundColor: barColor }]}
+                                            />
                                         </View>
                                     </View>
                                 );
@@ -214,7 +255,10 @@ export default function WellnessScreen({ navigation, route }) {
                         activeOpacity={0.8}
                         onPress={() => {
                             tap();
-                            navigation.navigate('WellnessLogForm', { athleteId: athleteId ?? undefined, prefill: scoreData });
+                            navigation.navigate('WellnessLogForm', {
+                                athleteId: athleteId ?? undefined,
+                                prefill: scoreData,
+                            });
                         }}
                     >
                         <Text style={[s.ctaText, hasData ? { color: C.cyan } : { color: '#FBFBF8' }]}>
@@ -224,7 +268,11 @@ export default function WellnessScreen({ navigation, route }) {
 
                     {/* Sleep detail card — WN-22 */}
                     {sleepLast7.length > 1 && (
-                        <TouchableOpacity style={s.chartCard} onPress={() => setSleepExpanded(e => !e)} activeOpacity={0.8}>
+                        <TouchableOpacity
+                            style={s.chartCard}
+                            onPress={() => setSleepExpanded((e) => !e)}
+                            activeOpacity={0.8}
+                        >
                             <View style={s.chartHeaderRow}>
                                 <Text style={s.chartTitle}>Sleep Score — Last 7 Days</Text>
                                 <Text style={{ color: C.muted, fontSize: 12 }}>{sleepExpanded ? '▲' : '▼'}</Text>
@@ -233,8 +281,16 @@ export default function WellnessScreen({ navigation, route }) {
                             {sleepExpanded && (
                                 <View style={s.sleepMeta}>
                                     <Text style={s.chartSub}>Avg: {sleepAvg} / 100</Text>
-                                    {sleepBest && <Text style={s.chartSub}>Best: {sleepBest.date} ({sleepBest.score})</Text>}
-                                    {sleepWorst && <Text style={s.chartSub}>Worst: {sleepWorst.date} ({sleepWorst.score})</Text>}
+                                    {sleepBest && (
+                                        <Text style={s.chartSub}>
+                                            Best: {sleepBest.date} ({sleepBest.score})
+                                        </Text>
+                                    )}
+                                    {sleepWorst && (
+                                        <Text style={s.chartSub}>
+                                            Worst: {sleepWorst.date} ({sleepWorst.score})
+                                        </Text>
+                                    )}
                                     <Text style={s.chartSub}>Target line: 8h sleep → ~80</Text>
                                 </View>
                             )}
@@ -242,7 +298,7 @@ export default function WellnessScreen({ navigation, route }) {
                     )}
 
                     {/* Weekly sparkline — WN-23 */}
-                    {trendValues.filter(v => v > 0).length >= 2 ? (
+                    {trendValues.filter((v) => v > 0).length >= 2 ? (
                         <View style={s.chartCard}>
                             <View style={s.chartHeaderRow}>
                                 <Text style={s.chartTitle}>4-Week Trend</Text>
@@ -270,7 +326,14 @@ export default function WellnessScreen({ navigation, route }) {
 }
 
 const sc = StyleSheet.create({
-    circle: { width: 130, height: 130, borderRadius: 65, borderWidth: 7, alignItems: 'center', justifyContent: 'center' },
+    circle: {
+        width: 130,
+        height: 130,
+        borderRadius: 65,
+        borderWidth: 7,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     scoreNum: { fontSize: 44, fontWeight: '900', lineHeight: 52 },
     scoreMax: { fontSize: 13, color: C.muted, marginTop: -4 },
 });
@@ -289,14 +352,27 @@ const wb = StyleSheet.create({
 
 const s = StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.bg },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10 },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+    },
     backBtn: { width: 60 },
     backText: { color: C.cyan, fontSize: 14 },
     title: { color: C.text, fontSize: 18, fontWeight: '700' },
     scoreSection: { alignItems: 'center', paddingVertical: 20 },
     recoveryBadge: { marginTop: 12, paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
     recoveryText: { fontSize: 14, fontWeight: '600' },
-    recommendation: { color: C.textSub, fontSize: 13, textAlign: 'center', marginTop: 10, paddingHorizontal: 20, lineHeight: 18 },
+    recommendation: {
+        color: C.textSub,
+        fontSize: 13,
+        textAlign: 'center',
+        marginTop: 10,
+        paddingHorizontal: 20,
+        lineHeight: 18,
+    },
     componentGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
     componentCard: { width: '31%', backgroundColor: C.surf, borderRadius: 10, padding: 10 },
     componentLabel: { color: C.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
