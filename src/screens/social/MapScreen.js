@@ -1,16 +1,14 @@
-import React, { useRef, useEffect, useState } from 'react';
-import {
-    View, StyleSheet, SafeAreaView, Text, TouchableOpacity, Platform,
-} from 'react-native';
+import { useRef, useEffect, useState } from 'react';
+import { View, StyleSheet, SafeAreaView, Text, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
-import { PLAYFIELDS } from '../data/constants';
-import { API_BASE } from '../services/api';
+import { PLAYFIELDS } from '../../data/constants';
+import { API_BASE } from '../../services/api';
 
 // Map served from the proxy-server /map route (no Live Server needed)
 const DEV_MAP_URL = `${API_BASE}/map`;
 
-const C = { bg: '#0f172a', cyan: '#06b6d4', text: '#f1f5f9', muted: '#64748b', surf: '#1e293b' };
+const C = { bg: '#FBFBF8', cyan: '#FC4C02', text: '#242428', muted: '#9CA3AF', surf: '#FFFFFF' };
 
 const FILTER_PILLS = [
     { label: 'Challenges', icon: '⚡', action: 'showChallenges' },
@@ -43,7 +41,7 @@ export default function MapScreen() {
             locationSub.current = await Location.watchPositionAsync(
                 {
                     accuracy: Location.Accuracy.Balanced,
-                    distanceInterval: 5,   // update every 5m moved
+                    distanceInterval: 5, // update every 5m moved
                     timeInterval: 10000, // or every 10s, whichever first
                 },
                 (loc) => {
@@ -54,13 +52,15 @@ export default function MapScreen() {
 
                     // Send real position to the WebView map
                     if (webRef.current) {
-                        webRef.current.postMessage(JSON.stringify({
-                            type: 'gps',
-                            lat: latitude,
-                            lng: longitude,
-                        }));
+                        webRef.current.postMessage(
+                            JSON.stringify({
+                                type: 'gps',
+                                lat: latitude,
+                                lng: longitude,
+                            }),
+                        );
                     }
-                }
+                },
             );
         })();
 
@@ -74,18 +74,27 @@ export default function MapScreen() {
     const onMapLoad = () => {
         if (!webRef.current) return;
         // Send all playfields for the map to render as pins
-        webRef.current.postMessage(JSON.stringify({
-            type: 'initPins',
-            fields: PLAYFIELDS.map(f => ({
-                name: f.name, type: f.type, status: f.status,
-                lat: f.coords.lat, lng: f.coords.lng,
-            })),
-        }));
+        webRef.current.postMessage(
+            JSON.stringify({
+                type: 'initPins',
+                fields: PLAYFIELDS.map((f) => ({
+                    name: f.name,
+                    type: f.type,
+                    status: f.status,
+                    lat: f.coords.lat,
+                    lng: f.coords.lng,
+                })),
+            }),
+        );
         // If we already have a fix, push it immediately
         if (lastCoords) {
-            webRef.current.postMessage(JSON.stringify({
-                type: 'gps', lat: lastCoords.lat, lng: lastCoords.lng,
-            }));
+            webRef.current.postMessage(
+                JSON.stringify({
+                    type: 'gps',
+                    lat: lastCoords.lat,
+                    lng: lastCoords.lng,
+                }),
+            );
         }
     };
 
@@ -95,9 +104,13 @@ export default function MapScreen() {
         }
     };
 
-    const gpsDot = gpsStatus === 'active' ? C.cyan
-        : gpsStatus === 'granted' ? '#facc15'
-            : gpsStatus === 'denied' ? '#ef4444'
+    const gpsDot =
+        gpsStatus === 'active'
+            ? C.cyan
+            : gpsStatus === 'granted'
+              ? '#facc15'
+              : gpsStatus === 'denied'
+                ? '#ef4444'
                 : C.muted;
 
     return (
@@ -109,16 +122,24 @@ export default function MapScreen() {
                     <View style={s.gpsBadge}>
                         <View style={[s.gpsDot, { backgroundColor: gpsDot }]} />
                         <Text style={[s.gpsText, { color: gpsDot }]}>
-                            {gpsStatus === 'active' ? `GPS: ${lastCoords?.lat?.toFixed(5)}, ${lastCoords?.lng?.toFixed(5)}`
-                                : gpsStatus === 'granted' ? 'Getting GPS fix...'
-                                    : gpsStatus === 'denied' ? 'GPS denied'
-                                        : 'GPS pending'}
+                            {gpsStatus === 'active'
+                                ? `GPS: ${lastCoords?.lat?.toFixed(5)}, ${lastCoords?.lng?.toFixed(5)}`
+                                : gpsStatus === 'granted'
+                                  ? 'Getting GPS fix...'
+                                  : gpsStatus === 'denied'
+                                    ? 'GPS denied'
+                                    : 'GPS pending'}
                         </Text>
                     </View>
                 </View>
                 <View style={s.pills}>
-                    {FILTER_PILLS.map(p => (
-                        <TouchableOpacity key={p.action} style={s.pill} onPress={() => sendToMap(p.action)} activeOpacity={0.8}>
+                    {FILTER_PILLS.map((p) => (
+                        <TouchableOpacity
+                            key={p.action}
+                            style={s.pill}
+                            onPress={() => sendToMap(p.action)}
+                            activeOpacity={0.8}
+                        >
                             <Text style={s.pillText}>{`${p.icon} ${p.label}`}</Text>
                         </TouchableOpacity>
                     ))}
@@ -141,7 +162,7 @@ export default function MapScreen() {
                     try {
                         const msg = JSON.parse(event.nativeEvent.data);
                         console.log('[MapScreen ←]', msg);
-                    } catch { }
+                    } catch {}
                 }}
                 onError={(e) => console.warn('[WebView Error]', e.nativeEvent.description)}
                 onHttpError={(e) => console.warn('[WebView HTTP Error]', e.nativeEvent.statusCode)}
@@ -162,25 +183,39 @@ export default function MapScreen() {
 const s = StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.bg },
     topBar: {
-        paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 12,
         backgroundColor: 'rgba(15,23,42,0.92)',
-        borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.08)',
     },
     titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
     title: { color: C.text, fontWeight: '900', fontSize: 18 },
-    gpsBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+    gpsBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
     gpsDot: { width: 7, height: 7, borderRadius: 4, marginRight: 5 },
     gpsText: { fontSize: 9, fontWeight: '700' },
     pills: { flexDirection: 'row', flexWrap: 'wrap' },
     pill: {
-        backgroundColor: 'rgba(6,182,212,0.12)', borderRadius: 99,
-        paddingHorizontal: 12, paddingVertical: 5,
-        borderWidth: 1, borderColor: 'rgba(6,182,212,0.3)',
-        marginRight: 8, marginBottom: 4,
+        backgroundColor: 'rgba(6,182,212,0.12)',
+        borderRadius: 99,
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderWidth: 1,
+        borderColor: 'rgba(6,182,212,0.3)',
+        marginRight: 8,
+        marginBottom: 4,
     },
     pillText: { color: C.cyan, fontWeight: '700', fontSize: 11 },
     webview: { flex: 1 },
-    loadingView: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#050a14', padding: 24 },
+    loadingView: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FBFBF8', padding: 24 },
     loadingText: { color: C.cyan, fontWeight: '700', fontSize: 16, marginBottom: 12 },
     loadingHint: { color: C.muted, fontSize: 11, textAlign: 'center', lineHeight: 18 },
 });

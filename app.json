@@ -1,47 +1,15 @@
 {
-  "expo": {
-    "name": "Personal Health",
-    "slug": "personal-health",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0f172a"
-    },
-    "assetBundlePatterns": [
-      "**/*",
-      "assets/**"
-    ],
-    "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "com.personalhealth.app"
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0f172a"
-      },
-      "package": "com.personalhealth.app",
-      "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.INTERNET",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
-      ]
-    },
-    "plugins": [
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow Personal Health to use camera for AI biomechanics analysis."
-        }
-      ]
-    ],
-    "extra": {
-      "backendHost": "192.168.1.16"
-    }
-  }
+  "_comment": [
+    "NOT THE ACTIVE CONFIG. Expo resolves app.config.js and does NOT merge",
+    "app.json into it, so anything added here is silently ignored.",
+    "",
+    "This file previously carried a full duplicate config whose android",
+    "permissions (location, boot-completed) and deep-link scheme never",
+    "reached the build, while app.config.js shipped a smaller permission",
+    "set. Those values now live in app.config.js.",
+    "",
+    "Edit app.config.js. This stub exists only so tooling that probes for",
+    "app.json finds a valid file instead of guessing."
+  ],
+  "expo": {}
 }
